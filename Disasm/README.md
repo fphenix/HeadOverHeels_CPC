@@ -1,9 +1,15 @@
 Z80 disassembly of the Head Over Heels files (Amstrad CPC)
 
-HEADOVER.BIN is the loader:
-* Loads HEADOVER.I (Title image ; Mode 0).
-* Loads HEADOVER.II and .III and jump #0100 to starts the execution of the game.
-
+fileinfo.txt
+============
 The loader is described in fileinfo.txt (TODO: must be re-written.)
+  HEADOVER.BIN is the loader:
+    * Loads HEADOVER.I (Title image ; Mode 0).
+    * Loads HEADOVER.II and .III and jump #0100 to starts the execution of the game.
 
-THe main game is described in fileinfo_II.txt (TODO: work in progress). This is the Main file for this repo!)
+fileinfo_II.txt
+===============
+THe main game is described in fileinfo_II.txt (TODO: work in progress). 
+This is the main file for this repo!
+
+Note: Tabs have been unaligned when uploading, sorry!
