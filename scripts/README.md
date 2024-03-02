@@ -1,4 +1,4 @@
-Python 3.11 script:
+Python 3.11 scripts:
 
 Script 1:
 =========
@@ -13,4 +13,4 @@ Script 2:
 
 Executable : **spr_display.py** : Will display a few sprites by mixing image and mask.
 
-Note: Needs pygame-ce 2.4.0 or aboce
+Note: Needs pygame-ce 2.4.0 or above
