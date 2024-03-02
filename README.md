@@ -11,9 +11,16 @@ A few Python3 scripts.
 Thanks:
 =======
 
-A big thanks and credit must be given to Simon Frankau:
-    https://github.com/simon-frankau/head-over-heels
+A big thanks and credit must be given to **Simon Frankau**:
+    https://github.com/simon-frankau/head-over-heels .
 Simon Frankau did a similar work for the ZX-Spectrum version (from which the CPC version has been ported hence which is very similar).
+
+Files:
+======
+
+The main file for this repo is Disasm/fileinfo_II.txt.
+* DSK/HEADOVER.dsk : The WinApe compatible DSK file (Amstrad CPC disk image)
+* scripts/hoh_rooms.py : Python3 script that decompacts the Rooms data to visualize the data we get. Result log file scripts/hoh_rooms.out.txt
 
 Licence or rather lack thereof:
 ===============================
