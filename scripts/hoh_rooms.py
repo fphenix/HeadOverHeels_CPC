@@ -1,6 +1,8 @@
 # Python 3 script
 # Author : Fred Limouzin (fphenix@hotmail.com)
 # THis will parse the Rooms data from Head Over Heels (Amstrad CPC) and print out the decompacted data (Room Building).
+# Result in hoh_rooms.out.txt
+# Input data in hoh_rooms_in.py
 
 from hoh_rooms_in import *
 from os.path import dirname, realpath, join
