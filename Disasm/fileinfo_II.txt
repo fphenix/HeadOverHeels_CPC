@@ -701,39 +701,42 @@ smc_copy_func:
 	042A C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
+;; In sync with the Do_Objects_Phase, process the next object in the
+;; linked list (CallObjFn : call object function) and point on next Object.
+;; The phase mechanism allows an object to not get processed for one frame.
 .Do_Objects:
-	;; The phase mechanism allows an object to not get processed for one frame.
-	042B 3A 10 01       LD A,(Do_Objects_Phase)								get Do_Objects_Phase
-	042E EE 80          XOR 80												toggle b7
-	0430 32 10 01       LD (Do_Objects_Phase),A								update Do_Objects_Phase
+	042B 3A 10 01       LD A,(Do_Objects_Phase)								; get Do_Objects_Phase
+	042E EE 80          XOR 80												; toggle b7
+	0430 32 10 01       LD (Do_Objects_Phase),A								; update Do_Objects_Phase
 	0433 CD 51 25       CALL CharThing
-	0436 2A AB 39       LD HL,(ObjectLists+2)
-	0439 18 1D          JR doob_1
+	0436 2A AB 39       LD HL,(ObjectLists+2)								; get object pointer
+	0439 18 1D          JR Sub_Do_Objects_entry
+
 doob_loop:
-	043B E5             PUSH HL												save current HL
+	043B E5             PUSH HL												; save current object pointer
 	043C 7E             LD A,(HL)
 	043D 23             INC HL
 	043E 66             LD H,(HL)
-	043F 6F             LD L,A												get next HL from (old HL)
-	0440 E3             EX (SP),HL											Next item replace top of stack, curr item in HL
-	0441 EB             EX DE,HL											put it in DE
-	0442 21 0A 00       LD HL,000A											add 10
-	0445 19             ADD HL,DE
-	0446 3A 10 01       LD A,(Do_Objects_Phase)								get Do_Objects_Phase
-	0449 AE             XOR (HL)
+	043F 6F             LD L,A												; get next object pointer in HL from (ObjectLists+2)
+	0440 E3             EX (SP),HL											; exchange object pointers (curr and next (next is now on the stack))
+	0441 EB             EX DE,HL											; put current pointer in DE
+	0442 21 0A 00       LD HL,O_FUNC										; O_FUNC = offset 000A in TmpObj_variables
+	0445 19             ADD HL,DE											; HL = current + 10 (byte that has the phase ???)
+	0446 3A 10 01       LD A,(Do_Objects_Phase)								; get Do_Objects_Phase
+	0449 AE             XOR (HL)											; test bit7
 	044A FE 80          CP 80
-	044C 38 09          JR C,doob_0											Skip if top bit doesn't match Phase
-	044E 7E             LD A,(HL)
+	044C 38 09          JR C,doob_0											; Skip if top bit doesn't match Phase
+	044E 7E             LD A,(HL)											; else...
 	044F EE 80          XOR 80
-	0451 77             LD (HL),A											Flip top bit - will now mismatch Phase
-	0452 E6 7F          AND 7F
-	0454 C4 64 37       CALL NZ,CallObjFn 									And if any other bits set
+	0451 77             LD (HL),A											; ...flip top bit - will now mismatch Phase
+	0452 E6 7F          AND 7F												; test other bits = Object Function ID
+	0454 C4 64 37       CALL NZ,CallObjFn 									; if any other bits set, CallObjFn; DE is the current object pointer
 doob_0:
-	0457 E1             POP HL
-doob_1:
-	0458 7C             LD A,H												loop until null pointer.
-	0459 B5             OR L
-	045A 20 DF          JR NZ,doob_loop
+	0457 E1             POP HL												; get next pointer from stack
+Sub_Do_Objects_entry:
+	0458 7C             LD A,H
+	0459 B5             OR L												; test if HL = 0
+	045A 20 DF          JR NZ,doob_loop										; loop until null pointer.
 	045C C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -5909,7 +5912,8 @@ BaseFlags:				; object flags when builing a room
 ;;           	Bit 1 set for other bit of double height?
 ;;           	Bit 2 = we're Head.
 ;;           	Bit 4 = non-deadlyness?
-;;           	Bit 5 = (bit5: set = double size) has another object tacked after (double height?)
+;;           	Bit 5 = 0 single height (one sprite) ; 1 double size (i.e. 2 sprites, need to Animate and move both sprites together as a single object);
+;;				bit 6 = 0 : object has function; 1 : do not do function
 ;;           	Bit 7 = switched flag
 ;;           	Gets loaded into SpriteFlags
 ;; Offset A: O_FUNC : Function and Phase
@@ -10437,45 +10441,49 @@ initobj_2:
 	3763 C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; Takes an object pointer in DE, and index the object function in A
+;; Takes an object pointer in DE, and index the object function in A.
+;; Note that the function ID starts at 1, so to align on the ObjFnTbl
+;; table, need to do a -1.
+;; The object is of the same format that TmpObj_variables.
 .CallObjFn:
-	3764 ED 53 EE 36    LD (CurrObject),DE									update curr object
+	3764 ED 53 EE 36    LD (CurrObject),DE									; update curr object
 	3768 D5             PUSH DE
-	3769 FD E1          POP IY
-	376B 3D             DEC A
-	376C 87             ADD A,A												*2 (word align as it is addr that are stored in this table)
-	376D C6 7F          ADD A,7F											ObjFnTbl & $00FF
+	3769 FD E1          POP IY												; current object pointer in IY
+	376B 3D             DEC A												; Function ID (-1 to align on table)
+	376C 87             ADD A,A												; *2 (word align as it is addr that are stored in this table)
+	376D C6 7F          ADD A,7F											; ObjFnTbl & $00FF
 	376F 6F             LD L,A
-	3770 CE 38          ADC A,38											ObjFnTbl >> 8	; #387F+object_num_offset
+	3770 CE 38          ADC A,38											; ObjFnTbl >> 8	; #387F+object_num_offset
 	3772 95             SUB L
-	3773 67             LD H,A
-	3774 7E             LD A,(HL)											get object ...
+	3773 67             LD H,A												; HL = pointer on the function pointer
+	3774 7E             LD A,(HL)											; get the function pointer...
 	3775 23             INC HL
 	3776 66             LD H,(HL)
-	3777 6F             LD L,A												... function address in HL
-	3778 AF             XOR A												A=0
-	3779 32 E8 4B       LD (DrawFlags),A									reset flags
-	377C FD 7E 0B       LD A,(IY+0B)
-	377F 32 F0 36       LD (ObjDir),A
-	3782 FD 36 0B FF    LD (IY+0B),FF
-	3786 FD CB 09 76    BIT 6,(IY+O_SPRFLAGS)
-	378A C0             RET NZ
-	378B E9             JP (HL)
+	3777 6F             LD L,A												; ...(function address) in HL
+	3778 AF             XOR A												; A=0
+	3779 32 E8 4B       LD (DrawFlags),A									; reset drawing flags
+	377C FD 7E 0B       LD A,(IY+0B)										; ??TODO?? get object facing direction
+	377F 32 F0 36       LD (ObjDir),A										; current Object is flipped or not?
+	3782 FD 36 0B FF    LD (IY+0B),FF										; reset the object direction
+	3786 FD CB 09 76    BIT 6,(IY+O_SPRFLAGS)								; test object flag bit6
+	378A C0             RET NZ												; if bit6 is 1 leave, else call object function
+	378B E9             JP (HL)												; if SpriteFlags bit6 is 0, then call the object function
 
+;; -----------------------------------------------------------------------------------------------------------
 .AnimateObj:
-	378C FD CB 09 6E    BIT 5,(IY+O_SPRFLAGS)
-	3790 28 19          JR Z,Animate
-	3792 CD AB 37       CALL Animate
-	3795 08             EX AF,AF
-	3796 FD 4E 10       LD C,(IY+O_DIRECTION)
-	3799 11 12 00       LD DE,0012
+	378C FD CB 09 6E    BIT 5,(IY+O_SPRFLAGS)								; test object sprite flag bit5
+	3790 28 19          JR Z,Animate										; if 0 Animate and RET (single sprite), else:
+	3792 CD AB 37       CALL Animate										; Need to Move and Animate both stacked sprites (double height)
+	3795 08             EX AF,AF											; save flags (carry)
+	3796 FD 4E 10       LD C,(IY+O_DIRECTION)								; C=facing direction
+	3799 11 12 00       LD DE,0012											; points on ...
 	379C FD E5          PUSH IY
-	379E FD 19          ADD IY,DE
+	379E FD 19          ADD IY,DE											; ...next object (the 2nd object in the double stacked/height)
 	37A0 CD 9D 50       CALL SetFacingDir
 	37A3 CD AB 37       CALL Animate
-	37A6 FD E1          POP IY
-	37A8 D8             RET C
-	37A9 08             EX AF,AF
+	37A6 FD E1          POP IY												; get back curr object pointer
+	37A8 D8             RET C												; Animate returned with Carry set if anim, else NC
+	37A9 08             EX AF,AF											; get flags -carry) of first sprite and return Carry set (anim) or NC (not anim)
 	37AA C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -10726,12 +10734,12 @@ initobj_2:
 ;; The Reinitialise call with 3986 as argument will copy the 27 bytes of
 ;; ObjVars_reset_data into the ObjListIdx & after
 ObjVars:
-	3986 DATAWORD 1B														length : 27 bytes
+	3986 DATAWORD 1B														; length : 27 bytes
 ObjVars_reset_data:
 	3987 DATAWORD 00
-	3988 DATAWORD 40 6A           											Objects  			6A40
-	398A DATAWORD A9 39            											ObjectLists + 0		39A9
-	398C DATAWORD AB 39           											ObjectLists + 2  	39AB
+	3988 DATAWORD 40 6A           											; reset for Objects  			6A40
+	398A DATAWORD A9 39            											; reset for ObjectLists + 0		39A9
+	398C DATAWORD AB 39           											; reset for ObjectLists + 2  	39AB
 	398E DATAWORD 00 00
 	3990 DATAWORD 00 00
 	3992 DATAWORD 00 00 00 00
@@ -10748,9 +10756,9 @@ Object_Destination:															; Current pointer for where we write objects i
 	39A3 DATAWORD 40 6A														; 6A40 buffer
 
 .ObjListAPtr:																; 'A' list item pointers are offset +2 from 'B' list pointers.
-	39A5 DATAWORD A9 39														; ObjectLists	+ 0	: 39A9
+	39A5 DATAWORD A9 39														; ObjectLists + 0 : 39A9
 .ObjListBPtr:
-	39A7 DATAWORD AB 39														; ObjectLists + 2	: 39AB
+	39A7 DATAWORD AB 39														; ObjectLists + 2 : 39AB
 
 ;; Each list consists of a pair of pointers to linked lists of
 ;; objects (ListA and ListB). They're opposite directions in a
@@ -15030,6 +15038,7 @@ hmin_2:
 	4FD9 2A EE 36       LD HL,(CurrObject)
 	4FDC C3 EB 1C       JP UnionAndDraw
 
+;; -----------------------------------------------------------------------------------------------------------
 .FaceAndAnimate:
 	4FDF CD 8E 50       CALL SetFacingDirEx
 ; Calls animate and MarkToDraw if it's an animation.
@@ -15141,6 +15150,8 @@ ObjAgain11:
 	5086 DATABYTE FD F9 FB FA FE F6 F7 F5									; -3, -7, -5, -6, -2, -10, -9, -11
 
 ;; -----------------------------------------------------------------------------------------------------------
+;; IY points on the object's object (variables)
+;; SetFacingDir : C has the direction
 .SetFacingDirEx:
 	508E FD 4E 10       LD C,(IY+O_DIRECTION)								; Read direction code
 	5091 CB 49          BIT 1,C												; Heading 'down'?
@@ -15148,7 +15159,7 @@ ObjAgain11:
 	5097 20 04          JR NZ,SetFacingDir
 	5099 FD CB 04 E6    SET 4,(IY+O_FLAGS)
 .SetFacingDir:
-	509D FD 7E 0F       LD A,(IY+O_ANIM)				 						Load animation code.
+	509D FD 7E 0F       LD A,(IY+O_ANIM)				 					; Load animation code.
 	50A0 A7             AND A
 	50A1 C8             RET Z												; Return if not animated
 	50A2 CB 51          BIT 2,C												; Heading right?
@@ -23165,7 +23176,7 @@ img_pillar_mid:				;; 4x6 *2 Pillar Mid (img1+msk1+img2+msk2 interlaced)
          ..@@@@...@@@@... ................ : ..oooo...oooo...
          ...@@@@@@@@@.... ................ : ...ooooooooo....
          .....@@@@@...... ..@.........@... : ..c..ooooo..c...
-
+^
 image_pillar_btm:			;; 4x4 *2 Pillar Bottom
    B878 00 78 00 3C 00 7F 00 FC 00 3F 00 F8 00 0F 00 E0
    ;;  B888-B897 : This is missing from the DSK file I used in the file HEADOVER.III !
