@@ -35,7 +35,7 @@ Current_Direction:
 
 ;; -----------------------------------------------------------------------------------------------------------
 .special_key_pressed:
-	;;for the following 3 bytes:
+	;; for the following 3 bytes:
 	;; 		bit1 = 'currently being pressed' (if set)
 	;;      bit0 = 'recently pressed' (if set)
 	;;		bit2 (Swop key) will store which of Head or Heels will be
@@ -96,7 +96,9 @@ play_a_sound:																; play a sound (if one exists)
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Sub function of Victory_Room
 ;; Set Z if in Victory room, else Z is reset ("NZ" set):
-RoomID_Victory:		EQU		8D30
+RoomID_Victory:			EQU		8D30
+RoomID_Head_1st:		EQU		8A40
+RoomID_Heels_1st:		EQU		8940
 
 .Sub_Check_Victory_Room:
 	015E 2A 0E 01       LD HL,(current_Room_ID)								; get current_Room_ID
@@ -2454,7 +2456,7 @@ gsebcv_loop:
 	0C8D C2 33 0E       JP NZ,Sub_update_voice
 	0C90 FD 35 0D       DEC (IY+SND_NOTE_DURATION)
 	0C93 20 13          JR NZ,uvoi_1
-	0C95 CD 74 0E       CALL Func_Sound_0E74
+	0C95 CD 74 0E       CALL Sound_Parse_data
 	0C98 FD CB 00 5E    BIT 3,(IY+SND_FLAGS)
 	0C9C C8             RET Z
 	0C9D FD 21 9A 10    LD IY,Voice_Noise_data								(noise)
@@ -2570,29 +2572,27 @@ f_0d46_2:
 	0D76 C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
+;; Disable_current_voice : Disable current sound voice
+;; Disable_sound_bit : Disable sound voice, number in B
 .Disable_current_voice:
-	0D77 21 50 10       LD HL,Sound_Voice0_status							point on Sound_enable (Sound_Interrupt_data table)
-	0D7A 3A 53 10       LD A,(Current_sound_voice_number)					get Current sound voice number
+	0D77 21 50 10       LD HL,Sound_Voice0_status							; point on Sound_enable (Sound_Interrupt_data table)
+	0D7A 3A 53 10       LD A,(Current_sound_voice_number)					; get Current sound voice number
 	0D7D 5F             LD E,A
 	0D7E 16 00          LD D,00
-	0D80 19             ADD HL,DE											HL+offset voicenum
-	0D81 36 FF          LD (HL),FF											put FF (disable)
+	0D80 19             ADD HL,DE											; HL + offset voicenum
+	0D81 36 FF          LD (HL),FF											; put FF (disable)
 	0D83 47             LD B,A
-;; Normally, SndEnable's top bit is used for enable/disable of sound.
-;; We're stashing stuff in the lower bits.
-;;
-;; Takes the bit number in B.
-.Disable_sound_bit:															Convert bit number to a bit mask.
-	0D84 04             INC B												B = bit num for voice
-	0D85 21 54 10       LD HL,Sound_channels_enable							pointer on Sound_enable ; HL = addr on Sound volume/amount
-	0D88 AF             XOR A												A = 0
-	0D89 37             SCF													Set Carry
+.Disable_sound_bit:															; Convert voice number to corresponding bit number
+	0D84 04             INC B												; B = bit num for voice
+	0D85 21 54 10       LD HL,Sound_channels_enable							; pointer on Sound_enable ; HL = addr on Sound volume/amount
+	0D88 AF             XOR A												; A = 0
+	0D89 37             SCF													; Set Carry
 dsb_loop:
-	0D8A 17             RLA													Carry in b0 ; (b7 in carry)
-	0D8B 10 FD          DJNZ dsb_loop
+	0D8A 17             RLA													; Carry in b0 ; (b7 in carry)
+	0D8B 10 FD          DJNZ dsb_loop										; until voice number
 	0D8D 47             LD B,A
-	0D8E B6             OR (HL)												"Or" the mask into SndEnable.
-	0D8F 77             LD (HL),A											update Sound_enable
+	0D8E B6             OR (HL)												; "Or" the mask into SndEnable.
+	0D8F 77             LD (HL),A											; update Sound_enable
 	0D90 C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -2736,22 +2736,24 @@ psid_32:
 	0E32 C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; first byte is the reference Note number,
+;; Parse the first 2 bytes of the sound data:
+;; The first byte [7:2] is the reference Note number, [1:0] the global volume level
 ;; where 0 is the lowest Do (octave 1, period #EEE)
 ;;  D0 : 110100 00 : #34|0 = num 52 : ref mi (octave 5)
 ;;  C3 : 110000 11 : #30|3 = num 48 : ref do (octave 5)
 ;;  C0 : 110000 00 : #30|0 = num 48 : ref do (octave 5)
 ;;  A8 : 101010 00 : #2A|0 = num 42 : ref fa# (octave 4)
+;; The 2nd byte is (TODO) the volume/enveloppe
 .Sub_update_voice:
 	0E33 CD 4C 0E       CALL Get_sound_data_pointer_in_IX					; IX points on current voice data
 	0E36 01 03 02       LD BC,0203											; B = 2 right shift ; C=03 mask
 	0E39 CD 84 0F       CALL Read_IX_data_and_split							; read first byte and split at bit 2 (eg: #93=100100_11 gets D=#24 ; E=#03)
 	0E3C FD 72 0A       LD (IY+SND_REF_NOTE),D								; reference Note number (eg. #24 = num 36 = Do octave 3)
-	0E3F FD 73 0B       LD (IY+SND_VOL_LEVEL),E								; (volume addition ???)
+	0E3F FD 73 0B       LD (IY+SND_VOL_LEVEL),E								; (main volume level)
 	0E42 DD 23          INC IX												; next data
-	0E44 CD 93 0F       CALL Func_Sound_0F93								; select volume/enveloppe ????
+	0E44 CD 93 0F       CALL Slice_VolumeEnvp_Effects						; select volume/enveloppe ????
 	0E47 DD 23          INC IX												; next data (first note)
-	0E49 C3 74 0E       JP Func_Sound_0E74
+	0E49 C3 74 0E       JP Sound_Parse_data									; continue parsing sound data at 3rd byte
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Get the pointer on sound data in IX
@@ -2767,40 +2769,46 @@ psid_32:
 	0E59 C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; The function is "Func_Sound_0E74"
-fe4c_1:
-	0E5A CD 4C 0E       CALL Get_sound_data_pointer_in_IX
-	0E5D DD 23          INC IX												point next sound data
-	0E5F 18 0E          JR fe4c_2
+;; The function entry is "Sound_Parse_data"; it parses sound data from the 3rd byte
+;; Sound data format from 3rd byte:
+;; FF FF : disable voice
+;; FF nn : envp nn?
+;; FF 00 : loop from the start (2nd byte : read volume/envp)
+;; byte [7:3] = note offset, [2:0] duration index (in Note_duration_array)
+snd_parse_loop:
+	0E5A CD 4C 0E       CALL Get_sound_data_pointer_in_IX					; Get the pointer on current sound data in IX
+	0E5D DD 23          INC IX												; points on next sound data (volume/envp)
+	0E5F 18 0E          JR snd_parse_vol_envp								; jump snd_parse_vol_envp
 
-fe4c_3:
-	0E61 DD 23          INC IX												point next sound data
-	0E63 DD BE 00       CP (IX+00)											test if 00 (after a previous FF)
-	0E66 28 F2          JR Z,fe4c_1											if so, jump fe4c_1, else:
-	0E68 3D             DEC A												A back to FF
-	0E69 DD BE 00       CP (IX+00)											test if FF (after a previous FF)
-	0E6C CA 77 0D       JP Z,Disable_current_voice							if so, goto Disable_current_voice (finished)
-fe4c_2:
-	0E6F CD 93 0F       CALL Func_Sound_0F93
-	0E72 DD 23          INC IX												point next sound data
-.Func_Sound_0E74:
-	0E74 FD CB 00 A6    RES 4,(IY+SND_FLAGS)										reset status flag bit4
-	0E78 DD 7E 00       LD A,(IX+00)										get sound data
-	0E7B 3C             INC A												test A=FF
-	0E7C CA 61 0E       JP Z,fe4c_3											if A was FF jump fe4c_3, else:
-	0E7F 01 07 03       LD BC,0307											B=3 right shifts; #07=mask for bits [2:0] : split at bit 3
-	0E82 CD 84 0F       CALL Read_IX_data_and_split
-	0E85 4A             LD C,D												C = D = note offset from ref note; E = note_duration_index
-	0E86 21 B0 10       LD HL,Voice_duration_array
+snd_parse_FF:																; if data byte was FF
+	0E61 DD 23          INC IX												; point next sound data byte
+	0E63 DD BE 00       CP (IX+00)											; test if byte is 00 (after a previous FF)
+	0E66 28 F2          JR Z,snd_parse_loop									; if so, jump snd_parse_loop and restart from the begining, else:
+	0E68 3D             DEC A												; A back to FF
+	0E69 DD BE 00       CP (IX+00)											; test if FF (after a previous FF)
+	0E6C CA 77 0D       JP Z,Disable_current_voice							; if so, goto Disable_current_voice (finished)
+snd_parse_vol_envp:
+	0E6F CD 93 0F       CALL Slice_VolumeEnvp_Effects						; FF <nn> (nn ni 00 ni FF) : enveloppe?
+	0E72 DD 23          INC IX												; point next sound data
+.Sound_Parse_data:
+	0E74 FD CB 00 A6    RES 4,(IY+SND_FLAGS)								; reset status flag bit4
+	0E78 DD 7E 00       LD A,(IX+00)										; get sound data
+	0E7B 3C             INC A												; test A=FF
+	0E7C CA 61 0E       JP Z,snd_parse_FF									; if A was FF jump snd_parse_FF, else:
+	;; get 3rd byte note offset (from ref) and duration
+	0E7F 01 07 03       LD BC,0307											; B=3 right shifts; #07=mask for bits [2:0] : split at bit 3
+	0E82 CD 84 0F       CALL Read_IX_data_and_split							; get data and split in 2 (at bit 3)
+	0E85 4A             LD C,D												; C = D = note offset from ref note; E = note_duration_index
+	0E86 21 B0 10       LD HL,Note_duration_array
 	0E89 16 00          LD D,00
-	0E8B 19             ADD HL,DE											HL+note_duration_index
-	0E8C 7E             LD A,(HL)											A = duration_value
-	0E8D FD 77 0D       LD (IY+SND_NOTE_DURATION),A										write duration value in array[#0D]
-	0E90 AF             XOR A												A = 0
-	0E91 B9             CP C												test if C = 0
-	0E92 20 17          JR NZ,Func_0EAB										no, then Func_0EAB, else:
-	0E94 FD CB 00 EE    SET 5,(IY+SND_FLAGS)										set status flag bit 5 (no note ?? or is it ref note???)
-	0E98 C3 70 0F       JP Func_0F70										will RET
+	0E8B 19             ADD HL,DE											; HL + note_duration_index
+	0E8C 7E             LD A,(HL)											; A = duration_value
+	0E8D FD 77 0D       LD (IY+SND_NOTE_DURATION),A							; write duration value in array[#0D]
+	0E90 AF             XOR A												; A = 0
+	0E91 B9             CP C												; test if C = 0 (note offset = 0 so curr note = ref note)
+	0E92 20 17          JR NZ,Calc_Note_Ref_plus_Offset						; no, then Calc_Note_Ref_plus_Offset (will do Sound_Prepare_Next_Note), else:
+	0E94 FD CB 00 EE    SET 5,(IY+SND_FLAGS)								; else set status flag bit 5
+	0E98 C3 70 0F       JP Sound_Prepare_Next_Note							; Sound_Prepare_Next_Note ; will RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Provides 2 functions:
@@ -2822,180 +2830,145 @@ gvd_loop:
 	0EAA C9             RET													; HL points now on the pointers or Voice_channel_1_data or Voice_channel_2_data
 
 ;; -----------------------------------------------------------------------------------------------------------
-.Func_0EAB:
-	0EAB FD CB 00 AE    RES 5,(IY+SND_FLAGS)								reset status flag bit 5 ("got note"??)
-	0EAF FD 7E 0A       LD A,(IY+SND_REF_NOTE)								get ref Note
-	0EB2 81             ADD A,C												refNote in A + noteOffset in C --> A=note ???????
-	0EB3 01 0C FF       LD BC,FF0C											B will be 0; C=12 because 12 notes in the chromatic scale (one full octave)
-;; from the note number, get in B the octave number and the note number in that octave
-;; eg. #2A = 42 ; B=int(42/12)=3 (ie. octave 4) ; A=(42%12)=6
+;; From the reference note in SND_REF_NOTE and the offset in C
+;; calculate the current desired note.
+.Calc_Note_Ref_plus_Offset:
+	0EAB FD CB 00 AE    RES 5,(IY+SND_FLAGS)								; reset status flag bit 5 ("got note"??)
+	0EAF FD 7E 0A       LD A,(IY+SND_REF_NOTE)								; get ref Note
+	0EB2 81             ADD A,C												; refNote in A + noteOffset in C --> A=note ???????
+	0EB3 01 0C FF       LD BC,FF0C											; B will be 0; C=12 because 12 notes in the chromatic scale (one full octave)
+;; from the note number, get in B the octave number and the note number in
+;; that octave. eg. #2A = 42 ; B=int(42/12)=3 (ie. octave 4) ; A=(42%12)=6
 f0eab_1:
-	0EB6 04             INC B												B is the integer division result (octave value-1)
-	0EB7 91             SUB C												modulo: sub C until value goes negative
+	0EB6 04             INC B												; B is the integer division result (octave value-1)
+	0EB7 91             SUB C												; modulo: sub C until value goes negative
 	0EB8 30 FC          JR NC,f0eab_1
-	0EBA 81             ADD A,C												add back last C that's been sub to get result of modulo
-	0EBB 87             ADD A,A												*2 (to get a word-aligned offset)
+	0EBA 81             ADD A,C												; add back last C that's been sub to get result of modulo
+	0EBB 87             ADD A,A												; *2 (to get a word-aligned offset)
 	0EBC 5F             LD E,A
-	0EBD 16 00          LD D,00												in DE
+	0EBD 16 00          LD D,00												; in DE
 	0EBF 21 8B 0B       LD HL,Notes_periodes_Lowest_Octave
 	0EC2 19             ADD HL,DE
 	0EC3 5E             LD E,(HL)
 	0EC4 23             INC HL
 	0EC5 56             LD D,(HL)
-	0EC6 23             INC HL												get note pitch values as if in octave 1 (fa# get #0ABF)
+	0EC6 23             INC HL												; get note pitch values as if in octave 1 (fa# get #0ABF)
 	0EC7 4E             LD C,(HL)
 	0EC8 23             INC HL
-	0EC9 7E             LD A,(HL)											get note+semitone pitch (octave1) in A(high byte);C(lowbyte)
-	0ECA 04             INC B												now B has the value of the octave we want
+	0EC9 7E             LD A,(HL)											; get note+semitone pitch (octave1) in A(high byte);C(lowbyte)
+	0ECA 04             INC B												; now B has the value of the octave we want
 	0ECB 18 08          JR f0eab_2
 
 f0eab_2loop:
-	0ECD CB 3F          SRL A												AC/2
-	0ECF CB 19          RR C                                    			for each octaves we divide the period by 2 (in other words, mult the freq by 2)
-	0ED1 CB 3A          SRL D												DE/2
+	0ECD CB 3F          SRL A												; AC/2
+	0ECF CB 19          RR C                                    			; for each octaves we divide the period by 2 (in other words, mult the freq by 2)
+	0ED1 CB 3A          SRL D												; DE/2
 	0ED3 CB 1B          RR E
 f0eab_2:
-	0ED5 10 F6          DJNZ f0eab_2loop									(loop B times) this calculate the periode of the note for the octave we want
-;; for exemple at this point, ref note #24 + noteoffset = 6, give note #2A = Fa# oct4
-;; Fa# in oct1 has a period of #0ABF in DE (and Sol in oct1 has a period of #09F7 in "AC")
-;; B was 3 (so 4 loops where we divide DE and "AC" by 2
-;; resulting DE = #0151 (period of Fa# in oct4); AC = #013E (period of Sol in oct4)
-	0ED7 47             LD B,A												BC now has the value of the curr_note+semitone note
-	0ED8 FD 7E 00       LD A,(IY+SND_FLAGS)									set status flags
-	0EDB E6 42          AND 42												look bits 6 and 1
-	0EDD FE 40          CP 40												test if bit6 was 1 and bit1 was 0 (was it noise or sound)
-	0EDF 20 08          JR NZ,f0eab_3										if that was NOT the case (sound) jump f0eab_3, else (noise):
-	0EE1 FD 73 06       LD (IY+NOISE_FINE),E								was a noise pitch
-	0EE4 FD 72 07       LD (IY+NOISE_COARSE),D								save note periode in array[7] (high byte) and [6] (low byte)
+	0ED5 10 F6          DJNZ f0eab_2loop									; (loop B times) this calculate the periode of the note for the octave we want
+	;; for exemple at this point, ref note #24 + noteoffset = 6, gives
+	;; note #2A = Fa# oct4; Fa# in oct1 has a period of #0ABF in DE
+	;; (and Sol in oct1 has a period of #09F7 in "AC")
+	;; B was 3 (so 4 loops where we divide DE and "AC" by 2 resulting in
+	;; DE=#0151 (period of Fa# oct4); AC=#013E (period of Sol oct4)
+	0ED7 47             LD B,A												; BC now has the value of the curr_note+semitone note
+	0ED8 FD 7E 00       LD A,(IY+SND_FLAGS)									; set status flags
+	0EDB E6 42          AND 42												; look bits 6 and 1
+	0EDD FE 40          CP 40												; test if bit6 was 1 and bit1 was 0 (was it noise or sound)
+	0EDF 20 08          JR NZ,f0eab_3										; if that was NOT the case (sound) jump f0eab_3, else (noise):
+	0EE1 FD 73 06       LD (IY+NOISE_FINE),E								; was a noise pitch
+	0EE4 FD 72 07       LD (IY+NOISE_COARSE),D								; save note periode in array[7] (high byte) and [6] (low byte)
 	0EE7 18 06          JR f0eab_4
 
-f0eab_3:																	else it was a sound note
-	0EE9 FD 73 08       LD (IY+SND_FINE),E									save it in array [9] and [8], note pitch
+f0eab_3:																	; else it was a sound note
+	0EE9 FD 73 08       LD (IY+SND_FINE),E									; save it in array [9] and [8], note pitch
 	0EEC FD 72 09       LD (IY+SND_COARSE),D
 f0eab_4:
-	0EEF FD CB 00 7E    BIT 7,(IY+SND_FLAGS)								test status flag bit7
-	0EF3 28 27          JR Z,f0eab_5										if it was 0, jump f0eab_5, else:
+	0EEF FD CB 00 7E    BIT 7,(IY+SND_FLAGS)								; test status flag bit7
+	0EF3 28 27          JR Z,f0eab_5										; if it was 0, jump f0eab_5, else:
 	;; is this to add a dotted note or extra-duration OR...
-	;; OR would that be to cut the note duration in pieces to apply a enveloppe or volume modification across the full note duration
-	0EF5 EB             EX DE,HL											HL = current note
-	0EF6 A7             AND A												clear Carry
-	0EF7 ED 42          SBC HL,BC											get the difference between the current_note period and its following one in the scale
+	;; OR would that be to cut the note duration in pieces to apply a
+	;; enveloppe or volume modification across the full note duration
+	0EF5 EB             EX DE,HL											; HL = current note
+	0EF6 A7             AND A												; clear Carry
+	0EF7 ED 42          SBC HL,BC											; get the difference between the current_note period and its following one in the scale
 	0EF9 CB 3D          SRL L
-	0EFB CB 3D          SRL L												divide it by 4
-	0EFD FD 7E 10       LD A,(IY+10)										array [#10]
-	0F00 A7             AND A												test it (Z set if 0, S bit set if bit7=1, Neg and Carry reset)
-	0F01 28 12          JR Z,f0eab_6										if 0, then jump f0eab_6, else:
-	0F03 67             LD H,A												H=array[#10] L=notegap/4
+	0EFB CB 3D          SRL L												; divide it by 4
+	0EFD FD 7E 10       LD A,(IY+10)										; array [#10]
+	0F00 A7             AND A												; test it (Z set if 0, S bit set if bit7=1, Neg and Carry reset)
+	0F01 28 12          JR Z,f0eab_6										; if 0, then jump f0eab_6, else:
+	0F03 67             LD H,A												; H=array[#10] L=notegap/4
 	0F04 7D             LD A,L
-	0F05 FA 10 0F       JP M,f0eab_7										jump f0eab_7 if S flag (arry[#10] bit7) is set, else (H bit7=0):
+	0F05 FA 10 0F       JP M,f0eab_7										; jump f0eab_7 if S flag (arry[#10] bit7) is set, else (H bit7=0):
 f0eab_9:
-	0F08 CB 0C          RRC H												this will multiply A by 2 depending on
-	0F0A 38 08          JR C,f0eab_8										which is the first bit of H set
-	0F0C 87             ADD A,A												x2
-	0F0D 18 F9          JR f0eab_9											loop
+	0F08 CB 0C          RRC H												; this will multiply A by 2 depending on
+	0F0A 38 08          JR C,f0eab_8										; which is the first bit of H set
+	0F0C 87             ADD A,A												; x2
+	0F0D 18 F9          JR f0eab_9											; loop
 
-f0eab_10:																	Carry=0 if we arrive here
-	0F0F 1F             RRA													A parity/bit0 in Carry and A/2
+f0eab_10:																	; Carry=0 if we arrive here
+	0F0F 1F             RRA													; A parity/bit0 in Carry and A/2
 f0eab_7:
-	0F10 CB 0C          RRC H												this will divide A by 2 until we reach the first
-	0F12 30 FB          JR NC,f0eab_10										bit set in H
+	0F10 CB 0C          RRC H												; this will divide A by 2 until we reach the first
+	0F12 30 FB          JR NC,f0eab_10										; bit set in H
 f0eab_8:
-	0F14 6F             LD L,A												update value in L
+	0F14 6F             LD L,A												; update value in L
 f0eab_6:
-	0F15 FD 75 0E       LD (IY+SND_DELTA_FINE),L							store value in array[#E] (sound delta pitch for bend/vibrato effect)
+	0F15 FD 75 0E       LD (IY+SND_DELTA_FINE),L							; store value in array[#E] (sound delta pitch for bend/vibrato effect)
 	0F18 AF             XOR A
-	0F19 FD 77 0F       LD (IY+SND_DELTA_COARSE),A							put 0 in array[#F]
+	0F19 FD 77 0F       LD (IY+SND_DELTA_COARSE),A							; put 0 in array[#F]
 f0eab_5:
-	0F1C FD 7E 00       LD A,(IY+SND_FLAGS)									read status flag reg
-	0F1F CB 77          BIT 6,A												test bit6
-	0F21 28 43          JR Z,f0eab_11										if 0, jump f0eab_11, else:
-	0F23 CB 4F          BIT 1,A												test bit 1
-	0F25 28 06          JR Z,f0eab_12										if 0, jump f0eab_12, else:
-	0F27 FD CB 00 E6    SET 4,(IY+SND_FLAGS)								set status flag bit4
-	0F2B 18 39          JR f0eab_11											jump f0eab_11
+	0F1C FD 7E 00       LD A,(IY+SND_FLAGS)									; read status flag reg
+	0F1F CB 77          BIT 6,A												; test bit6
+	0F21 28 43          JR Z,f0eab_11										; if 0, jump f0eab_11, else:
+	0F23 CB 4F          BIT 1,A												; test bit 1
+	0F25 28 06          JR Z,f0eab_12										; if 0, jump f0eab_12, else:
+	0F27 FD CB 00 E6    SET 4,(IY+SND_FLAGS)								; set status flag bit4
+	0F2B 18 39          JR f0eab_11											; jump f0eab_11
 
 f0eab_12:
 	0F2D FD 6E 06       LD L,(IY+NOISE_FINE)
-	0F30 FD 66 07       LD H,(IY+NOISE_COARSE)								HL = noise note periode
+	0F30 FD 66 07       LD H,(IY+NOISE_COARSE)								; HL = noise note periode
 	0F33 FD 5E 08       LD E,(IY+SND_FINE)
-	0F36 FD 56 09       LD D,(IY+SND_COARSE)								DE = sound note periode
-	0F39 FD CB 00 1E    RR (IY+SND_FLAGS)									flags shift right
-	0F3D AF             XOR A												A=0, Carry cleared
-	0F3E ED 52          SBC HL,DE											diff between noise and sound periods in HL
-	0F40 FD CB 00 16    RL (IY+SND_FLAGS)									flags shift left, but carry reset, so flag bit0 was cleared
-	0F44 FD 4E 0D       LD C,(IY+SND_NOTE_DURATION)							note duration
-	0F47 1E 80          LD E,80												put a "1" in bit7 to init
-	0F49 06 08          LD B,08												test up to 8 bits
+	0F36 FD 56 09       LD D,(IY+SND_COARSE)								; DE = sound note periode
+	0F39 FD CB 00 1E    RR (IY+SND_FLAGS)									; flags shift right
+	0F3D AF             XOR A												; A=0, Carry cleared
+	0F3E ED 52          SBC HL,DE											; diff between noise and sound periods in HL
+	0F40 FD CB 00 16    RL (IY+SND_FLAGS)									; flags shift left, but carry reset, so flag bit0 was cleared
+	0F44 FD 4E 0D       LD C,(IY+SND_NOTE_DURATION)							; note duration
+	0F47 1E 80          LD E,80												; put a "1" in bit7 to init
+	0F49 06 08          LD B,08												; test up to 8 bits
 f0eab_13:
-	0F4B 7B             LD A,E												A has a wandering "1", starting at bit7 downward
-	0F4C A1             AND C												test duration value
-	0F4D 20 04          JR NZ,f0eab_14										if found a 1 jump f0eab_14, else:
-	0F4F CB 0B          RRC E												move "1" bit to the right
-	0F51 10 F8          DJNZ f0eab_13										jump up to test next bit
-f0eab_14:																	we found the highest bit of duration set to 1, the 1 in A indicates which bit is it
-	0F53 0F             RRCA												A[0] goes in carry and A/2
-	0F54 38 06          JR C,f0eab_15										if bit0 of A was 1 jump f0eab_15, else:
+	0F4B 7B             LD A,E												; A has a wandering "1", starting at bit7 downward
+	0F4C A1             AND C												; test duration value
+	0F4D 20 04          JR NZ,f0eab_14										; if found a 1 jump f0eab_14, else:
+	0F4F CB 0B          RRC E												; move "1" bit to the right
+	0F51 10 F8          DJNZ f0eab_13										; jump up to test next bit
+f0eab_14:																	; we found the highest bit of duration set to 1, the 1 in A indicates which bit is it
+	0F53 0F             RRCA												; A[0] goes in carry and A/2
+	0F54 38 06          JR C,f0eab_15										; if bit0 of A was 1 jump f0eab_15, else:
 	0F56 CB 2C          SRA H
-	0F58 CB 1D          RR L												divide HL (gap between noise and sound period) by 2
-	0F5A 18 F7          JR f0eab_14											until we reach the bit set in A
+	0F58 CB 1D          RR L												; divide HL (gap between noise and sound period) by 2
+	0F5A 18 F7          JR f0eab_14											; until we reach the bit set in A
 
 f0eab_15:
 	0F5C FD 75 11       LD (IY+NOISE_DELTA_FINE),L
-	0F5F FD 74 12       LD (IY+NOISE_DELTA_COARSE),H						put result in array [#11] and [#12] (delta pitch for bend/vibrato effect)
-	0F62 FD CB 00 A6    RES 4,(IY+SND_FLAGS)								and reset status flag bit4
+	0F5F FD 74 12       LD (IY+NOISE_DELTA_COARSE),H						; put result in array [#11] and [#12] (delta pitch for bend/vibrato effect)
+	0F62 FD CB 00 A6    RES 4,(IY+SND_FLAGS)								; and reset status flag bit4
 f0eab_11:
-	0F66 FD 36 03 00    LD (IY+SND_VOL_INDEX),00							init chosen volume array index
-	0F6A FD 7E 05       LD A,(IY+SND_NB_FX_SLICES)							put array[5] in ...
-	0F6D FD 77 04       LD (IY+SND_CURR_FX_SLICE),A							... array[4]
-.Func_0F70:
-	0F70 FD CB 00 8E    RES 1,(IY+SND_FLAGS)								reset status flag bit1
+	0F66 FD 36 03 00    LD (IY+SND_VOL_INDEX),00							; init chosen volume array index
+	0F6A FD 7E 05       LD A,(IY+SND_NB_FX_SLICES)							; put array[5] in ...
+	0F6D FD 77 04       LD (IY+SND_CURR_FX_SLICE),A							; ... array[4]
+.Sound_Prepare_Next_Note:
+	0F70 FD CB 00 8E    RES 1,(IY+SND_FLAGS)								; reset status flag bit1
 	0F74 DD E5          PUSH IX
-	0F76 D1             POP DE												sound data pointer in DE
-	0F77 13             INC DE												DE points on the next data for that voice
-	0F78 2A 4E 10       LD HL,(curr_Voice_data_pointer)						get which is the current curr_Voice_data_addr
+	0F76 D1             POP DE												; sound data pointer in DE
+	0F77 13             INC DE												; DE points on the next data for that voice
+	0F78 2A 4E 10       LD HL,(curr_Voice_data_pointer)						; get which is the current curr_Voice_data_addr
 	0F7B 73             LD (HL),E
 	0F7C 23             INC HL
-	0F7D 72             LD (HL),D											and we save next data pointer it in the current curr_Voice_data_addr
+	0F7D 72             LD (HL),D											; and we save next data pointer it in the current curr_Voice_data_addr
 	0F7E C9             RET
-
-;; -----------------------------------------------------------------------------------------------------------
-;; Sound data format:
-;;	* 1st byte: data[7:2] = reference note number ;
-;;              data[1:0] = volume level (to increase general volume for channel)
-;;	* 2nd byte: data[7:4] ; data[3:0]	: volume/enveloppe/effect ????
-;;		then:
-;;    		byte: data[7:3]=note offset from ref note ; data[2:0]=duration index
-;;		or	byte = FF + (enveloppe/effect?)
-;;
-;; note_duration_offset:  0  1  2  3  4  5  6  7
-;;	    DATABYTE (hex)   01 02 04 06 08 0C 10 20
-;;
-;; Exemple:
-;;	 D0 0E 6E 96 6E 56 FF 01 34 36 FF 0E 7C 6C 54 6E			; ID #41 = Market
-;;	 47 FF FF
-;;
-;;	 55555555666666666666
-;;	   # # #  # #  # # #
-;;	 effggaabccddeffggaab		ref note = e (mi) octave 5
-;;	 0123456789ABCDEF0123
-;;
-;;	 D0        110100 00	ref note num = #34 = 52 : reference note = mi (octave 5) ; volume level = 0 (no extra volume added to volume)
-;;   0E		   0000 0111	volume / envp?
-;;	 6E        01101 110	offset=#0D duration_index=blanche	note = fa (octave 6)
-;;	 96        10010 110	offset=#12 duration_index=blanche	note = la# (octave 6)
-;;	 6E        01101 110	offset=#0D duration_index=blanche	note = fa (octave 6)
-;;	 56        01010 110	offset=#0A duration_index=blanche	note = re (octave 6)
-;;	 FF 01
-;;	 34        00110 100	offset=#06 duration_index=noire		note = la# (octave 5)
-;;	 36        00110 110	offset=#06 duration_index=blanche	note = la# (octave 5)
-;;	 FF 0E
-;;	 7C        01111 100	offset=#0F duration_index=noire		note = sol (octave 6)
-;;	 6C        01101 100	offset=#0D duration_index=noire		note = fa (octave 6)
-;;	 54        01010 100	offset=#0A duration_index=noire		note = re (octave 6)
-;;	 6E        01101 110	offset=#0D duration_index=blanche	note = fa (octave 6)
-;;	 47        01000 111	offset=#08 duration_index=ronde		note = do (octave 6)
-;;	 FF FF
-;; -----------------------------------------------------------------------------------------------------------
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Split the byte in D in 2 nibbles, results in D and E.
@@ -3028,7 +3001,7 @@ rnsplt_loop:																; need to shift right so that the lsb bit od D is at
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;;
-.Func_Sound_0F93:
+.Slice_VolumeEnvp_Effects:
 	0F93 01 0F 04       LD BC,040F											; B = 4 right shifts; C = #0F mask which means split in two 4-bit nibbles
 	0F96 CD 84 0F       CALL Read_IX_data_and_split							; Read (IX) and split : D = high nibble, E = low nibble
 	0F99 3E 02          LD A,02
@@ -3212,6 +3185,43 @@ Sound_channels_enable:
 	10AD DATABYTE 81 42 48   												; this is 3 pairs of nibbles 8;1 4;2  4;8
 
 ;; -----------------------------------------------------------------------------------------------------------
+;; Sound data format:
+;;	* 1st byte: data[7:2] = reference note number ;
+;;              data[1:0] = volume level (to increase general volume for channel)
+;;	* 2nd byte: data[7:4] ; data[3:0]	: volume/enveloppe/effect ????
+;;		then:
+;;    		byte: data[7:3]=note offset from ref note ; data[2:0]=duration index
+;;		or	byte = FF + (enveloppe/effect?)
+;;
+;; note_duration_offset:  0  1  2  3  4  5  6  7
+;;	    DATABYTE (hex)   01 02 04 06 08 0C 10 20
+;;
+;; Exemple:
+;;	 D0 0E 6E 96 6E 56 FF 01 34 36 FF 0E 7C 6C 54 6E			; ID #41 = Market
+;;	 47 FF FF
+;;
+;;	 55555555666666666666
+;;	   # # #  # #  # # #
+;;	 effggaabccddeffggaab		ref note = e (mi) octave 5
+;;	 0123456789ABCDEF0123
+;;
+;;	 D0        110100 00	ref note num = #34 = 52 : reference note = mi (octave 5) ; volume level = 0 (no extra volume added to volume)
+;;   0E		   0000 0111	volume / envp?
+;;	 6E        01101 110	offset=#0D duration_index=blanche	note = fa (octave 6)
+;;	 96        10010 110	offset=#12 duration_index=blanche	note = la# (octave 6)
+;;	 6E        01101 110	offset=#0D duration_index=blanche	note = fa (octave 6)
+;;	 56        01010 110	offset=#0A duration_index=blanche	note = re (octave 6)
+;;	 FF 01		volume/envp 01
+;;	 34        00110 100	offset=#06 duration_index=noire		note = la# (octave 5)
+;;	 36        00110 110	offset=#06 duration_index=blanche	note = la# (octave 5)
+;;	 FF 0E		volume/envp 0E
+;;	 7C        01111 100	offset=#0F duration_index=noire		note = sol (octave 6)
+;;	 6C        01101 100	offset=#0D duration_index=noire		note = fa (octave 6)
+;;	 54        01010 100	offset=#0A duration_index=noire		note = re (octave 6)
+;;	 6E        01101 110	offset=#0D duration_index=blanche	note = fa (octave 6)
+;;	 47        01000 111	offset=#08 duration_index=ronde		note = do (octave 6)
+;;	 FF FF		end
+;; -----------------------------------------------------------------------------------------------------------
 ;; Notes duration:
 ;; 000 : 1	triple croche (1/8 noire)
 ;; 001 : 2	double croche (1/4 noire)
@@ -3223,7 +3233,7 @@ Sound_channels_enable:
 ;; 110 : 16	Blanche (2 noires)
 ;; ___ : 24	Blanche pointée (3 noires) NOT USED!
 ;; 111 32	Ronde (4 noires)
-.Voice_duration_array:														; note_durations
+.Note_duration_array:														; note_durations
     ;; note_duration_offset:   0  1  2  3  4  5  6  7
 	10B0 DATABYTE             01 02 04 06 08 0C 10 20
 
@@ -4678,6 +4688,7 @@ nf2_2:
 	19B1 C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
+.DoJumpIX:
 .DoCopy:
 	19B2 DD E9          JP (IX)												; Call the copying function
 .DoClear:
@@ -6831,9 +6842,7 @@ dcwll_2:
 	22EA C3 39 35       JP Init_table_rev									; Continue at Init_table_rev ; will have a RET
 
 ;; -----------------------------------------------------------------------------------------------------------
-RoomID_Head_FirstRoom:		EQU		#8A40
-RoomID_Heels_FirstRoom:		EQU		#8940
-
+;; Initialization of a new game
 .Init_new_game:
 	22ED AF             XOR A												; A=0
 	22EE 32 EA 3D       LD (saved_World_Mask),A								; reset saved_World_Mask
@@ -6846,40 +6855,41 @@ RoomID_Heels_FirstRoom:		EQU		#8940
 	2301 CD C6 43       CALL Erase_visited_room								; Erase "visited room" bits from mem #4261 length 012D (301 bytes (for 301 rooms) : in fact only 38 are used!)
 	2304 CD 55 24       CALL Reinitialise									; Reinitialise with:
 	2307 DATAWORD 71 24            											; Argument StatusReinit 2471 (counters)
-	2309 CD 50 3F       CALL ResetSpecials
-	230C 21 40 89       LD HL,RoomID_Heels_FirstRoom						; This is Heels initial room id (#8940)
+	2309 CD 50 3F       CALL ResetSpecials									; reset the "picked up" bit for the special items
+	230C 21 40 89       LD HL,RoomID_Heels_1st								; This is Heels initial room id (#8940)
 	230F 22 0E 01       LD (current_Room_ID),HL								; update current_Room_ID
 	2312 3E 01          LD A,01												; init selected character
-	2314 CD 22 23       CALL InitThings
-	2317 21 40 8A       LD HL,RoomID_Head_FirstRoom							This is Head initial room id (#8A40)
-	231A 22 0E 01       LD (current_Room_ID),HL								update current_Room_ID
-	231D AF             XOR A												A=0
-	231E 32 58 46       LD (access_new_room_code),A							reset access_new_room_code with 0 ("stay same room" Code)
+	2314 CD 22 23       CALL InitOtherChar									; this will first load Heels room, build it, and create Heels and Objects; then we'll switch the Head (1st room we see when starting the game), so that if we Swop, the other character (Heels) is already defined.
+	2317 21 40 8A       LD HL,RoomID_Head_1st								; This is Head initial room id (#8A40)
+	231A 22 0E 01       LD (current_Room_ID),HL								; update current_Room_ID
+	231D AF             XOR A												; A=0
+	231E 32 58 46       LD (access_new_room_code),A							; reset access_new_room_code with 0 ("stay same room" Code)
 	2321 C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; Initialize the character in A (1=Heels, 2=Head)
-.InitThings:
+;; Initialize the character in A (1=Heels, 2=Head) to create the "other"
+;; character so then if we swop, everything needed (other char, other char's room, objects) already exist.
+.InitOtherChar:
 	2322 32 84 24       LD (selected_characters),A							; update selected_characters with value in A
 	2325 F5             PUSH AF
 	2326 32 10 BB       LD (Other_Character_state),A
-	2329 CD 9E 23       CALL EnterRoom										enter first room
-	232C AF             XOR A												A=0
-	232D 32 87 24       LD (Teleport_down_anim_length),A
+	2329 CD 9E 23       CALL EnterRoom										; enter first room
+	232C AF             XOR A												; A=0
+	232D 32 87 24       LD (Teleport_down_anim_length),A					; Init Teleport anim
 	2330 CD 48 2B       CALL CharThing15
 	2333 18 03          JR initth_sub
 
 initth_loop:
 	2335 CD 51 25       CALL CharThing
 initth_sub:
-	2338 3A AC 24       LD A,(Saved_Objects_List_index)						get Saved_Objects_List_index
-	233B A7             AND A												test A
-	233C 20 F7          JR NZ,initth_loop									if not 0 jump loop, else:
+	2338 3A AC 24       LD A,(Saved_Objects_List_index)						; get Saved_Objects_List_index
+	233B A7             AND A												; test A
+	233C 20 F7          JR NZ,initth_loop									; if not 0 jump loop, else:
 	233E F1             POP AF
-	233F EE 03          XOR 03												switch bits 1 and 0 (change selected character)
-	2341 32 84 24       LD (selected_characters),A							update selected_characters
-	2344 CD 7B 27       CALL CharThing3										init bit2 of SwopChara_Pressed
-	2347 C3 73 03       JP Save_array
+	233F EE 03          XOR 03												; switch bits 1 and 0 (change selected character)
+	2341 32 84 24       LD (selected_characters),A							; update selected_characters
+	2344 CD 7B 27       CALL CharThing3										; init bit2 of SwopChara_Pressed
+	2347 C3 73 03       JP Save_array										; save other character
 
 ;; -----------------------------------------------------------------------------------------------------------
 .Init_Continue_game:
@@ -10545,7 +10555,7 @@ initobj_2:
 .anim_setsound:
 	37ED 79             LD A,C
 	37EE CC 1C 2B       CALL Z,SetSound
-	37F1 37             SCF													Return with Carry set (anim updated)
+	37F1 37             SCF													; Return with Carry set (anim updated)
 	37F2 C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -10781,18 +10791,18 @@ Saved_Object_Destination:
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Given an index in A, set the object list index and pointers.
 .SetObjList:
-	39C1 32 A2 39       LD (ObjListIdx),A									object id
-	39C4 87             ADD A,A												*2
-	39C5 87             ADD A,A												*4
-	39C6 C6 A9          ADD A,A9											(ObjectLists & $00ff) + (4 * object id)
+	39C1 32 A2 39       LD (ObjListIdx),A									; object id
+	39C4 87             ADD A,A												; *2
+	39C5 87             ADD A,A												; *4
+	39C6 C6 A9          ADD A,A9											; (ObjectLists & $00ff) + (4 * object id)
 	39C8 6F             LD L,A
-	39C9 CE 39          ADC A,39											ObjectLists >> 8	; #39A9+offset
+	39C9 CE 39          ADC A,39											; ObjectLists >> 8	; #39A9+offset
 	39CB 95             SUB L
 	39CC 67             LD H,A
-	39CD 22 A5 39       LD (ObjListAPtr),HL									pointer A
+	39CD 22 A5 39       LD (ObjListAPtr),HL									; pointer A
 	39D0 23             INC HL
-	39D1 23             INC HL												next word in list
-	39D2 22 A7 39       LD (ObjListBPtr),HL									pointer B
+	39D1 23             INC HL												; next word in list
+	39D2 22 A7 39       LD (ObjListBPtr),HL									; pointer B
 	39D5 C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -11474,14 +11484,12 @@ Walls_DoorZ:
 ;; Configure the walls.
 ;; Height of highest door in A.
 .ConfigWalls:
-	3C63 32 49 3C       LD (Walls_DoorZ),A
-	;; Do the V wall case before doing the U wall in this function.
+	3C63 32 49 3C       LD (Walls_DoorZ),A									; door height
 	3C66 CD 85 3C       CALL VWall
-	;; Now do the UWall case.
     ;; Skip if there's an extra room visible in the U dir.
 	3C69 3A C0 1E       LD A,(Has_no_wall)
-	3C6C E6 04          AND 04
-	3C6E C0             RET NZ
+	3C6C E6 04          AND 04												; test bit 2 : wall U side (ne)
+	3C6E C0             RET NZ												; if there is a wall, leave (else can see further into next room
 	;; Put the wall mask in B' and stash the reflection flag at smc_OWFlag.
     ;; Step size in DE, direction extent in A.
 	3C6F 06 04          LD B,04
@@ -11949,52 +11957,50 @@ br_3F25
 ;; -----------------------------------------------------------------------------------------------------------
 ; Reset the "collected" flag (bit0) on all the specials.
 .ResetSpecials:
-	3F50 21 EB 3D       LD HL,tab_Specials_collectible						in special collectible table
-	3F53 11 04 00       LD DE,0004											every 4 bytes in the table is the low byte for roomID
-	3F56 06 34          LD B,34												#34=52 special obj
-rstspe_loop:																when picked up the bit0 was set (so we could not pick it up again)
-	3F58 CB 86          RES 0,(HL)											so reset it to reinit it
+	3F50 21 EB 3D       LD HL,tab_Specials_collectible						; in special collectible table
+	3F53 11 04 00       LD DE,0004											; every 4 bytes in the table is the low byte for roomID
+	3F56 06 34          LD B,34												; #34=52 special obj
+rstspe_loop:																; when the item was picked up, the bit0 was set (so we could not pick it up again)
+	3F58 CB 86          RES 0,(HL)											; so reset it to reinit it
 	3F5A 19             ADD HL,DE
-	3F5B 10 FB          DJNZ rstspe_loop									and do it for all 52 special objects
+	3F5B 10 FB          DJNZ rstspe_loop									; and do it for all 52 special objects
 	3F5D C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Get a special item. Id in A
 .GetSpecial:
-	3F5E 57             LD D,A												store special we want in D
-	3F5F CD CA 3E       CALL Find_Specials_current
+	3F5E 57             LD D,A												; store special we want in D
+	3F5F CD CA 3E       CALL Find_Specials_current							; Find Specials in current_Room_ID (HL points on 2bd byte of object in tab_Specials_collectible)
 getspe_1:
-	3F62 C0             RET NZ												leave if not found, else:
-	3F63 23             INC HL												point on special object byte
-	3F64 7E             LD A,(HL)											get special obj value
-	3F65 2B             DEC HL												this is just to realign HL if we loop
-	3F66 E6 0F          AND 0F												only look at bits [3:0]
-	3F68 BA             CP D												compare witch the one we want
-	3F69 28 05          JR Z,special_found									jump special_found if found, else:
-	3F6B CD DB 3E       CALL FindSpecCont									not the one we want, search more
-	3F6E 18 F2          JR getspe_1											loop
+	3F62 C0             RET NZ												; leave if not found, else:
+	3F63 23             INC HL												; point on special object <low byte : Z|SPR#>  (<high byte : UV)
+	3F64 7E             LD A,(HL)											; get special obj value
+	3F65 2B             DEC HL												; this is just to realign HL if we loop
+	3F66 E6 0F          AND 0F												; only look at bits [3:0] : Sprite ID in Special items
+	3F68 BA             CP D												; compare witch the one we want
+	3F69 28 05          JR Z,special_found									; jump special_found if found, else:
+	3F6B CD DB 3E       CALL FindSpecCont									; not the one we want, go to the next items until "00"
+	3F6E 18 F2          JR getspe_1											; loop
 
 special_found:
-	3F70 2B             DEC HL												point back on room ID in table
-	3F71 CB C6          SET 0,(HL)											set bit 0 of room ID low byte; so this item is no longer available (we caught it already)
-	;; Look up the special in a table
-	3F73 87             ADD A,A												*2 (word align)
-	3F74 C6 89          ADD A,89											SpecialFns low byte
+	3F70 2B             DEC HL												; point back on room ID in table
+	3F71 CB C6          SET 0,(HL)											; set bit 0 of room ID low byte; so this item is no longer available (we picked it up already)
+	3F73 87             ADD A,A												; *2 (word align)
+	3F74 C6 89          ADD A,89											; SpecialFns low byte
 	3F76 6F             LD L,A
-	3F77 CE 3F          ADC A,3F											SpecialFns high byte : #3F89 + special obj offset
+	3F77 CE 3F          ADC A,3F											; SpecialFns high byte : #3F89 + special obj offset
 	3F79 95             SUB L
 	3F7A 67             LD H,A
 	3F7B 5E             LD E,(HL)
 	3F7C 23             INC HL
 	3F7D 66             LD H,(HL)
-	3F7E 6B             LD L,E												get in HL the addr of the special function from SpecialFns table
-	;; Set IX to the continuation point after the JP (HL) is done ????
-	3F7F DD 21 84 3F    LD IX,special_found_end_1
-	3F83 E9             JP (HL)												jump to the selected special function
+	3F7E 6B             LD L,E												; get in HL the addr of the special function from SpecialFns table
+	3F7F DD 21 84 3F    LD IX,special_found_end_1							; Set IX to the continuation point after the JP (HL) is done
+	3F83 E9             JP (HL)												; jump to the selected special function (PickUp2, Boost*, SaveContinue, GetCrown)
 
 special_found_end_1:
-	3F84 06 C5          LD B,C5												Sound ID Dum-diddy-dum
-	3F86 C3 91 0D       JP 	Play_Sound										will RET
+	3F84 06 C5          LD B,C5												; Sound ID Dum-diddy-dum
+	3F86 C3 91 0D       JP 	Play_Sound										; will RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Array of functions pointers when picking up a special item.
@@ -12017,109 +12023,116 @@ special_found_end_1:
 	3FA3 DATAWORD 14 40							; #D : Crown GetCrown 4014 (Emperor)
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; Pickup Purse or Hooter
+;; Pickup Purse or Hooter, update Inventory and update HUD
+;; PickUp2 : D has the bitnb for the item: Purse bit 0, Hooter bit 1
+;; Pick_it_up : item bitnb in A (eg. bit 2 = donut tray)
 .PickUp2:
-	3FA5 7A             LD A,D
+	3FA5 7A             LD A,D												; item bir nb
 .Pick_it_up:
-	3FA6 21 7B 24       LD HL,Inventory										point on Inventory
-	3FA9 CD 39 41       CALL Set_bit_nb_A_in_content_HL
-	3FAC CD 9C 45       CALL Draw_Screen_Periphery
-	3FAF 06 C2          LD B,C2												Sound ID HornPipe
-	3FB1 C3 91 0D       JP Play_Sound										will RET
+	3FA6 21 7B 24       LD HL,Inventory										; point on Inventory
+	3FA9 CD 39 41       CALL Set_bit_nb_A_in_content_HL						; add item bit to Inventory
+	3FAC CD 9C 45       CALL Draw_Screen_Periphery							; update HUD
+	3FAF 06 C2          LD B,C2												; Sound ID HornPipe
+	3FB1 C3 91 0D       JP Play_Sound										; will RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; pick up a donut tray
 .BoostDonuts:
-	3FB4 3A 84 24       LD A,(selected_characters)							get selected_characters
-	3FB7 E6 02          AND 02												test if Head
-	3FB9 C8             RET Z												if not Head, then leave
-	3FBA 3E 06          LD A,06												CNT_DONUTS
-	3FBC CD F2 3F       CALL BoostCountPlus
-	3FBF 3E 02          LD A,02												code for pick-up donuts
-	3FC1 18 E3          JR Pick_it_up
+	3FB4 3A 84 24       LD A,(selected_characters)							; get selected_characters
+	3FB7 E6 02          AND 02												; test if Head
+	3FB9 C8             RET Z												; if not Head, then leave
+	3FBA 3E 06          LD A,06												; CNT_DONUTS
+	3FBC CD F2 3F       CALL BoostCountPlus									; boost counter
+	3FBF 3E 02          LD A,02												; bit2 in Inventory for pick-up a donuts tray
+	3FC1 18 E3          JR Pick_it_up										; add it to inventory and update HUD
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Pick up a Bunny. 4 types of Bunnies : lives, invulnerability, speed, extra jump.
 .BoostSpeed:
-	3FC3 3A 84 24       LD A,(selected_characters)							get selected_characters
-	3FC6 E6 02          AND 02												test if Head
-	3FC8 C8             RET Z												if not Head, then leave
-	3FC9 AF             XOR A												code for CNT_SPEED
-	3FCA 18 26          JR BoostCountPlus
+	3FC3 3A 84 24       LD A,(selected_characters)							; get selected_characters
+	3FC6 E6 02          AND 02												; test if Head
+	3FC8 C8             RET Z												; if not Head, then leave
+	3FC9 AF             XOR A												; code for CNT_SPEED
+	3FCA 18 26          JR BoostCountPlus									; Boost!
 
 .BoostSpring:
-	3FCC 3A 84 24       LD A,(selected_characters)							get selected_characters
-	3FCF E6 01          AND 01												test if Heels
-	3FD1 C8             RET Z												if not Heels, then leave
-	3FD2 18 1E          JR BoostCountPlus									; A = 01, code for CNT_SPRING
+	3FCC 3A 84 24       LD A,(selected_characters)							; get selected_characters
+	3FCF E6 01          AND 01												; test if Heels
+	3FD1 C8             RET Z												; if not Heels, then leave
+	3FD2 18 1E          JR BoostCountPlus									; A = 01, code for CNT_SPRING, boost
 
+;; heels : c=2; a=b01 a=0 cy=1 a=2 push a ret
+;; head : c=2 a=b10 a=1 cy=0 a=3 push a ret
+;; both : c=2 a=b11 a=2 call boostcount (boost heels invul and refresh HUD) a=3 push a ret
 .BoostInvuln2:
-	3FD4 DD 21 E2 3E    LD IX,special_found_end_2							special_found_end_2
+	3FD4 DD 21 E2 3E    LD IX,special_found_end_2							; the DoJumpIX will just RET
 .BoostInvuln:
-	3FD8 0E 02          LD C,02												CNT_HEELS_INVULN
+	3FD8 0E 02          LD C,02												; CNT_HEELS_INVULN
 	3FDA 18 02          JR BoostMaybeDbl
 
 .BoostLives:
-	3FDC 0E 04          LD C,04												CNT_HEELS_LIVES
+	3FDC 0E 04          LD C,04												; CNT_HEELS_LIVES
 ;; Boosts both characters counts if they're joined. Only works for
 ;; invuln and lives.
 .BoostMaybeDbl:
-	3FDE 3A 84 24       LD A,(selected_characters)							get selected_characters
-	3FE1 FE 03          CP 03												both Head and Heels?
-	3FE3 28 06          JR Z,BoostCountDbl									if yes, then increment both BoostCountDbl, else:
-	3FE5 1F             RRA													bit Head in bit[0], bit Heels in Carry
-	3FE6 E6 01          AND 01												is it Head?
-	3FE8 81             ADD A,C												then increament A = C + 1
-	3FE9 18 07          JR BoostCountPlus
+	3FDE 3A 84 24       LD A,(selected_characters)							; get selected_characters
+	3FE1 FE 03          CP 03												; both Head and Heels?
+	3FE3 28 06          JR Z,BoostCountDbl									; if yes, then increment both (invuln if coming from BoostInvuln or lives if coming from BoostLives) (BoostCountDbl), else:
+	3FE5 1F             RRA													; bit Head in bit[0], bit Heels in Carry
+	3FE6 E6 01          AND 01												; if Head increment, if Heels add 0
+	3FE8 81             ADD A,C												; coming from BoostLives : either CNT_HEELS_LIVES or CNT_HEAD_LIVES ; coming from BoostInvuln : either CNT_HEELS_INVULN or CNT_HEAD_INVULN
+	3FE9 18 07          JR BoostCountPlus									; boost
 
+;; Head and Heels are joined : increment both counters
+;; This can come from BoostLives (lives) or BoostInvuln (invuln)
 .BoostCountDbl:
-	;; Boosts two subsequent counts. For use when Head and Heels are joined.
-	3FEB 79             LD A,C
+	3FEB 79             LD A,C												; counter for Heels
 	3FEC F5             PUSH AF
-	3FED CD F7 3F       CALL BoostCount
+	3FED CD F7 3F       CALL BoostCount										; boost
 	3FF0 F1             POP AF
-	3FF1 3C             INC A
+	3FF1 3C             INC A												; counter for Head
 .BoostCountPlus:
 	3FF2 F5             PUSH AF
-	3FF3 CD B2 19       CALL DoCopy
+	3FF3 CD B2 19       CALL DoJumpIX										; this does a JP (IX); coming from BoostInvuln2 it'll just RET (special_found_end_2), or a Sound+RET (special_found_end_1) if coming from a Special item function
 	3FF6 F1             POP AF
 .BoostCount:
 	;; Boosts whichever count index is provided in A, and displays it.
-	;; 0: speed, 1: spring, 2:Heels Invul, 3: Head Invul, 4:Heels Lives, 5:Head Lives, 6:Donuts
+	;; 0: speed, 1: spring, 2:Heels Invul, 3: Head Invul,
+	;; 4:Heels Lives, 5:Head Lives, 6:Donuts
 	3FF7 CD 78 41       CALL Get_Count_pointer								; HL=pointer on counter at index in A; output A=increment
-	3FFA CD 66 41       CALL Boost_HLcontent_base10_clamp99 				(AddBCD)
+	3FFA CD 66 41       CALL Boost_HLcontent_base10_clamp99 				; AddBCD clamped
 .Show_Num:
 	; Number to print in A, location in C.
 	3FFD F5             PUSH AF
 	3FFE C5             PUSH BC
 	3FFF A7             AND A
-	4000 3E 81          LD A,81												color1 when printing 0
-	4002 28 02          JR Z,fsnum_1
-	4004 3E 83          LD A,83												color3 if not 0
+	4000 3E 81          LD A,81												; color1 when printing 0
+	4002 28 02          JR Z,fsnum_1										; was "0" else:
+	4004 3E 83          LD A,83												; color3 if not 0
 fsnum_1:
-	4006 CD C2 4A       CALL Print_String
+	4006 CD C2 4A       CALL Print_String									; Print new count on HUD
 	4009 C1             POP BC
 	400A 79             LD A,C
-	400B C6 B1          ADD A,B1											B1 = Ligthning ; Position indexed into array...
+	400B C6 B1          ADD A,B1											; B1 = Ligthning ; Position indexed into array...
 	400D CD C2 4A       CALL Print_String
 	4010 F1             POP AF
-	4011 C3 BF 4B       JP Print_2Digits_RightAligned						print value in A, right aligned; will RET
+	4011 C3 BF 4B       JP Print_2Digits_RightAligned						; print value in A, right aligned; will RET
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; Pick up a crown
+;; Pick up a crown; WorldId in D
 .GetCrown:
-	4014 7A             LD A,D												world nb
-	4015 D6 09          SUB 09												in SpecialFns the GetCrown are items 9 to #E so align it at 0
-	4017 21 EA 3D       LD HL,saved_World_Mask								points on saved_World_Mask
-	401A CD 39 41       CALL Set_bit_nb_A_in_content_HL						set the bit N (N in A) in (HL) corresponding to the world we saved.
-	401D 06 C1          LD B,C1												Sound_ID #C1 = "Tada!"
-	401F CD 91 0D       CALL Play_Sound
-	4022 C3 1D 45       JP Emperor_Screen_Cont
+	4014 7A             LD A,D												; special item ID
+	4015 D6 09          SUB 09												; in SpecialFns the GetCrown are items 9 to #E so align it at 0 (world nb)
+	4017 21 EA 3D       LD HL,saved_World_Mask								; points on saved_World_Mask
+	401A CD 39 41       CALL Set_bit_nb_A_in_content_HL						; set the bit N (N in A) in (HL) corresponding to the world we saved.
+	401D 06 C1          LD B,C1												; Sound_ID #C1 = "Tada!"
+	401F CD 91 0D       CALL Play_Sound										; play
+	4022 C3 1D 45       JP Emperor_Screen_Cont								; display the "Emperor" screen if we got 5 crowns
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Pick up a Fish (save points)
 .SaveContinue:
-	4025 06 C2          LD B,C2												Sound_ID #C2 = Hornpipe
+	4025 06 C2          LD B,C2												; Sound_ID #C2 = Hornpipe
 	4027 CD 91 0D       CALL Play_Sound
 	402A CD 2A 41       CALL GetContinueData								; get current save array (18 bytes)
 	402D DD 21 EB 3D    LD IX,tab_Specials_collectible
@@ -12231,7 +12244,7 @@ br_40DD
 	40F9 EE 03          XOR 03
 	40FB 32 10 BB       LD (Other_Character_state),A
 	40FE E5             PUSH HL
-	40FF CD 22 23       CALL InitThings
+	40FF CD 22 23       CALL InitOtherChar
 	4102 E1             POP HL
 dconti_1:
 	4103 11 0E 01       LD DE,current_Room_ID								point on current_Room_ID
@@ -12252,15 +12265,16 @@ dconti_1:
 	4129 C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
+;; Output : HL points on the Continue_Data data for the Save point in Save_point_value
 .GetContinueData:
-	412A 3A 94 41       LD A,(Save_point_value)								Continues Save point value (living fish)
+	412A 3A 94 41       LD A,(Save_point_value)								; Continues Save point value
 	412D 47             LD B,A
-	412E 04             INC B												get which save point we need to restore
-	412F 21 83 41       LD HL,Continue_Data-#12								Continue_Data (4195) - $12 (because it'll get added #12 just next)
-	4132 11 12 00       LD DE,0012											Char obj size
+	412E 04             INC B												; get which save point we need to restore
+	412F 21 83 41       LD HL,Continue_Data-#12								; Continue_Data (4195) - $12 (because it'll get added #12 just next)
+	4132 11 12 00       LD DE,0012											; Character obj size
 gcdta_loop:
-	4135 19             ADD HL,DE
-	4136 10 FD          DJNZ gcdta_loop										loop until HL points on the data
+	4135 19             ADD HL,DE											; (Continue_Data + #12) B times
+	4136 10 FD          DJNZ gcdta_loop										; loop until HL points on the data
 	4138 C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -12305,7 +12319,7 @@ prntstat_1:
 	415E CD FD 3F       CALL Show_Num										; print value
 	4161 F1             POP AF
 	4162 3D             DEC A												; next counter
-	4163 20 F3          JR NZ,prntstat_1									loop counters id 6 to 0
+	4163 20 F3          JR NZ,prntstat_1									; loop counters id 6 to 0
 	4165 C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -12372,10 +12386,11 @@ CounterIncrements:
 
 ;; -----------------------------------------------------------------------------------------------------------
 .Save_point_value:
-	4194 DATABYTE 00   														; (Continues) Save-point value (living fish comsumed?)
+	4194 DATABYTE 00				; (Continues) Save-point value (living fish comsumed)
 
 ;; A bunch of #12 (18) bytes arrays for save points
 ;; (up to 11 Living Fish are defined in the room data hence the 11*18 size)
+;; The default values are probably "don't care"
 .Continue_Data:
 	;; Default Values do not matter, they'll be overwritten
 	4195 DATABYTE FF 21 00 F8 CD 41 4D F6 01 D1 C9 CD 17 28 C3 34
@@ -12602,22 +12617,22 @@ gs_1:
 ;; third entry goes in A and is the DirTable inverse mapping.
 .DirDeltas:
 	442A 6F             LD L,A
-	442B 87             ADD A,A												*2
-	442C 85             ADD A,L												*3 (groups of 3 bytes)
-	442D C6 3A          ADD A,3A											DirTable2 & #00FF
+	442B 87             ADD A,A												; *2
+	442C 85             ADD A,L												; *3 (groups of 3 bytes)
+	442D C6 3A          ADD A,3A											; DirTable2 & #00FF
 	442F 6F             LD L,A
-	4430 CE 44          ADC A,44											(DirTable2 & #FF00) >> 8	; #443A+(dir*3) ; DirTable2 addr = #443A
+	4430 CE 44          ADC A,44											; (DirTable2 & #FF00) >> 8	; #443A+(dir*3) ; DirTable2 addr = #443A
 	4432 95             SUB L
-	4433 67             LD H,A												Update H if needed (carry)
-	4434 4E             LD C,(HL)											C = 1st byte = Ydelta
+	4433 67             LD H,A												; HL = DirTable2 + 3*A
+	4434 4E             LD C,(HL)											; C = 1st byte = Ydelta
 	4435 23             INC HL
-	4436 46             LD B,(HL)											B = 2nb byte = Xdelta
+	4436 46             LD B,(HL)											; B = 2nb byte = Xdelta
 	4437 23             INC HL
-	4438 7E             LD A,(HL)											A = DirTable inverse mapping
+	4438 7E             LD A,(HL)											; A = DirTable inverse mapping
 	4439 C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; First byte is Y delta, second X, third is reverse lookup?
+;; First byte is Y delta, second X, third is reverse lookup (DirTable inverse mapping)?
 .DirTable2:
 	443A DATABYTE FF 00 0D          		; Ydelta, Xdelta, DirTable ~F2 ; down
 	443D DATABYTE FF FF 09          		; Ydelta, Xdelta, DirTable ~F6 ; south-east
@@ -13256,11 +13271,11 @@ dco_3:
 	475E C0             RET NZ												if not 0 (dying anim) return, else:
 	475F 3A EA 3D       LD A,(saved_World_Mask)								get saved_World_Mask
 	4762 FE 1F          CP 1F												if all worlds saved (then we are Emperor)
-	4764 C8             RET Z												then Return, else
+	4764 C8             RET Z												then Return (invulnerable as Emperor), else
 	4765 36 0C          LD (HL),0C											Set value of DyingAnimFrameIndex to #0C (dying, will count down to 0 while the vape/dying anim is played)
 	4767 3A 58 46       LD A,(access_new_room_code)							get access_new_room_code
 	476A A7             AND A												test if 0
-	476B C4 D4 3F       CALL NZ,BoostInvuln2								call BoostInvuln2 if access_new_room_code not 0
+	476B C4 D4 3F       CALL NZ,BoostInvuln2								??? if merged HnH, then heels boost invuln ??? ; call BoostInvuln2 if access_new_room_code not 0 (changing room)
 	476E 06 C6          LD B,C6												Sound_ID $C6 ; Death noise
 	4770 C3 91 0D       JP Play_Sound										will RET
 
