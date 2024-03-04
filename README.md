@@ -15,6 +15,8 @@ A big thanks and credit must be given to **Simon Frankau**:
     https://github.com/simon-frankau/head-over-heels .
 Simon Frankau did a similar work for the ZX-Spectrum version (from which the CPC version has been ported hence which is very similar), if was therefore natural to merge his work with my own findings.
 
+Thanks Mr. **Ritman** and Mr **Drummond** for one of the best 8-bit game, and Mr **Sugar** for the Amstrad CPC!
+
 Files:
 ======
 
@@ -28,7 +30,13 @@ The main file for this repo is Disasm/fileinfo_II.txt.
 Licence or rather lack thereof:
 ===============================
 
-I do not own anything related to this game and this is some reverse-engineering of somebody else's work.
 This is done as a hobby, for my own interest, as a study case.
+I do not own anything related to this game and this is some reverse-engineering of somebody else's work:
+Head over Heels: 
+* Code : **Jon Ritman**
+* Graphics : **Bernie Drummond**
+* Music : **Guy Stevens**
+* Title screen : **F. David Thorpe**
+* (c) Ocean Software Ltd, Producer Bob Wakelin
 
 I do not accept any responsability related to consulting or using the information in this repository.
