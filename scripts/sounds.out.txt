@@ -1,0 +1,1303 @@
+Sound Title : Silence (ID #C0)
+	Voice #0
+	Data : 11 03 FF FF
+		Ref note : 4 : mi octave 0
+		Main Volume Level : 1
+		No ???
+		SND_NB_FX_SLICES = 0x1
+		SND_CURR_FX_SLICE = 0x1
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x1
+		Envp data = 04 05 07 09 0A 0B 8C
+		Stop
+	Voice #1
+	Data : 11 03 FF FF
+		Ref note : 4 : mi octave 0
+		Main Volume Level : 1
+		No ???
+		SND_NB_FX_SLICES = 0x1
+		SND_CURR_FX_SLICE = 0x1
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x1
+		Envp data = 04 05 07 09 0A 0B 8C
+		Stop
+	Voice #2
+	Data : 11 03 FF FF
+		Ref note : 4 : mi octave 0
+		Main Volume Level : 1
+		No ???
+		SND_NB_FX_SLICES = 0x1
+		SND_CURR_FX_SLICE = 0x1
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x1
+		Envp data = 04 05 07 09 0A 0B 8C
+		Stop
+Sound Title : Tada! (ID #C1)
+	Voice #0
+	Data : 90 41 0C 36 FF 02 35 35 35 45 35 45 FF 41 56 FF 21 57 FF FF
+		Ref note : 0 : do octave 3
+		Main Volume Level : 0
+		No ???
+		SND_NB_FX_SLICES = 0x1
+		SND_CURR_FX_SLICE = 0x1
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x0
+		Envp data = 8C
+		Note = do#	octave 3	; Duration = 8 (Noire)
+		Note = fa#	octave 3	; Duration = 16 (Blanche (2 noires))
+		No ???
+		SND_NB_FX_SLICES = 0x4
+		SND_CURR_FX_SLICE = 0x4
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x2
+		Envp data = 0C 08 04 01 80
+		Div ([#10]) = 0x82
+		SND_NB_FX_SLICES = 0x1
+		SND_CURR_FX_SLICE = 0x1
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x2
+		Envp data = 0C 08 04 01 80
+		Div ([#10]) = 0x82
+		SND_NB_FX_SLICES = 0x1
+		SND_CURR_FX_SLICE = 0x1
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x2
+		Envp data = 0C 08 04 01 80
+		Div ([#10]) = 0x82
+		SND_NB_FX_SLICES = 0x1
+		SND_CURR_FX_SLICE = 0x1
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x2
+		Envp data = 0C 08 04 01 80
+		No ???
+		SND_NB_FX_SLICES = 0x1
+		SND_CURR_FX_SLICE = 0x1
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x2
+		Envp data = 0C 08 04 01 80
+		Div ([#10]) = 0x82
+		SND_NB_FX_SLICES = 0x1
+		SND_CURR_FX_SLICE = 0x1
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x2
+		Envp data = 0C 08 04 01 80
+		No ???
+		SND_NB_FX_SLICES = 0x1
+		SND_CURR_FX_SLICE = 0x1
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x2
+		Envp data = 0C 08 04 01 80
+		Stop
+	Voice #1
+	Data : 90 41 0C 6E FF 02 6D 6D 6D 7D 6D 7D FF 41 D5 FF 21 D2 D7 FF FF
+		Ref note : 0 : do octave 3
+		Main Volume Level : 0
+		No ???
+		SND_NB_FX_SLICES = 0x1
+		SND_CURR_FX_SLICE = 0x1
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x0
+		Envp data = 8C
+		Note = do#	octave 3	; Duration = 8 (Noire)
+		Note = do#	octave 4	; Duration = 16 (Blanche (2 noires))
+		No ???
+		SND_NB_FX_SLICES = 0x4
+		SND_CURR_FX_SLICE = 0x4
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x2
+		Envp data = 0C 08 04 01 80
+		Div ([#10]) = 0x2
+		SND_NB_FX_SLICES = 0x4
+		SND_CURR_FX_SLICE = 0x4
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x4
+		Envp data = 08 00 0C 00 07 00 04 00 02 00 01 80
+		Div ([#10]) = 0x2
+		SND_NB_FX_SLICES = 0x4
+		SND_CURR_FX_SLICE = 0x4
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x4
+		Envp data = 08 00 0C 00 07 00 04 00 02 00 01 80
+		Div ([#10]) = 0x2
+		SND_NB_FX_SLICES = 0x4
+		SND_CURR_FX_SLICE = 0x4
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x4
+		Envp data = 08 00 0C 00 07 00 04 00 02 00 01 80
+		Div ([#10]) = 0x82
+		SND_NB_FX_SLICES = 0x4
+		SND_CURR_FX_SLICE = 0x4
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x4
+		Envp data = 08 00 0C 00 07 00 04 00 02 00 01 80
+		Div ([#10]) = 0x2
+		SND_NB_FX_SLICES = 0x4
+		SND_CURR_FX_SLICE = 0x4
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x4
+		Envp data = 08 00 0C 00 07 00 04 00 02 00 01 80
+		Div ([#10]) = 0x82
+		SND_NB_FX_SLICES = 0x4
+		SND_CURR_FX_SLICE = 0x4
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x4
+		Envp data = 08 00 0C 00 07 00 04 00 02 00 01 80
+		Stop
+	Voice #2
+	Data : 90 41 0C E6 FF 02 B5 B5 B5 C5 B5 C5 FF 41 8D FF 21 8A 8F FF FF
+		Ref note : 0 : do octave 3
+		Main Volume Level : 0
+		No ???
+		SND_NB_FX_SLICES = 0x1
+		SND_CURR_FX_SLICE = 0x1
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x0
+		Envp data = 8C
+		Note = do#	octave 3	; Duration = 8 (Noire)
+		Note = mi	octave 5	; Duration = 16 (Blanche (2 noires))
+		No ???
+		SND_NB_FX_SLICES = 0x4
+		SND_CURR_FX_SLICE = 0x4
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x2
+		Envp data = 0C 08 04 01 80
+		Div ([#10]) = 0x82
+		SND_NB_FX_SLICES = 0x1
+		SND_CURR_FX_SLICE = 0x1
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x2
+		Envp data = 0C 08 04 01 80
+only if Voice 0 : Noise ! (TODO from addr #1002)
+		Div ([#10]) = 0x82
+		SND_NB_FX_SLICES = 0x1
+		SND_CURR_FX_SLICE = 0x1
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x2
+		Envp data = 0C 08 04 01 80
+only if Voice 0 : Noise ! (TODO from addr #1002)
+		Div ([#10]) = 0x82
+		SND_NB_FX_SLICES = 0x1
+		SND_CURR_FX_SLICE = 0x1
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x2
+		Envp data = 0C 08 04 01 80
+only if Voice 0 : Noise ! (TODO from addr #1002)
+		Stop
+Sound Title : Hornpipe (ID #C2)
+	Voice #0
+	Data : 63 02 B2 BA CC 34 34 6A 5A 52 6A 92 8A 94 C2 CA DC 44 44 A2 92 8A 92 8A 7A 6E FF FF
+		Ref note : 0 : do octave 2
+		Main Volume Level : 3
+		No ???
+		SND_NB_FX_SLICES = 0x4
+		SND_CURR_FX_SLICE = 0x4
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x2
+		Envp data = 0C 08 04 01 80
+		Note = la#	octave 3	; Duration = 4 (croche (1/2 noire))
+		Note = si	octave 3	; Duration = 4 (croche (1/2 noire))
+		Note = do#	octave 4	; Duration = 8 (Noire)
+		Note = fa#	octave 2	; Duration = 8 (Noire)
+		Note = fa#	octave 2	; Duration = 8 (Noire)
+		Note = do#	octave 3	; Duration = 4 (croche (1/2 noire))
+		Note = si	octave 2	; Duration = 4 (croche (1/2 noire))
+		Note = la#	octave 2	; Duration = 4 (croche (1/2 noire))
+		Note = do#	octave 3	; Duration = 4 (croche (1/2 noire))
+		Note = fa#	octave 3	; Duration = 4 (croche (1/2 noire))
+		Note = fa	octave 3	; Duration = 4 (croche (1/2 noire))
+		Note = fa#	octave 3	; Duration = 8 (Noire)
+		Note = do	octave 4	; Duration = 4 (croche (1/2 noire))
+		Note = do#	octave 4	; Duration = 4 (croche (1/2 noire))
+		Note = re#	octave 4	; Duration = 8 (Noire)
+		Note = sol#	octave 2	; Duration = 8 (Noire)
+		Note = sol#	octave 2	; Duration = 8 (Noire)
+		Note = sol#	octave 3	; Duration = 4 (croche (1/2 noire))
+		Note = fa#	octave 3	; Duration = 4 (croche (1/2 noire))
+		Note = fa	octave 3	; Duration = 4 (croche (1/2 noire))
+		Note = fa#	octave 3	; Duration = 4 (croche (1/2 noire))
+		Note = fa	octave 3	; Duration = 4 (croche (1/2 noire))
+		Note = re#	octave 3	; Duration = 4 (croche (1/2 noire))
+		Note = do#	octave 3	; Duration = 16 (Blanche (2 noires))
+		Stop
+	Voice #1
+	Data : C0 03 92 8A 94 34 54 6A 5A 52 6A 92 8A 94 8A 92 A4 44 64 A2 92 8A 92 8A 7A 6D FF FF
+		Ref note : 0 : do octave 4
+		Main Volume Level : 0
+		No ???
+		SND_NB_FX_SLICES = 0x1
+		SND_CURR_FX_SLICE = 0x1
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x1
+		Envp data = 04 05 07 09 0A 0B 8C
+		Note = fa#	octave 5	; Duration = 4 (croche (1/2 noire))
+		Note = fa	octave 5	; Duration = 4 (croche (1/2 noire))
+		Note = fa#	octave 5	; Duration = 8 (Noire)
+		Note = fa#	octave 4	; Duration = 8 (Noire)
+		Note = la#	octave 4	; Duration = 8 (Noire)
+		Note = do#	octave 5	; Duration = 4 (croche (1/2 noire))
+		Note = si	octave 4	; Duration = 4 (croche (1/2 noire))
+		Note = la#	octave 4	; Duration = 4 (croche (1/2 noire))
+		Note = do#	octave 5	; Duration = 4 (croche (1/2 noire))
+		Note = fa#	octave 5	; Duration = 4 (croche (1/2 noire))
+		Note = fa	octave 5	; Duration = 4 (croche (1/2 noire))
+		Note = fa#	octave 5	; Duration = 8 (Noire)
+		Note = fa	octave 5	; Duration = 4 (croche (1/2 noire))
+		Note = fa#	octave 5	; Duration = 4 (croche (1/2 noire))
+		Note = sol#	octave 5	; Duration = 8 (Noire)
+		Note = sol#	octave 4	; Duration = 8 (Noire)
+		Note = do	octave 5	; Duration = 8 (Noire)
+		Note = sol#	octave 5	; Duration = 4 (croche (1/2 noire))
+		Note = fa#	octave 5	; Duration = 4 (croche (1/2 noire))
+		Note = fa	octave 5	; Duration = 4 (croche (1/2 noire))
+		Note = fa#	octave 5	; Duration = 4 (croche (1/2 noire))
+		Note = fa	octave 5	; Duration = 4 (croche (1/2 noire))
+		Note = re#	octave 5	; Duration = 4 (croche (1/2 noire))
+		Note = do#	octave 5	; Duration = 12 (noire pointee (1.5 noires))
+		Stop
+	Voice #2
+	Data : 30 02 04 36 0E 56 36 46 1E 64 54 47 FF FF
+		Ref note : 0 : do octave 1
+		Main Volume Level : 0
+		No ???
+		SND_NB_FX_SLICES = 0x4
+		SND_CURR_FX_SLICE = 0x4
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x2
+		Envp data = 0C 08 04 01 80
+		Note = do	octave 1	; Duration = 8 (Noire)
+		Note = fa#	octave 1	; Duration = 16 (Blanche (2 noires))
+		Note = do#	octave 1	; Duration = 16 (Blanche (2 noires))
+		Note = la#	octave 1	; Duration = 16 (Blanche (2 noires))
+		Note = fa#	octave 1	; Duration = 16 (Blanche (2 noires))
+		Note = sol#	octave 1	; Duration = 16 (Blanche (2 noires))
+		Note = re#	octave 1	; Duration = 16 (Blanche (2 noires))
+		Note = do	octave 2	; Duration = 8 (Noire)
+		Note = la#	octave 1	; Duration = 8 (Noire)
+		Note = sol#	octave 1	; Duration = 32 (Ronde (4 noires))
+		Stop
+Sound Title : HoH theme (ID #C3)
+	Voice #0
+	Data : 90 41 31 91 95 97 84 94 FF 22 96 06 CE 06 FF 41 51 B1 B5 B7 A4 B4 FF 22 B6 06 CE 06 FF 41 59 B9 BD BF AC BC FF 22 BE 06 F6 06 FF 41 31 91 95 97 84 94 FF 22 96 06 CE 06 FF 41 CA CD CF BC CC FF 22 CE 06 EE 06 FF 41 C9 F1 F3 03 C9 F1 F3 03 07 C9 F1 F3 03 FF 55 F2 CA EA DA B2 CA BA 92 B2 A4 6A FF 00
+		Ref note : 0 : do octave 3
+		Main Volume Level : 0
+		No ???
+		SND_NB_FX_SLICES = 0x1
+		SND_CURR_FX_SLICE = 0x1
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x0
+		Envp data = 8C
+		Note = fa#	octave 3	; Duration = 2 (double croche (1/4 noire))
+		Note = fa#	octave 4	; Duration = 2 (double croche (1/4 noire))
+		Note = fa#	octave 4	; Duration = 12 (noire pointee (1.5 noires))
+		Note = fa#	octave 4	; Duration = 32 (Ronde (4 noires))
+		Note = mi	octave 4	; Duration = 8 (Noire)
+		Note = fa#	octave 4	; Duration = 8 (Noire)
+		Div ([#10]) = 0x2
+		SND_NB_FX_SLICES = 0x4
+		SND_CURR_FX_SLICE = 0x4
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x2
+		Envp data = 0C 08 04 01 80
+		Div ([#10]) = 0x8
+		SND_NB_FX_SLICES = 0x4
+		SND_CURR_FX_SLICE = 0x4
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x1
+		Envp data = 04 05 07 09 0A 0B 8C
+only if Voice 0 : Noise ! (TODO from addr #1002)
+		No ???
+		SND_NB_FX_SLICES = 0x2
+		SND_CURR_FX_SLICE = 0x2
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x9
+		Envp data = 0C 0B 0A 09 08 07 06 05 04 03 02 81
+only if Voice 0 : Noise ! (TODO from addr #1002)
+		Stop
+	Voice #1
+	Data : 62 08 36 56 6E 7E 86 7E 6E 56 36 56 6E 7E 86 7E 6E 56 5E 7E 96 A6 AE A6 96 7E 36 56 6E 7E 86 7E 6E 56 6E 8E A6 B6 BE B6 A6 8E 96 7E 6E 56 6E 7E 86 8E FF 00
+		Ref note : 0 : do octave 2
+		Main Volume Level : 2
+		No ???
+		SND_NB_FX_SLICES = 0x2
+		SND_CURR_FX_SLICE = 0x2
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x5
+		Envp data = 0C 0A 08 45
+		Note = fa#	octave 2	; Duration = 16 (Blanche (2 noires))
+		Note = la#	octave 2	; Duration = 16 (Blanche (2 noires))
+		Note = do#	octave 3	; Duration = 16 (Blanche (2 noires))
+		Note = re#	octave 3	; Duration = 16 (Blanche (2 noires))
+		Note = mi	octave 3	; Duration = 16 (Blanche (2 noires))
+		Note = re#	octave 3	; Duration = 16 (Blanche (2 noires))
+		Note = do#	octave 3	; Duration = 16 (Blanche (2 noires))
+		Note = la#	octave 2	; Duration = 16 (Blanche (2 noires))
+		Note = fa#	octave 2	; Duration = 16 (Blanche (2 noires))
+		Note = la#	octave 2	; Duration = 16 (Blanche (2 noires))
+		Note = do#	octave 3	; Duration = 16 (Blanche (2 noires))
+		Note = re#	octave 3	; Duration = 16 (Blanche (2 noires))
+		Note = mi	octave 3	; Duration = 16 (Blanche (2 noires))
+		Note = re#	octave 3	; Duration = 16 (Blanche (2 noires))
+		Note = do#	octave 3	; Duration = 16 (Blanche (2 noires))
+		Note = la#	octave 2	; Duration = 16 (Blanche (2 noires))
+		Note = si	octave 2	; Duration = 16 (Blanche (2 noires))
+		Note = re#	octave 3	; Duration = 16 (Blanche (2 noires))
+		Note = fa#	octave 3	; Duration = 16 (Blanche (2 noires))
+		Note = sol#	octave 3	; Duration = 16 (Blanche (2 noires))
+		Note = la	octave 3	; Duration = 16 (Blanche (2 noires))
+		Note = sol#	octave 3	; Duration = 16 (Blanche (2 noires))
+		Note = fa#	octave 3	; Duration = 16 (Blanche (2 noires))
+		Note = re#	octave 3	; Duration = 16 (Blanche (2 noires))
+		Note = fa#	octave 2	; Duration = 16 (Blanche (2 noires))
+		Note = la#	octave 2	; Duration = 16 (Blanche (2 noires))
+		Note = do#	octave 3	; Duration = 16 (Blanche (2 noires))
+		Note = re#	octave 3	; Duration = 16 (Blanche (2 noires))
+		Note = mi	octave 3	; Duration = 16 (Blanche (2 noires))
+		Note = re#	octave 3	; Duration = 16 (Blanche (2 noires))
+		Note = do#	octave 3	; Duration = 16 (Blanche (2 noires))
+		Note = la#	octave 2	; Duration = 16 (Blanche (2 noires))
+		Note = do#	octave 3	; Duration = 16 (Blanche (2 noires))
+		Note = fa	octave 3	; Duration = 16 (Blanche (2 noires))
+		Note = sol#	octave 3	; Duration = 16 (Blanche (2 noires))
+		Note = la#	octave 3	; Duration = 16 (Blanche (2 noires))
+		Note = si	octave 3	; Duration = 16 (Blanche (2 noires))
+		Note = la#	octave 3	; Duration = 16 (Blanche (2 noires))
+		Note = sol#	octave 3	; Duration = 16 (Blanche (2 noires))
+		Note = fa	octave 3	; Duration = 16 (Blanche (2 noires))
+		Note = fa#	octave 3	; Duration = 16 (Blanche (2 noires))
+		Note = re#	octave 3	; Duration = 16 (Blanche (2 noires))
+		Note = do#	octave 3	; Duration = 16 (Blanche (2 noires))
+		Note = la#	octave 2	; Duration = 16 (Blanche (2 noires))
+		Note = do#	octave 3	; Duration = 16 (Blanche (2 noires))
+		Note = re#	octave 3	; Duration = 16 (Blanche (2 noires))
+		Note = mi	octave 3	; Duration = 16 (Blanche (2 noires))
+		Note = fa	octave 3	; Duration = 16 (Blanche (2 noires))
+		Loop
+	Voice #2
+	Data : 93 05 34 94 54 B4 6C CC 7C DC FF 00
+		Ref note : 0 : do octave 3
+		Main Volume Level : 3
+		No ???
+		SND_NB_FX_SLICES = 0x1
+		SND_CURR_FX_SLICE = 0x1
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x2
+		Envp data = 0C 08 04 01 80
+		Note = fa#	octave 3	; Duration = 8 (Noire)
+		Note = fa#	octave 4	; Duration = 8 (Noire)
+		Note = la#	octave 3	; Duration = 8 (Noire)
+		Note = la#	octave 4	; Duration = 8 (Noire)
+		Note = do#	octave 4	; Duration = 8 (Noire)
+		Note = do#	octave 5	; Duration = 8 (Noire)
+		Note = re#	octave 4	; Duration = 8 (Noire)
+		Note = re#	octave 5	; Duration = 8 (Noire)
+		Loop
+Sound Title : No Can Do! (ID #C4)
+	Voice #0
+	Data : 60 51 32 B5 55 32 FF FF
+		Ref note : 0 : do octave 2
+		Main Volume Level : 0
+		Div ([#10]) = 0x8
+		SND_NB_FX_SLICES = 0x1
+		SND_CURR_FX_SLICE = 0x1
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x0
+		Envp data = 8C
+		Note = fa#	octave 2	; Duration = 4 (croche (1/2 noire))
+		Note = la#	octave 3	; Duration = 12 (noire pointee (1.5 noires))
+		Note = la#	octave 2	; Duration = 12 (noire pointee (1.5 noires))
+		Note = fa#	octave 2	; Duration = 4 (croche (1/2 noire))
+		Stop
+	Voice #1
+	Data : C0 51 92 CD 95 92 FF FF
+		Ref note : 0 : do octave 4
+		Main Volume Level : 0
+		Div ([#10]) = 0x8
+		SND_NB_FX_SLICES = 0x1
+		SND_CURR_FX_SLICE = 0x1
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x0
+		Envp data = 8C
+		Note = fa#	octave 5	; Duration = 4 (croche (1/2 noire))
+		Note = do#	octave 6	; Duration = 12 (noire pointee (1.5 noires))
+		Note = fa#	octave 5	; Duration = 12 (noire pointee (1.5 noires))
+		Note = fa#	octave 5	; Duration = 4 (croche (1/2 noire))
+		Stop
+	Voice #2
+	Data : 60 51 92 6D 95 92 FF FF
+		Ref note : 0 : do octave 2
+		Main Volume Level : 0
+		Div ([#10]) = 0x8
+		SND_NB_FX_SLICES = 0x1
+		SND_CURR_FX_SLICE = 0x1
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x0
+		Envp data = 8C
+		Note = fa#	octave 3	; Duration = 4 (croche (1/2 noire))
+		Note = do#	octave 3	; Duration = 12 (noire pointee (1.5 noires))
+		Note = fa#	octave 3	; Duration = 12 (noire pointee (1.5 noires))
+		Note = fa#	octave 3	; Duration = 4 (croche (1/2 noire))
+		Stop
+Sound Title : Dum-diddy-dum (ID #C5)
+	Voice #0
+	Data : 33 43 09 33 FF 08 36 56 5E 66 6C 0C 04 FF 02 32 37 FF FF
+		Ref note : 0 : do octave 1
+		Main Volume Level : 3
+		No ???
+		SND_NB_FX_SLICES = 0x1
+		SND_CURR_FX_SLICE = 0x1
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x1
+		Envp data = 04 05 07 09 0A 0B 8C
+		Note = do#	octave 1	; Duration = 2 (double croche (1/4 noire))
+		Note = fa#	octave 1	; Duration = 6 (croche pointee (3/4 noire))
+		No ???
+		SND_NB_FX_SLICES = 0x2
+		SND_CURR_FX_SLICE = 0x2
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x5
+		Envp data = 0C 0A 08 45
+		Div ([#10]) = 0x82
+		SND_NB_FX_SLICES = 0x4
+		SND_CURR_FX_SLICE = 0x4
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x1
+		Envp data = 04 05 07 09 0A 0B 8C
+		Div ([#10]) = 0x8
+		SND_NB_FX_SLICES = 0x4
+		SND_CURR_FX_SLICE = 0x4
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x1
+		Envp data = 04 05 07 09 0A 0B 8C
+		Div ([#10]) = 0x8
+		SND_NB_FX_SLICES = 0x2
+		SND_CURR_FX_SLICE = 0x2
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x9
+		Envp data = 0C 0B 0A 09 08 07 06 05 04 03 02 81
+		Div ([#10]) = 0x2
+		SND_NB_FX_SLICES = 0x4
+		SND_CURR_FX_SLICE = 0x4
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x1
+		Envp data = 04 05 07 09 0A 0B 8C
+		Div ([#10]) = 0x2
+		SND_NB_FX_SLICES = 0x2
+		SND_CURR_FX_SLICE = 0x2
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x6
+		Envp data = 02 00 00 04 00 00 06 00 00 09 00 0C 00 40
+		No ???
+		SND_NB_FX_SLICES = 0x2
+		SND_CURR_FX_SLICE = 0x2
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x6
+		Envp data = 02 00 00 04 00 00 06 00 00 09 00 0C 00 40
+		No ???
+		SND_NB_FX_SLICES = 0x2
+		SND_CURR_FX_SLICE = 0x2
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x4
+		Envp data = 08 00 0C 00 07 00 04 00 02 00 01 80
+		Stop
+	Voice #1
+	Data : F0 08 04 96 86 7E 76 6C 06 FF 41 94 FF 3E 97 FF FF
+		Ref note : 0 : do octave 5
+		Main Volume Level : 0
+		No ???
+		SND_NB_FX_SLICES = 0x2
+		SND_CURR_FX_SLICE = 0x2
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x5
+		Envp data = 0C 0A 08 45
+		Note = do	octave 5	; Duration = 8 (Noire)
+		Note = fa#	octave 6	; Duration = 16 (Blanche (2 noires))
+		Note = mi	octave 6	; Duration = 16 (Blanche (2 noires))
+		Note = re#	octave 6	; Duration = 16 (Blanche (2 noires))
+		Note = re	octave 6	; Duration = 16 (Blanche (2 noires))
+		Note = do#	octave 6	; Duration = 8 (Noire)
+		Note = do	octave 5	; Duration = 16 (Blanche (2 noires))
+		No ???
+		SND_NB_FX_SLICES = 0x1
+		SND_CURR_FX_SLICE = 0x1
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x0
+		Envp data = 8C
+		Div ([#10]) = 0x8
+		SND_NB_FX_SLICES = 0x2
+		SND_CURR_FX_SLICE = 0x2
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x4
+		Envp data = 08 00 0C 00 07 00 04 00 02 00 01 80
+only if Voice 0 : Noise ! (TODO from addr #1002)
+		Div ([#10]) = 0x82
+		SND_NB_FX_SLICES = 0x2
+		SND_CURR_FX_SLICE = 0x2
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x9
+		Envp data = 0C 0B 0A 09 08 07 06 05 04 03 02 81
+		Div ([#10]) = 0x8
+		SND_NB_FX_SLICES = 0x1
+		SND_CURR_FX_SLICE = 0x1
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x6
+		Envp data = 02 00 00 04 00 00 06 00 00 09 00 0C 00 40
+only if Voice 0 : Noise ! (TODO from addr #1002)
+		Stop
+	Voice #2
+	Data : C0 22 04 96 86 7E 76 6C 06 FF 41 6C FF 2E 6F FF FF
+		Ref note : 0 : do octave 4
+		Main Volume Level : 0
+		Div ([#10]) = 0x2
+		SND_NB_FX_SLICES = 0x4
+		SND_CURR_FX_SLICE = 0x4
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x2
+		Envp data = 0C 08 04 01 80
+		Note = do	octave 4	; Duration = 8 (Noire)
+		Note = fa#	octave 5	; Duration = 16 (Blanche (2 noires))
+		Note = mi	octave 5	; Duration = 16 (Blanche (2 noires))
+		Note = re#	octave 5	; Duration = 16 (Blanche (2 noires))
+		Note = re	octave 5	; Duration = 16 (Blanche (2 noires))
+		Note = do#	octave 5	; Duration = 8 (Noire)
+		Note = do	octave 4	; Duration = 16 (Blanche (2 noires))
+		No ???
+		SND_NB_FX_SLICES = 0x1
+		SND_CURR_FX_SLICE = 0x1
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x0
+		Envp data = 8C
+		Div ([#10]) = 0x2
+		SND_NB_FX_SLICES = 0x2
+		SND_CURR_FX_SLICE = 0x2
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x6
+		Envp data = 02 00 00 04 00 00 06 00 00 09 00 0C 00 40
+		Stop
+Sound Title : Death (ID #C6)
+	Voice #0
+	Data : 60 03 07 06 05 A5 B6 FF FF
+		Ref note : 0 : do octave 2
+		Main Volume Level : 0
+		No ???
+		SND_NB_FX_SLICES = 0x1
+		SND_CURR_FX_SLICE = 0x1
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x1
+		Envp data = 04 05 07 09 0A 0B 8C
+		Note = do	octave 2	; Duration = 32 (Ronde (4 noires))
+		Note = do	octave 2	; Duration = 16 (Blanche (2 noires))
+		Note = do	octave 2	; Duration = 12 (noire pointee (1.5 noires))
+		Note = sol#	octave 3	; Duration = 12 (noire pointee (1.5 noires))
+		Note = la#	octave 3	; Duration = 16 (Blanche (2 noires))
+		Stop
+	Voice #1
+	Data : 90 23 F5 CA C2 CA DD CD 05 5D 6E FF FF
+		Ref note : 0 : do octave 3
+		Main Volume Level : 0
+		Div ([#10]) = 0x2
+		SND_NB_FX_SLICES = 0x1
+		SND_CURR_FX_SLICE = 0x1
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x1
+		Envp data = 04 05 07 09 0A 0B 8C
+		Note = fa#	octave 5	; Duration = 12 (noire pointee (1.5 noires))
+		Note = do#	octave 5	; Duration = 4 (croche (1/2 noire))
+		Note = do	octave 5	; Duration = 4 (croche (1/2 noire))
+		Note = do#	octave 5	; Duration = 4 (croche (1/2 noire))
+		Note = re#	octave 5	; Duration = 12 (noire pointee (1.5 noires))
+		Note = do#	octave 5	; Duration = 12 (noire pointee (1.5 noires))
+		Note = do	octave 3	; Duration = 12 (noire pointee (1.5 noires))
+		Note = si	octave 3	; Duration = 12 (noire pointee (1.5 noires))
+		Note = do#	octave 4	; Duration = 16 (Blanche (2 noires))
+		Stop
+	Voice #2
+	Data : 93 00 95 6A 62 6A 7D 6D FF 82 C0 15 FF 03 8D 96 FF FF
+		Ref note : 0 : do octave 3
+		Main Volume Level : 3
+		No ???
+		SND_NB_FX_SLICES = 0x2
+		SND_CURR_FX_SLICE = 0x2
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x2
+		Envp data = 0C 08 04 01 80
+		Note = fa#	octave 4	; Duration = 12 (noire pointee (1.5 noires))
+		Note = do#	octave 4	; Duration = 4 (croche (1/2 noire))
+		Note = do	octave 4	; Duration = 4 (croche (1/2 noire))
+		Note = do#	octave 4	; Duration = 4 (croche (1/2 noire))
+		Note = re#	octave 4	; Duration = 12 (noire pointee (1.5 noires))
+		Note = do#	octave 4	; Duration = 12 (noire pointee (1.5 noires))
+		No ???
+		SND_NB_FX_SLICES = 0x4
+		SND_CURR_FX_SLICE = 0x4
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x2
+		Envp data = 0C 08 04 01 80
+only if Voice 0 : Noise ! (TODO from addr #1002)
+		Div ([#10]) = 0x8
+		SND_NB_FX_SLICES = 0x1
+		SND_CURR_FX_SLICE = 0x1
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x2
+		Envp data = 0C 08 04 01 80
+		Stop
+Sound Title : Teleport up (ID #C7)
+	Voice #0
+	Data : A0 7C 30 3E FF 7B 5E FE FF FF
+		Ref note : 4 : mi octave 3
+		Main Volume Level : 0
+		Div ([#10]) = 0x82
+		SND_NB_FX_SLICES = 0x2
+		SND_CURR_FX_SLICE = 0x2
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x6
+		Envp data = 02 00 00 04 00 00 06 00 00 09 00 0C 00 40
+		Note = la#	octave 3	; Duration = 1 (triple croche (1/8 noire))
+		Note = si	octave 3	; Duration = 16 (Blanche (2 noires))
+		Div ([#10]) = 0x82
+		SND_NB_FX_SLICES = 0x1
+		SND_CURR_FX_SLICE = 0x1
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x7
+		Envp data = 0C 00 40
+		Div ([#10]) = 0x8
+		SND_NB_FX_SLICES = 0x2
+		SND_CURR_FX_SLICE = 0x2
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x9
+		Envp data = 0C 0B 0A 09 08 07 06 05 04 03 02 81
+		Div ([#10]) = 0x82
+		SND_NB_FX_SLICES = 0x2
+		SND_CURR_FX_SLICE = 0x2
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x9
+		Envp data = 0C 0B 0A 09 08 07 06 05 04 03 02 81
+only if Voice 0 : Noise ! (TODO from addr #1002)
+		Stop
+	Voice #1
+	Data : B8 7C 31 3E FF 7B 5E CE FF 52 AE FF FF
+		Ref note : 10 : la# octave 3
+		Main Volume Level : 0
+		Div ([#10]) = 0x82
+		SND_NB_FX_SLICES = 0x2
+		SND_CURR_FX_SLICE = 0x2
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x6
+		Envp data = 02 00 00 04 00 00 06 00 00 09 00 0C 00 40
+		Note = mi	octave 4	; Duration = 2 (double croche (1/4 noire))
+		Note = fa	octave 4	; Duration = 16 (Blanche (2 noires))
+		Div ([#10]) = 0x82
+		SND_NB_FX_SLICES = 0x1
+		SND_CURR_FX_SLICE = 0x1
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x7
+		Envp data = 0C 00 40
+		Div ([#10]) = 0x8
+		SND_NB_FX_SLICES = 0x2
+		SND_CURR_FX_SLICE = 0x2
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x9
+		Envp data = 0C 0B 0A 09 08 07 06 05 04 03 02 81
+		No ???
+		SND_NB_FX_SLICES = 0x2
+		SND_CURR_FX_SLICE = 0x2
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x9
+		Envp data = 0C 0B 0A 09 08 07 06 05 04 03 02 81
+only if Voice 0 : Noise ! (TODO from addr #1002)
+		Div ([#10]) = 0x8
+		SND_NB_FX_SLICES = 0x4
+		SND_CURR_FX_SLICE = 0x4
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x2
+		Envp data = 0C 08 04 01 80
+		Div ([#10]) = 0x2
+		SND_NB_FX_SLICES = 0x2
+		SND_CURR_FX_SLICE = 0x2
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x9
+		Envp data = 0C 0B 0A 09 08 07 06 05 04 03 02 81
+only if Voice 0 : Noise ! (TODO from addr #1002)
+		Stop
+	Voice #2
+	Data : C3 7C 30 3E FF FB 44 5E CE FF FF
+		Ref note : 0 : do octave 4
+		Main Volume Level : 3
+		Div ([#10]) = 0x82
+		SND_NB_FX_SLICES = 0x2
+		SND_CURR_FX_SLICE = 0x2
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x6
+		Envp data = 02 00 00 04 00 00 06 00 00 09 00 0C 00 40
+		Note = fa#	octave 4	; Duration = 1 (triple croche (1/8 noire))
+		Note = sol	octave 4	; Duration = 16 (Blanche (2 noires))
+		Div ([#10]) = 0x82
+		SND_NB_FX_SLICES = 0x1
+		SND_CURR_FX_SLICE = 0x1
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x7
+		Envp data = 0C 00 40
+only if Voice 0 : Noise ! (TODO from addr #1002)
+		Div ([#10]) = 0x8
+		SND_NB_FX_SLICES = 0x2
+		SND_CURR_FX_SLICE = 0x2
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x9
+		Envp data = 0C 0B 0A 09 08 07 06 05 04 03 02 81
+		No ???
+		SND_NB_FX_SLICES = 0x2
+		SND_CURR_FX_SLICE = 0x2
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x9
+		Envp data = 0C 0B 0A 09 08 07 06 05 04 03 02 81
+only if Voice 0 : Noise ! (TODO from addr #1002)
+		Stop
+Sound Title : Teleport down (ID #C8)
+	Voice #0
+	Data : A0 7B F0 A6 5E FF 7C 3E FF FF
+		Ref note : 4 : mi octave 3
+		Main Volume Level : 0
+		Div ([#10]) = 0x82
+		SND_NB_FX_SLICES = 0x1
+		SND_CURR_FX_SLICE = 0x1
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x7
+		Envp data = 0C 00 40
+		Note = la#	octave 5	; Duration = 1 (triple croche (1/8 noire))
+		Note = do	octave 5	; Duration = 16 (Blanche (2 noires))
+		Note = re#	octave 4	; Duration = 16 (Blanche (2 noires))
+		Div ([#10]) = 0x82
+		SND_NB_FX_SLICES = 0x2
+		SND_CURR_FX_SLICE = 0x2
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x6
+		Envp data = 02 00 00 04 00 00 06 00 00 09 00 0C 00 40
+		Div ([#10]) = 0x82
+		SND_NB_FX_SLICES = 0x2
+		SND_CURR_FX_SLICE = 0x2
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x9
+		Envp data = 0C 0B 0A 09 08 07 06 05 04 03 02 81
+		Stop
+	Voice #1
+	Data : B8 7B C0 A6 5E FF 7C 3E FF 52 27 FF FF
+		Ref note : 10 : la# octave 3
+		Main Volume Level : 0
+		Div ([#10]) = 0x82
+		SND_NB_FX_SLICES = 0x1
+		SND_CURR_FX_SLICE = 0x1
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x7
+		Envp data = 0C 00 40
+		Note = la#	octave 5	; Duration = 1 (triple croche (1/8 noire))
+		Note = fa#	octave 5	; Duration = 16 (Blanche (2 noires))
+		Note = la	octave 4	; Duration = 16 (Blanche (2 noires))
+		Div ([#10]) = 0x82
+		SND_NB_FX_SLICES = 0x2
+		SND_CURR_FX_SLICE = 0x2
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x6
+		Envp data = 02 00 00 04 00 00 06 00 00 09 00 0C 00 40
+		Div ([#10]) = 0x82
+		SND_NB_FX_SLICES = 0x2
+		SND_CURR_FX_SLICE = 0x2
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x9
+		Envp data = 0C 0B 0A 09 08 07 06 05 04 03 02 81
+		Stop
+	Voice #2
+	Data : C3 FC 02 C0 A6 5E FF FB 44 3E FF FF
+		Ref note : 0 : do octave 4
+		Main Volume Level : 3
+		Div ([#10]) = 0x82
+		SND_NB_FX_SLICES = 0x2
+		SND_CURR_FX_SLICE = 0x2
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x6
+		Envp data = 02 00 00 04 00 00 06 00 00 09 00 0C 00 40
+only if Voice 0 : Noise ! (TODO from addr #1002)
+		Note = do	octave 6	; Duration = 1 (triple croche (1/8 noire))
+		Note = sol#	octave 5	; Duration = 16 (Blanche (2 noires))
+		Note = si	octave 4	; Duration = 16 (Blanche (2 noires))
+		Div ([#10]) = 0x82
+		SND_NB_FX_SLICES = 0x1
+		SND_CURR_FX_SLICE = 0x1
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x7
+		Envp data = 0C 00 40
+only if Voice 0 : Noise ! (TODO from addr #1002)
+		Div ([#10]) = 0x82
+		SND_NB_FX_SLICES = 0x2
+		SND_CURR_FX_SLICE = 0x2
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x9
+		Envp data = 0C 0B 0A 09 08 07 06 05 04 03 02 81
+		Stop
+Sound Title : Blacktooth (ID #40)
+	Voice #0
+	Data : C0 0E 34 4E 5C 6C 74 6C 5E 44 26 FF FF
+		Ref note : 0 : do octave 4
+		Main Volume Level : 0
+		No ???
+		SND_NB_FX_SLICES = 0x2
+		SND_CURR_FX_SLICE = 0x2
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x9
+		Envp data = 0C 0B 0A 09 08 07 06 05 04 03 02 81
+		Note = fa#	octave 4	; Duration = 8 (Noire)
+		Note = la	octave 4	; Duration = 16 (Blanche (2 noires))
+		Note = si	octave 4	; Duration = 8 (Noire)
+		Note = do#	octave 5	; Duration = 8 (Noire)
+		Note = re	octave 5	; Duration = 8 (Noire)
+		Note = do#	octave 5	; Duration = 8 (Noire)
+		Note = si	octave 4	; Duration = 16 (Blanche (2 noires))
+		Note = sol#	octave 4	; Duration = 8 (Noire)
+		Note = mi	octave 4	; Duration = 16 (Blanche (2 noires))
+		Stop
+Sound Title : Market (ID #41)
+	Voice #0
+	Data : D0 0E 6E 96 6E 56 FF 01 34 36 FF 0E 7C 6C 54 6E 47 FF FF
+		Ref note : 4 : mi octave 4
+		Main Volume Level : 0
+		No ???
+		SND_NB_FX_SLICES = 0x2
+		SND_CURR_FX_SLICE = 0x2
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x9
+		Envp data = 0C 0B 0A 09 08 07 06 05 04 03 02 81
+		Note = fa	octave 5	; Duration = 16 (Blanche (2 noires))
+		Note = la#	octave 5	; Duration = 16 (Blanche (2 noires))
+		Note = fa	octave 5	; Duration = 16 (Blanche (2 noires))
+		Note = re	octave 5	; Duration = 16 (Blanche (2 noires))
+		No ???
+		SND_NB_FX_SLICES = 0x1
+		SND_CURR_FX_SLICE = 0x1
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x0
+		Envp data = 8C
+		Div ([#10]) = 0x82
+		SND_NB_FX_SLICES = 0x2
+		SND_CURR_FX_SLICE = 0x2
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x4
+		Envp data = 08 00 0C 00 07 00 04 00 02 00 01 80
+		Div ([#10]) = 0x82
+		SND_NB_FX_SLICES = 0x4
+		SND_CURR_FX_SLICE = 0x4
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x1
+		Envp data = 04 05 07 09 0A 0B 8C
+		Stop
+Sound Title : Egyptus (ID #42)
+	Voice #0
+	Data : C3 03 94 8C 94 8C FF 26 76 FF 61 6A 72 8A FF 22 8A FF 03 94 8C 74 8C 94 AC A4 94 FF 26 8F FF 22 80 FF FF
+		Ref note : 0 : do octave 4
+		Main Volume Level : 3
+		No ???
+		SND_NB_FX_SLICES = 0x1
+		SND_CURR_FX_SLICE = 0x1
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x1
+		Envp data = 04 05 07 09 0A 0B 8C
+		Note = fa#	octave 5	; Duration = 8 (Noire)
+		Note = fa	octave 5	; Duration = 8 (Noire)
+		Note = fa#	octave 5	; Duration = 8 (Noire)
+		Note = fa	octave 5	; Duration = 8 (Noire)
+		Div ([#10]) = 0x2
+		SND_NB_FX_SLICES = 0x4
+		SND_CURR_FX_SLICE = 0x4
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x1
+		Envp data = 04 05 07 09 0A 0B 8C
+		Div ([#10]) = 0x82
+		SND_NB_FX_SLICES = 0x4
+		SND_CURR_FX_SLICE = 0x4
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x1
+		Envp data = 04 05 07 09 0A 0B 8C
+		Stop
+Sound Title : Penitentiary (ID #43)
+	Voice #0
+	Data : 60 02 6C 96 04 96 8C 96 94 96 FF 0F 8C FF 01 AA FF 41 B2 FF 22 B4 FF 02 04 96 FF FF
+		Ref note : 0 : do octave 2
+		Main Volume Level : 0
+		No ???
+		SND_NB_FX_SLICES = 0x4
+		SND_CURR_FX_SLICE = 0x4
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x2
+		Envp data = 0C 08 04 01 80
+		Note = do#	octave 3	; Duration = 8 (Noire)
+		Note = fa#	octave 3	; Duration = 16 (Blanche (2 noires))
+		Note = do	octave 2	; Duration = 8 (Noire)
+		Note = fa#	octave 3	; Duration = 16 (Blanche (2 noires))
+		Note = fa	octave 3	; Duration = 8 (Noire)
+		Note = fa#	octave 3	; Duration = 16 (Blanche (2 noires))
+		Note = fa#	octave 3	; Duration = 8 (Noire)
+		Note = fa#	octave 3	; Duration = 16 (Blanche (2 noires))
+		No ???
+		SND_NB_FX_SLICES = 0x1
+		SND_CURR_FX_SLICE = 0x1
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x8
+		Envp data = 08 0A 0C 0C 0B 0A 09 08 07 06 05 04 03 02 81
+		No ???
+		SND_NB_FX_SLICES = 0x2
+		SND_CURR_FX_SLICE = 0x2
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x6
+		Envp data = 02 00 00 04 00 00 06 00 00 09 00 0C 00 40
+only if Voice 0 : Noise ! (TODO from addr #1002)
+		No ???
+		SND_NB_FX_SLICES = 0x1
+		SND_CURR_FX_SLICE = 0x1
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x0
+		Envp data = 8C
+		Div ([#10]) = 0x2
+		SND_NB_FX_SLICES = 0x3
+		SND_CURR_FX_SLICE = 0x3
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x4
+		Envp data = 08 00 0C 00 07 00 04 00 02 00 01 80
+only if Voice 0 : Noise ! (TODO from addr #1002)
+		No ???
+		SND_NB_FX_SLICES = 0x1
+		SND_CURR_FX_SLICE = 0x1
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x0
+		Envp data = 8C
+		Div ([#10]) = 0x82
+		SND_NB_FX_SLICES = 0x4
+		SND_CURR_FX_SLICE = 0x4
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x2
+		Envp data = 0C 08 04 01 80
+only if Voice 0 : Noise ! (TODO from addr #1002)
+		Div ([#10]) = 0x2
+		SND_NB_FX_SLICES = 0x4
+		SND_CURR_FX_SLICE = 0x4
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x2
+		Envp data = 0C 08 04 01 80
+		Div ([#10]) = 0x82
+		SND_NB_FX_SLICES = 0x2
+		SND_CURR_FX_SLICE = 0x2
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x4
+		Envp data = 08 00 0C 00 07 00 04 00 02 00 01 80
+only if Voice 0 : Noise ! (TODO from addr #1002)
+		No ???
+		SND_NB_FX_SLICES = 0x4
+		SND_CURR_FX_SLICE = 0x4
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x2
+		Envp data = 0C 08 04 01 80
+		No ???
+		SND_NB_FX_SLICES = 0x2
+		SND_CURR_FX_SLICE = 0x2
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x4
+		Envp data = 08 00 0C 00 07 00 04 00 02 00 01 80
+		Div ([#10]) = 0x8
+		SND_NB_FX_SLICES = 0x4
+		SND_CURR_FX_SLICE = 0x4
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x1
+		Envp data = 04 05 07 09 0A 0B 8C
+only if Voice 0 : Noise ! (TODO from addr #1002)
+		Stop
+Sound Title : Moon base (ID #44)
+	Voice #0
+	Data : A8 0F 35 35 55 6D 6E 04 55 56 04 35 36 FF FF
+		Ref note : 6 : fa# octave 3
+		Main Volume Level : 0
+		No ???
+		SND_NB_FX_SLICES = 0x1
+		SND_CURR_FX_SLICE = 0x1
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x8
+		Envp data = 08 0A 0C 0C 0B 0A 09 08 07 06 05 04 03 02 81
+		Note = do	octave 4	; Duration = 12 (noire pointee (1.5 noires))
+		Note = do	octave 4	; Duration = 12 (noire pointee (1.5 noires))
+		Note = mi	octave 4	; Duration = 12 (noire pointee (1.5 noires))
+		Note = sol	octave 4	; Duration = 12 (noire pointee (1.5 noires))
+		Note = sol	octave 4	; Duration = 16 (Blanche (2 noires))
+		Note = fa#	octave 3	; Duration = 8 (Noire)
+		Note = mi	octave 4	; Duration = 12 (noire pointee (1.5 noires))
+		Note = mi	octave 4	; Duration = 16 (Blanche (2 noires))
+		Note = fa#	octave 3	; Duration = 8 (Noire)
+		Note = do	octave 4	; Duration = 12 (noire pointee (1.5 noires))
+		Note = do	octave 4	; Duration = 16 (Blanche (2 noires))
+		Stop
+Sound Title : Book world (ID #45)
+	Voice #0
+	Data : 90 0E 0C 36 24 35 45 4E 44 4D 35 26 34 25 0D FF 0E 27 FF FF
+		Ref note : 0 : do octave 3
+		Main Volume Level : 0
+		No ???
+		SND_NB_FX_SLICES = 0x2
+		SND_CURR_FX_SLICE = 0x2
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x9
+		Envp data = 0C 0B 0A 09 08 07 06 05 04 03 02 81
+		Note = do#	octave 3	; Duration = 8 (Noire)
+		Note = fa#	octave 3	; Duration = 16 (Blanche (2 noires))
+		Note = mi	octave 3	; Duration = 8 (Noire)
+		Note = fa#	octave 3	; Duration = 12 (noire pointee (1.5 noires))
+		Note = sol#	octave 3	; Duration = 12 (noire pointee (1.5 noires))
+		Note = la	octave 3	; Duration = 16 (Blanche (2 noires))
+		Note = sol#	octave 3	; Duration = 8 (Noire)
+		Note = la	octave 3	; Duration = 12 (noire pointee (1.5 noires))
+		Note = fa#	octave 3	; Duration = 12 (noire pointee (1.5 noires))
+		Note = mi	octave 3	; Duration = 16 (Blanche (2 noires))
+		Note = fa#	octave 3	; Duration = 8 (Noire)
+		Note = mi	octave 3	; Duration = 12 (noire pointee (1.5 noires))
+		Note = do#	octave 3	; Duration = 12 (noire pointee (1.5 noires))
+		No ???
+		SND_NB_FX_SLICES = 0x2
+		SND_CURR_FX_SLICE = 0x2
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x9
+		Envp data = 0C 0B 0A 09 08 07 06 05 04 03 02 81
+		Div ([#10]) = 0x2
+		SND_NB_FX_SLICES = 0x1
+		SND_CURR_FX_SLICE = 0x1
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x6
+		Envp data = 02 00 00 04 00 00 06 00 00 09 00 0C 00 40
+		Stop
+Sound Title : Safari (ID #46)
+	Voice #0
+	Data : 40 02 36 0C 24 36 0C 24 34 4C 0C 4C 36 FF FF
+		Ref note : 4 : mi octave 1
+		Main Volume Level : 0
+		No ???
+		SND_NB_FX_SLICES = 0x4
+		SND_CURR_FX_SLICE = 0x4
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x2
+		Envp data = 0C 08 04 01 80
+		Note = la#	octave 1	; Duration = 16 (Blanche (2 noires))
+		Note = fa	octave 1	; Duration = 8 (Noire)
+		Note = sol#	octave 1	; Duration = 8 (Noire)
+		Note = la#	octave 1	; Duration = 16 (Blanche (2 noires))
+		Note = fa	octave 1	; Duration = 8 (Noire)
+		Note = sol#	octave 1	; Duration = 8 (Noire)
+		Note = la#	octave 1	; Duration = 8 (Noire)
+		Note = do#	octave 2	; Duration = 8 (Noire)
+		Note = fa	octave 1	; Duration = 8 (Noire)
+		Note = do#	octave 2	; Duration = 8 (Noire)
+		Note = la#	octave 1	; Duration = 16 (Blanche (2 noires))
+		Stop
+Sound Title : Teleport waiting (ID #47)
+	Voice #0
+	Data : F0 67 10 F6 06 16 07 FF FF
+		Ref note : 0 : do octave 5
+		Main Volume Level : 0
+		Div ([#10]) = 0x2
+		SND_NB_FX_SLICES = 0x1
+		SND_CURR_FX_SLICE = 0x1
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x6
+		Envp data = 02 00 00 04 00 00 06 00 00 09 00 0C 00 40
+		Note = re	octave 5	; Duration = 1 (triple croche (1/8 noire))
+		Note = fa#	octave 7	; Duration = 16 (Blanche (2 noires))
+		Note = do	octave 5	; Duration = 16 (Blanche (2 noires))
+		Note = re	octave 5	; Duration = 16 (Blanche (2 noires))
+		Note = do	octave 5	; Duration = 32 (Ronde (4 noires))
+		Stop
+Sound Title : Donut firing (ID #48)
+	Voice #0
+	Data : 27 50 51 BB FF 5D 97 FF FF
+		Ref note : 9 : la octave 0
+		Main Volume Level : 3
+		Div ([#10]) = 0x8
+		SND_NB_FX_SLICES = 0x2
+		SND_CURR_FX_SLICE = 0x2
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x2
+		Envp data = 0C 08 04 01 80
+		Note = sol	octave 1	; Duration = 2 (double croche (1/4 noire))
+		Note = sol#	octave 2	; Duration = 6 (croche pointee (3/4 noire))
+		Div ([#10]) = 0x8
+		SND_NB_FX_SLICES = 0x4
+		SND_CURR_FX_SLICE = 0x4
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x4
+		Envp data = 08 00 0C 00 07 00 04 00 02 00 01 80
+		Div ([#10]) = 0x8
+		SND_NB_FX_SLICES = 0x1
+		SND_CURR_FX_SLICE = 0x1
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x6
+		Envp data = 02 00 00 04 00 00 06 00 00 09 00 0C 00 40
+only if Voice 0 : Noise ! (TODO from addr #1002)
+		Stop
+Sound Title : ???????? (ID #00)
+	Voice #0
+	Data : 03 86 41 11 03 FF FF
+		Ref note : 0 : do octave 0
+		Main Volume Level : 3
+		No ???
+		SND_NB_FX_SLICES = 0x4
+		SND_CURR_FX_SLICE = 0x4
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x1
+		Envp data = 04 05 07 09 0A 0B 8C
+only if Voice 0 : Noise ! (TODO from addr #1002)
+		Note = re	octave 0	; Duration = 2 (double croche (1/4 noire))
+		Note = do	octave 0	; Duration = 6 (croche pointee (3/4 noire))
+		Stop
+Sound Title : ???????? (ID #01)
+	Voice #0
+	Data : 00 86 82 12 FF FF
+		Ref note : 0 : do octave 0
+		Main Volume Level : 0
+		No ???
+		SND_NB_FX_SLICES = 0x4
+		SND_CURR_FX_SLICE = 0x4
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x1
+		Envp data = 04 05 07 09 0A 0B 8C
+only if Voice 0 : Noise ! (TODO from addr #1002)
+		Note = re	octave 0	; Duration = 4 (croche (1/2 noire))
+		Stop
+Sound Title : ???????? (ID #02)
+	Voice #0
+	Data : FF 00 F3 EB E3 DB FF FF
+		Ref note : 3 : re# octave 5
+		Main Volume Level : 3
+		No ???
+		SND_NB_FX_SLICES = 0x2
+		SND_CURR_FX_SLICE = 0x2
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x2
+		Envp data = 0C 08 04 01 80
+		Note = la	octave 7	; Duration = 6 (croche pointee (3/4 noire))
+		Note = sol#	octave 7	; Duration = 6 (croche pointee (3/4 noire))
+		Note = sol	octave 7	; Duration = 6 (croche pointee (3/4 noire))
+		Note = fa#	octave 7	; Duration = 6 (croche pointee (3/4 noire))
+		Stop
+Sound Title : Didididip (ID #03)
+	Voice #0
+	Data : A0 40 30 6C 31 6C 41 6C FF FF
+		Ref note : 4 : mi octave 3
+		Main Volume Level : 0
+		No ???
+		SND_NB_FX_SLICES = 0x2
+		SND_CURR_FX_SLICE = 0x2
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x2
+		Envp data = 0C 08 04 01 80
+		Note = la#	octave 3	; Duration = 1 (triple croche (1/8 noire))
+		Note = fa	octave 4	; Duration = 8 (Noire)
+		Note = la#	octave 3	; Duration = 2 (double croche (1/4 noire))
+		Note = fa	octave 4	; Duration = 8 (Noire)
+		Note = do	octave 4	; Duration = 2 (double croche (1/4 noire))
+		Note = fa	octave 4	; Duration = 8 (Noire)
+		Stop
+Sound Title : GlouGlouGlou (ID #04)
+	Voice #0
+	Data : 03 CA 44 F0 0F FF 8C 01 0C FF FF
+		Ref note : 0 : do octave 0
+		Main Volume Level : 3
+		No ???
+		SND_NB_FX_SLICES = 0x3
+		SND_CURR_FX_SLICE = 0x3
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x4
+		Envp data = 08 00 0C 00 07 00 04 00 02 00 01 80
+only if Voice 0 : Noise ! (TODO from addr #1002)
+		Note = fa#	octave 2	; Duration = 1 (triple croche (1/8 noire))
+		Note = do#	octave 0	; Duration = 32 (Ronde (4 noires))
+		No ???
+		SND_NB_FX_SLICES = 0x2
+		SND_CURR_FX_SLICE = 0x2
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x6
+		Envp data = 02 00 00 04 00 00 06 00 00 09 00 0C 00 40
+only if Voice 0 : Noise ! (TODO from addr #1002)
+		No ???
+		SND_NB_FX_SLICES = 0x2
+		SND_CURR_FX_SLICE = 0x2
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x6
+		Envp data = 02 00 00 04 00 00 06 00 00 09 00 0C 00 40
+		Stop
+Sound Title : Beep (ID #05)
+	Voice #0
+	Data : B3 47 10 43 00 FF FF
+		Ref note : 8 : sol# octave 3
+		Main Volume Level : 3
+		No ???
+		SND_NB_FX_SLICES = 0x1
+		SND_CURR_FX_SLICE = 0x1
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x6
+		Envp data = 02 00 00 04 00 00 06 00 00 09 00 0C 00 40
+		Note = la#	octave 3	; Duration = 1 (triple croche (1/8 noire))
+		Note = mi	octave 4	; Duration = 6 (croche pointee (3/4 noire))
+		Note = sol#	octave 3	; Duration = 1 (triple croche (1/8 noire))
+		Stop
+Sound Title : Walking (ID #80)
+	Voice #0
+	Data : D3 29 31 51 01 41 29 01 31 19 01 29 41 01 FF 00
+		Ref note : 4 : mi octave 4
+		Main Volume Level : 3
+		Div ([#10]) = 0x2
+		SND_NB_FX_SLICES = 0x1
+		SND_CURR_FX_SLICE = 0x1
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x3
+		Envp data = 04 01 80
+		Note = la#	octave 4	; Duration = 2 (double croche (1/4 noire))
+		Note = re	octave 5	; Duration = 2 (double croche (1/4 noire))
+		Note = mi	octave 4	; Duration = 2 (double croche (1/4 noire))
+		Note = do	octave 5	; Duration = 2 (double croche (1/4 noire))
+		Note = la	octave 4	; Duration = 2 (double croche (1/4 noire))
+		Note = mi	octave 4	; Duration = 2 (double croche (1/4 noire))
+		Note = la#	octave 4	; Duration = 2 (double croche (1/4 noire))
+		Note = sol	octave 4	; Duration = 2 (double croche (1/4 noire))
+		Note = mi	octave 4	; Duration = 2 (double croche (1/4 noire))
+		Note = la	octave 4	; Duration = 2 (double croche (1/4 noire))
+		Note = do	octave 5	; Duration = 2 (double croche (1/4 noire))
+		Note = mi	octave 4	; Duration = 2 (double croche (1/4 noire))
+		Loop
+Sound Title : Running (ID #81)
+	Voice #0
+	Data : D3 09 31 51 00 41 29 00 31 19 00 29 41 00 FF 00
+		Ref note : 4 : mi octave 4
+		Main Volume Level : 3
+		No ???
+		SND_NB_FX_SLICES = 0x1
+		SND_CURR_FX_SLICE = 0x1
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x3
+		Envp data = 04 01 80
+		Note = la#	octave 4	; Duration = 2 (double croche (1/4 noire))
+		Note = re	octave 5	; Duration = 2 (double croche (1/4 noire))
+		Note = mi	octave 4	; Duration = 1 (triple croche (1/8 noire))
+		Note = do	octave 5	; Duration = 2 (double croche (1/4 noire))
+		Note = la	octave 4	; Duration = 2 (double croche (1/4 noire))
+		Note = mi	octave 4	; Duration = 1 (triple croche (1/8 noire))
+		Note = la#	octave 4	; Duration = 2 (double croche (1/4 noire))
+		Note = sol	octave 4	; Duration = 2 (double croche (1/4 noire))
+		Note = mi	octave 4	; Duration = 1 (triple croche (1/8 noire))
+		Note = la	octave 4	; Duration = 2 (double croche (1/4 noire))
+		Note = do	octave 5	; Duration = 2 (double croche (1/4 noire))
+		Note = mi	octave 4	; Duration = 1 (triple croche (1/8 noire))
+		Loop
+Sound Title : descending sequence - faster (ID #82)
+	Voice #0
+	Data : D3 09 F3 EB E3 DB EB E3 DB D3 E3 DB D3 CB DB D3 CB C3 FF 00
+		Ref note : 4 : mi octave 4
+		Main Volume Level : 3
+		No ???
+		SND_NB_FX_SLICES = 0x1
+		SND_CURR_FX_SLICE = 0x1
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x3
+		Envp data = 04 01 80
+		Note = la#	octave 6	; Duration = 6 (croche pointee (3/4 noire))
+		Note = la	octave 6	; Duration = 6 (croche pointee (3/4 noire))
+		Note = sol#	octave 6	; Duration = 6 (croche pointee (3/4 noire))
+		Note = sol	octave 6	; Duration = 6 (croche pointee (3/4 noire))
+		Note = la	octave 6	; Duration = 6 (croche pointee (3/4 noire))
+		Note = sol#	octave 6	; Duration = 6 (croche pointee (3/4 noire))
+		Note = sol	octave 6	; Duration = 6 (croche pointee (3/4 noire))
+		Note = fa#	octave 6	; Duration = 6 (croche pointee (3/4 noire))
+		Note = sol#	octave 6	; Duration = 6 (croche pointee (3/4 noire))
+		Note = sol	octave 6	; Duration = 6 (croche pointee (3/4 noire))
+		Note = fa#	octave 6	; Duration = 6 (croche pointee (3/4 noire))
+		Note = fa	octave 6	; Duration = 6 (croche pointee (3/4 noire))
+		Note = sol	octave 6	; Duration = 6 (croche pointee (3/4 noire))
+		Note = fa#	octave 6	; Duration = 6 (croche pointee (3/4 noire))
+		Note = fa	octave 6	; Duration = 6 (croche pointee (3/4 noire))
+		Note = mi	octave 6	; Duration = 6 (croche pointee (3/4 noire))
+		Loop
+Sound Title : Fall (ID #83)
+	Voice #0
+	Data : D3 09 BB A3 8B 73 5B 43 2B 23 FF 00
+		Ref note : 4 : mi octave 4
+		Main Volume Level : 3
+		No ???
+		SND_NB_FX_SLICES = 0x1
+		SND_CURR_FX_SLICE = 0x1
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x3
+		Envp data = 04 01 80
+		Note = re#	octave 6	; Duration = 6 (croche pointee (3/4 noire))
+		Note = do	octave 6	; Duration = 6 (croche pointee (3/4 noire))
+		Note = la	octave 5	; Duration = 6 (croche pointee (3/4 noire))
+		Note = fa#	octave 5	; Duration = 6 (croche pointee (3/4 noire))
+		Note = re#	octave 5	; Duration = 6 (croche pointee (3/4 noire))
+		Note = do	octave 5	; Duration = 6 (croche pointee (3/4 noire))
+		Note = la	octave 4	; Duration = 6 (croche pointee (3/4 noire))
+		Note = sol#	octave 4	; Duration = 6 (croche pointee (3/4 noire))
+		Loop
+Sound Title : Repeated rising sequence (ID #84)
+	Voice #0
+	Data : D3 09 13 33 53 73 93 B3 D3 DB E3 EE FF 00
+		Ref note : 4 : mi octave 4
+		Main Volume Level : 3
+		No ???
+		SND_NB_FX_SLICES = 0x1
+		SND_CURR_FX_SLICE = 0x1
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x3
+		Envp data = 04 01 80
+		Note = fa#	octave 4	; Duration = 6 (croche pointee (3/4 noire))
+		Note = la#	octave 4	; Duration = 6 (croche pointee (3/4 noire))
+		Note = re	octave 5	; Duration = 6 (croche pointee (3/4 noire))
+		Note = fa#	octave 5	; Duration = 6 (croche pointee (3/4 noire))
+		Note = la#	octave 5	; Duration = 6 (croche pointee (3/4 noire))
+		Note = re	octave 6	; Duration = 6 (croche pointee (3/4 noire))
+		Note = fa#	octave 6	; Duration = 6 (croche pointee (3/4 noire))
+		Note = sol	octave 6	; Duration = 6 (croche pointee (3/4 noire))
+		Note = sol#	octave 6	; Duration = 6 (croche pointee (3/4 noire))
+		Note = la	octave 6	; Duration = 16 (Blanche (2 noires))
+		Loop
+Sound Title : higher blip (ID #85)
+	Voice #0
+	Data : 78 05 33 FF FF
+		Ref note : 6 : fa# octave 2
+		Main Volume Level : 0
+		No ???
+		SND_NB_FX_SLICES = 0x1
+		SND_CURR_FX_SLICE = 0x1
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x2
+		Envp data = 0C 08 04 01 80
+		Note = do	octave 3	; Duration = 6 (croche pointee (3/4 noire))
+		Stop
+Sound Title : high blip (ID #86)
+	Voice #0
+	Data : 60 25 33 FF FF
+		Ref note : 0 : do octave 2
+		Main Volume Level : 0
+		Div ([#10]) = 0x2
+		SND_NB_FX_SLICES = 0x1
+		SND_CURR_FX_SLICE = 0x1
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x2
+		Envp data = 0C 08 04 01 80
+		Note = fa#	octave 2	; Duration = 6 (croche pointee (3/4 noire))
+		Stop
+Sound Title : sweep down and up (ID #87)
+	Voice #0
+	Data : D3 60 34 6A FF 09 01 BA BA FF FF
+		Ref note : 4 : mi octave 4
+		Main Volume Level : 3
+		Div ([#10]) = 0x2
+		SND_NB_FX_SLICES = 0x2
+		SND_CURR_FX_SLICE = 0x2
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x2
+		Envp data = 0C 08 04 01 80
+		Note = la#	octave 4	; Duration = 8 (Noire)
+		Note = fa	octave 5	; Duration = 4 (croche (1/2 noire))
+		No ???
+		SND_NB_FX_SLICES = 0x1
+		SND_CURR_FX_SLICE = 0x1
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x3
+		Envp data = 04 01 80
+		No ???
+		SND_NB_FX_SLICES = 0x1
+		SND_CURR_FX_SLICE = 0x1
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x0
+		Envp data = 8C
+		Div ([#10]) = 0x82
+		SND_NB_FX_SLICES = 0x3
+		SND_CURR_FX_SLICE = 0x3
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x4
+		Envp data = 08 00 0C 00 07 00 04 00 02 00 01 80
+only if Voice 0 : Noise ! (TODO from addr #1002)
+		Stop
+Sound Title : Menu blip (ID #88)
+	Voice #0
+	Data : 90 44 10 43 00 FF FF
+		Ref note : 0 : do octave 3
+		Main Volume Level : 0
+		No ???
+		SND_NB_FX_SLICES = 0x2
+		SND_CURR_FX_SLICE = 0x2
+		array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = 0x4
+		Envp data = 08 00 0C 00 07 00 04 00 02 00 01 80
+		Note = re	octave 3	; Duration = 1 (triple croche (1/8 noire))
+		Note = sol#	octave 3	; Duration = 6 (croche pointee (3/4 noire))
+		Note = do	octave 3	; Duration = 1 (triple croche (1/8 noire))
+		Stop
