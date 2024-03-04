@@ -2743,7 +2743,7 @@ psid_32:
 ;;  C3 : 110000 11 : #30|3 = num 48 : ref do (octave 5)
 ;;  C0 : 110000 00 : #30|0 = num 48 : ref do (octave 5)
 ;;  A8 : 101010 00 : #2A|0 = num 42 : ref fa# (octave 4)
-;; The 2nd byte is (TODO) the volume/enveloppe
+;; The 2nd byte is (TODO) the volume/enveloppe: [7:4][3:0]
 .Sub_update_voice:
 	0E33 CD 4C 0E       CALL Get_sound_data_pointer_in_IX					; IX points on current voice data
 	0E36 01 03 02       LD BC,0203											; B = 2 right shift ; C=03 mask
@@ -3000,7 +3000,8 @@ rnsplt_loop:																; need to shift right so that the lsb bit od D is at
 	0F92 C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
-;;
+;; IX : points on Data:  Voice_data_C?_V?
+;; IY : points on channel sound object : Voice_channel_?_data
 .Slice_VolumeEnvp_Effects:
 	0F93 01 0F 04       LD BC,040F											; B = 4 right shifts; C = #0F mask which means split in two 4-bit nibbles
 	0F96 CD 84 0F       CALL Read_IX_data_and_split							; Read (IX) and split : D = high nibble, E = low nibble
@@ -3008,11 +3009,15 @@ rnsplt_loop:																; need to shift right so that the lsb bit od D is at
 	0F9B FD A6 00       AND (IY+SND_FLAGS)									; only keep bit[1] from...
 	0F9E FD 77 00       LD (IY+SND_FLAGS),A									; ... the status/flag byte in the Voice_channel<n>_data array
 	0FA1 CB 52          BIT 2,D												; test bit 2 of high nibble in D
-	0FA3 28 04          JR Z,f0fa9_1										; and effectively copy that bit...
-	0FA5 FD CB 00 F6    SET 6,(IY+SND_FLAGS)								; ...in the status/flags bit6
+	0FA3 28 04          JR Z,f0fa9_1										; and effectively copy that bit (0 or 1)...
+	0FA5 FD CB 00 F6    SET 6,(IY+SND_FLAGS)								; ...in the status/flags bit6, because b6 was reset before.
 f0fa9_1:
+	; this will check if the 2nd byte bits[5:4] are 0, then skip all this;
+	; else if 1, 2 and 3, calc in A :
+	; max(x;y) / min(x;y) and A bit[7] = '0' if x>=y else '1' if x<y with
+	; x and y from the Voice_data_10AD, index being [5:4]-1
 	0FA9 3E 03          LD A,03												; this is to look at the (IX) data bits [5:4] or high nibble in D [1:0]
-	0FAB A2             AND D												; keep D[1:0] only and test if value = 0
+	0FAB A2             AND D												; keep D[1:0] (data high nibble) only and test if value = 0
 	0FAC 28 2E          JR Z,f0fdc_1										; if 0 then jump f0fdc_1, else D[1:0] is 1, 2 or 3
 	0FAE D5             PUSH DE												; save DE (splited (IX) data byte (2nd byte of sound data))
 	0FAF 3D             DEC A												; D[1:0] value-1 (new value can be 0, 1 or 2)
@@ -3040,10 +3045,11 @@ f0fa9_2:
 
 f0fa9_3:
 	0FD3 B2             OR D
-	;; from the values in 10AD we seem to get at this point: (can also be 0 if all this was skipped)
-	;; 8|1 : D=8; E=0; A=8
-	;; 4|2 : D=2; E=0; A=2
-	;; 4|8 : D=1; E=#20; A=#81
+	;; from the values in 10AD we seem to get at this point: A = max(D;E) / min(D;E) and A bit[7] = '0' if D>=E else '1' if D<E
+	;; (can also be 0 if all this was skipped)
+	;; 8|1 : D=8; E=0; A=8 		(8/1 = 8 and A bit[7] = 0 : D>=E)
+	;; 4|2 : D=2; E=0; A=2 		(4/2 = 2 and A bit[7] = 0 : D>=E)
+	;; 4|8 : D=2; E=#20; A=#82 	(8/4 = 2 and A bit[7] = 1 : D<E)
 f0fd4_1:
 	0FD4 FD 77 10       LD (IY+10),A										; store that computed A value in array[#10]
 	0FD7 FD CB 00 FE    SET 7,(IY+SND_FLAGS)								; and set bit7 of the status/flags
@@ -3059,7 +3065,7 @@ f0fdc_1:
 	0FEC CD 3F 10       CALL Func_Sound_103F								; choose volume array (E offset from low byte of data from Voice_data_10BE, can be from 0 to 9)
 	0FEF 3A 53 10       LD A,(Current_sound_voice_number)					; get Current sound voice number
 	0FF2 A7             AND A
-	0FF3 20 04          JR NZ,f0ff9_1										; if not 0 jump, else
+	0FF3 20 04          JR NZ,f0ff9_1										; if not 0 skip to f0ff9_1, else
 	0FF5 FD CB 00 9E    RES 3,(IY+SND_FLAGS)								; if channel 0 : reset status/flag bit3
 f0ff9_1:
 	0FF9 DD CB 00 7E    BIT 7,(IX+00)										; test 2nd byte of sound data bit7
@@ -3078,7 +3084,7 @@ f0ff9_1:
 	1016 3E 0F          LD A,0F
 	1018 A3             AND E
 	1019 5F             LD E,A
-	101A 21 B8 10       LD HL,Voice_data_10B8
+	101A 21 B8 10       LD HL,Noise_data_10B8
 	101D CB 03          RLC E
 	101F 16 00          LD D,00
 	1021 19             ADD HL,DE
@@ -3098,12 +3104,12 @@ f0ff9_1:
 	103E C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; Input: E has the offset from the data [3:0] in table at 10BE (can be 0 to 9)
+;; Input: E has the offset from the data [3:0] in table at 10BE (can be 0 to 9 from the sound data)
 .Func_Sound_103F:
 	103F 21 CE 10       LD HL,Voice_data_10CE								; points on 10CE array
 	1042 16 00          LD D,00
 	1044 19             ADD HL,DE											; add E as an offset
-	1045 5E             LD E,(HL)											; get value from that array
+	1045 5E             LD E,(HL)											; get the offset value from that array
 	1046 19             ADD HL,DE											; and add more offset
 	1047 FD 75 01       LD (IY+SND_VOL_PTR_L),L								; final value go in array[1]
 	104A FD 74 02       LD (IY+SND_VOL_PTR_H),H								; and array[2] (chosen volume array pointer)
@@ -3188,10 +3194,14 @@ Sound_channels_enable:
 ;; Sound data format:
 ;;	* 1st byte: data[7:2] = reference note number ;
 ;;              data[1:0] = volume level (to increase general volume for channel)
-;;	* 2nd byte: data[7:4] ; data[3:0]	: volume/enveloppe/effect ????
+;;	* 2nd byte: data[7:4] ; data[3:0]	: First volume/enveloppe/effect ????
+;;		if bit[7] = 1 (noise) then read one more byte to get the envp for noise.
 ;;		then:
 ;;    		byte: data[7:3]=note offset from ref note ; data[2:0]=duration index
-;;		or	byte = FF + (enveloppe/effect?)
+;;		or	byte =  FF + function:
+;;					FF 00 : loop back from 2nd byte
+;;					FF FF : end
+;;					FF nn : new enveloppe
 ;;
 ;; note_duration_offset:  0  1  2  3  4  5  6  7
 ;;	    DATABYTE (hex)   01 02 04 06 08 0C 10 20
@@ -3211,10 +3221,10 @@ Sound_channels_enable:
 ;;	 96        10010 110	offset=#12 duration_index=blanche	note = la# (octave 6)
 ;;	 6E        01101 110	offset=#0D duration_index=blanche	note = fa (octave 6)
 ;;	 56        01010 110	offset=#0A duration_index=blanche	note = re (octave 6)
-;;	 FF 01		volume/envp 01
+;;	 FF 01		new volume/envp 01
 ;;	 34        00110 100	offset=#06 duration_index=noire		note = la# (octave 5)
 ;;	 36        00110 110	offset=#06 duration_index=blanche	note = la# (octave 5)
-;;	 FF 0E		volume/envp 0E
+;;	 FF 0E		new volume/envp 0E
 ;;	 7C        01111 100	offset=#0F duration_index=noire		note = sol (octave 6)
 ;;	 6C        01101 100	offset=#0D duration_index=noire		note = fa (octave 6)
 ;;	 54        01010 100	offset=#0A duration_index=noire		note = re (octave 6)
@@ -3232,20 +3242,21 @@ Sound_channels_enable:
 ;; 101 : 12	noire pointée (1.5 noires)
 ;; 110 : 16	Blanche (2 noires)
 ;; ___ : 24	Blanche pointée (3 noires) NOT USED!
-;; 111 32	Ronde (4 noires)
+;; 111 : 32	Ronde (4 noires)
 .Note_duration_array:														; note_durations
     ;; note_duration_offset:   0  1  2  3  4  5  6  7
 	10B0 DATABYTE             01 02 04 06 08 0C 10 20
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; These are probably the Volume Enveloppes
-.Voice_data_10B8:
+.Noise_data_10B8:
 	10B8 DATABYTE 12 14 10 0C 36 00           								; TODO: Noise ENV; nibbles   1;2  1;4 1;0; 0;c 3;6  0;0
 
 .Voice_data_10BE:
 	10BE DATABYTE 22 10 42 11 24 12 41 16 25 13 34 17 26 44 29 18    		; TODO: Sound envp parts and effect number ; nibbles  42: 4 volume effect parts; index 2 in volume effect pointers array
 
 .Voice_data_10CE: ;0  1  2  3  4  5  6  7  8  9								; TODO: Sound Volume effect pointers (offset pointer to volume (enveloppe) array)
+	;    #10?? :  DE D8 DF E1 E4 F0 F4 FF 102 105
 	10CE DATABYTE 10 09 0F 10 12 1D 20 2A 2C 2E
 Voice_data_10D8:
 	10D8 DATABYTE 04 05 07 09 0A 0B											; volume enveloppes effects per parts
@@ -3303,7 +3314,7 @@ Voice_data_10D8:
 ;; -----------------------------------------------------------------------------------------------------------
 ;; This array return the pointers on the 3 channels data per HQ Sound ID Cx
 .Sound_High_table:									; Sound_group_3 ID 0xCx
-	1111 DATABYTE 4A 13 4A 13 4A 13					; Sound ID#C0 Silence		Voice_data_noise, Voice_data_noise, Voice_data_noise
+	1111 DATABYTE 4A 13 4A 13 4A 13					; Sound ID#C0 Silence		Voice_data_Silence, Voice_data_Silence, Voice_data_Silence
 	1117 DATABYTE BE 13 D2 13 E7 13					; Sound ID#C1 "Tada!"		Voice_data_C1_V0, Voice_data_C1_V1, Voice_data_C1_V2
 	111D DATABYTE FC 13 18 14 34 14					; Sound ID#C2 Hornpipe 		Voice_data_C2_V0, Voice_data_C2_V1, Voice_data_C2_V2
 	1123 DATABYTE 91 11 F4 11 28 12					; Sound ID#C3 HoH theme 	Voice_data_C3_V0, Voice_data_C3_V1, Voice_data_C3_V2
@@ -3427,11 +3438,12 @@ Voice_data_10D8:
 	1341 DATABYTE 00 86 82 12 FF FF
 .Voice_data_ID00:															; 00 ????????
 	1347 DATABYTE 03 86 41
-.Voice_data_noise:															; Sound ID #C0 (noise) Voice 0, 1 and 2 and ID # 80 Walking
-	134A DATABYTE 11 03 FF FF D3 29 31 51 01 41 29 01 31 19 01 29
-	135A DATABYTE 41 01
+.Voice_data_Silence:														; Sound ID #C0 (Silence) V0,1 and 2
+	134A DATABYTE 11 03 FF FF
+.Voice_data_noise:															; 80 Walking
+	134E DATABYTE D3 29 31 51 01 41 29 01 31 19 01 29 41 01
 .Voice_data_ID02:															; 02 ????????
-	135C DATABYTE FF 00 F3 EB E3 DB FF FF
+	135C DATABYTE FF 00 F3 EB E3 DB FF FF									; The "FF 00" is the end of "80 Walking"
 .Voice_data_ID81:															; 81 Running
 	1364 DATABYTE D3 09 31 51 00 41 29 00 31 19 00 29 41 00 FF 00
 .Voice_data_ID82:															; 82 (descending sequence - faster)
