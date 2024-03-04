@@ -14,3 +14,12 @@ Script 2:
 Executable : **spr_display.py** : Will display a few sprites by mixing image and mask.
 
 Note: Needs pygame-ce 2.4.0 or above
+
+Script 3:
+=========
+
+Executable : **sounds.py** : Music/Sounds data parsing.
+
+input data in : sounds_in.py
+
+Output log/result : sounds.out.txt
