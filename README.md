@@ -22,7 +22,8 @@ Files:
 
 Note : The files are intended to be view with a Tabs size of 4 defined in your "ProfileImage > Settings > Appearance > Tab Size preference".
 
-The main file for this repo is Disasm/fileinfo_II.txt.
+**The main file for this repo is Disasm/fileinfo_II.txt.**
+-------------------------------------------------------
 * DSK/HEADOVER.dsk : The WinApe compatible DSK file (Amstrad CPC disk image)
 * scripts/hoh_rooms.py : Python3 script that decompacts the Rooms data to visualize the data we get. Result log file scripts/hoh_rooms.out.txt
 * scripts/sounds.py : Python3 script that decompacts the Music/Sounds data. Result log file scripts/sounds.out.txt
