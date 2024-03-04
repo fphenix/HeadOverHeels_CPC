@@ -13,7 +13,7 @@ Thanks:
 
 A big thanks and credit must be given to **Simon Frankau**:
     https://github.com/simon-frankau/head-over-heels .
-Simon Frankau did a similar work for the ZX-Spectrum version (from which the CPC version has been ported hence which is very similar).
+Simon Frankau did a similar work for the ZX-Spectrum version (from which the CPC version has been ported hence which is very similar), if was therefore natural to merge his work with my own findings.
 
 Files:
 ======
