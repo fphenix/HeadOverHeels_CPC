@@ -3141,56 +3141,6 @@ Sound_channels_enable:
 	105F DATAWORD 00 00
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; Channel data to compute the AY3 registers ; 19 bytes per voice
-;;  * SND_FLAGS 							: 0x00 : flags & status
-;;  * SND_VOL_PTR_L, SND_VOL_PTR_L			: 0x01-0x02: Pointer to vol array
-;;  * SND_VOL_INDEX							: 0x03: current Index into vol array
-;;  * SND_CURR_FX_SLICE						: 0x04: ??? current value for (maybe) in how many parts the current note duration id cut to apply effects (bend/vibrato))
-;;  * SND_NB_FX_SLICES						: 0x05: ??? init value for (maybe) in how many parts the current note duration id cut to apply effects (bend/vibrato))
-;;  * NOISE_FINE, NOISE_COARSE	 			: 0x06-0x07: Noise fine and coarse pitch
-;;  * SND_FINE, SND_COARSE					: 0x08-0x09: Sound fine and coarse pitch
-;;  * SND_REF_NOTE							: 0x0A: Reference note number (first data byte [7:2]>>2)
-;;  * SND_VOL_LEVEL							: 0x0B: Volume addition (first data byte [1:0])
-;;  * 										: 0x0C:
-;;  * SND_NOTE_DURATION 					: 0x0D: note duration
-;;  * SND_DELTA_FINE, SND_DELTA_COARSE		: 0x0E-0x0F: Sound delta pitch (fine and coarse) for bend/vibrato effects
-;;  * 										: 0x10:
-;;  * NOISE_DELTA_FINE, NOISE_DELTA_COARSE	: 0x11-0x12: Noise delta pitch (fine and coarse) for bend/vibrato effects
-.Voice_channel_0_data:
-	;;             0  1  2  3  4  5  6  7  8  9  A  B  C  D  E  F 10 11 12
-	1061 DATABYTE 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-.Voice_channel_1_data:
-	1074 DATABYTE 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-.Voice_channel_2_data:
-	1087 DATABYTE 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-
-;; -----------------------------------------------------------------------------------------------------------
-.Voice_Noise_data:															; (noise)
-	109A DATABYTE 00 00 00 00 00 00 00 00									; Voice_Noise_data+0 to Voice_Noise_data+7
-
-;; -----------------------------------------------------------------------------------------------------------
-;; AY-3-8912 registers
-;; AY_A_FINE:       EQU 0  ; Channel A fine pitch    8-bit (0-255)
-;; AY_A_COARSE:     EQU 1  ; Channel A course pitch  4-bit (0-15)
-;; AY_B_FINE:       EQU 2  ; Channel B fine pitch    8-bit (0-255)
-;; AY_B_COARSE:     EQU 3  ; Channel B course pitch  4-bit (0-15)
-;; AY_C_FINE:       EQU 4  ; Channel C fine pitch    8-bit (0-255)
-;; AY_C_COARSE:     EQU 5  ; Channel C course pitch  4-bit (0-15)
-;; AY_NOISE:        EQU 6  ; Noise pitch             5-bit (0-31)
-;; AY_MIXER:        EQU 7  ; Mixer                   8-bit
-;; AY_A_VOL:        EQU 8  ; Channel A volume        4-bit (0-15)
-;; AY_B_VOL:        EQU 9  ; Channel B volume        4-bit (0-15)
-;; AY_C_VOL:        EQU 10 ; Channel C volume        4-bit (0-15)
-;; -----------------------------------------------------------------------------------------------------------
-;; This array store the value to be written to the AY-3 PSG
-.AY_Registers:																; 11 registers
-	10A2 DATABYTE 00 00 00 00 00 00 00 3F 00 00 00
-
-;; -----------------------------------------------------------------------------------------------------------
-.Voice_data_10AD:
-	10AD DATABYTE 81 42 48   												; this is 3 pairs of nibbles 8;1 4;2  4;8
-
-;; -----------------------------------------------------------------------------------------------------------
 ;; Sound data format:
 ;;	* 1st byte: data[7:2] = reference note number ;
 ;;              data[1:0] = volume level (to increase general volume for channel)
@@ -3231,6 +3181,92 @@ Sound_channels_enable:
 ;;	 6E        01101 110	offset=#0D duration_index=blanche	note = fa (octave 6)
 ;;	 47        01000 111	offset=#08 duration_index=ronde		note = do (octave 6)
 ;;	 FF FF		end
+;; -----------------------------------------------------------------------------------------------------------
+
+;; -----------------------------------------------------------------------------------------------------------
+;; Channel data to compute the AY3 registers ; 19 bytes per voice
+;;  * SND_FLAGS 							: 0x00 : flags & status
+;;  * SND_VOL_PTR_L, SND_VOL_PTR_L			: 0x01-0x02: Pointer to vol array
+;;  * SND_VOL_INDEX							: 0x03: current Index into vol array
+;;  * SND_CURR_FX_SLICE						: 0x04: ??? current value for (maybe) in how many parts the current note duration id cut to apply effects (bend/vibrato))
+;;  * SND_NB_FX_SLICES						: 0x05: ??? init value for (maybe) in how many parts the current note duration id cut to apply effects (bend/vibrato))
+;;  * NOISE_FINE, NOISE_COARSE	 			: 0x06-0x07: Noise fine and coarse pitch
+;;  * SND_FINE, SND_COARSE					: 0x08-0x09: Sound fine and coarse pitch
+;;  * SND_REF_NOTE							: 0x0A: Reference note number (first data byte [7:2]>>2)
+;;  * SND_VOL_LEVEL							: 0x0B: Volume addition (first data byte [1:0])
+;;  * 										: 0x0C:
+;;  * SND_NOTE_DURATION 					: 0x0D: note duration
+;;  * SND_DELTA_FINE, SND_DELTA_COARSE		: 0x0E-0x0F: Sound delta pitch (fine and coarse) for bend/vibrato effects
+;;  * 										: 0x10:
+;;  * NOISE_DELTA_FINE, NOISE_DELTA_COARSE	: 0x11-0x12: Noise delta pitch (fine and coarse) for bend/vibrato effects
+.Voice_channel_0_data:
+	;;             0  1  2  3  4  5  6  7  8  9  A  B  C  D  E  F 10 11 12
+	1061 DATABYTE 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+.Voice_channel_1_data:
+	1074 DATABYTE 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+.Voice_channel_2_data:
+	1087 DATABYTE 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+
+;; -----------------------------------------------------------------------------------------------------------
+.Voice_Noise_data:															; (noise)
+	109A DATABYTE 00 00 00 00 00 00 00 00									; Voice_Noise_data+0 to Voice_Noise_data+7
+
+;; -----------------------------------------------------------------------------------------------------------
+;; AY-3-8912 registers:
+;; AY_A_FINE:       EQU 00 ; Channel A fine pitch    8-bit (0-255)
+;; AY_A_COARSE:     EQU 01 ; Channel A coarse pitch  4-bit (0-15)
+;; AY_B_FINE:       EQU 02 ; Channel B fine pitch    8-bit (0-255)
+;; AY_B_COARSE:     EQU 03 ; Channel B coarse pitch  4-bit (0-15)
+;; AY_C_FINE:       EQU 04 ; Channel C fine pitch    8-bit (0-255)
+;; AY_C_COARSE:     EQU 05 ; Channel C coarse pitch  4-bit (0-15)
+;; AY_NOISE:        EQU 06 ; Noise pitch             5-bit (0-31)
+;; AY_MIXER:        EQU 07 ; Mixer                   8-bit
+;; AY_A_VOL:        EQU 08 ; Channel A volume        4-bit (0-15)
+;; AY_B_VOL:        EQU 09 ; Channel B volume        4-bit (0-15)
+;; AY_C_VOL:        EQU 0A ; Channel C volume        4-bit (0-15)
+;; -----------------------------------------------------------------------------------------------------------
+;; Registers AY_<A|B|C>_<FINE&COARSE>:
+;; Note freq = 440 * (2^((Octave -4) - ((10-N) / 12))
+;; 			with N the note (do=1, do#=2, ... la=10, la#=11, si=12)
+;;			and with "Octave" from 1 to 8, where Octave=4 is the A (A4:440Hz) reference octave (La international ; octave 4).
+;; Note Tone = (Chip_Clk / 16) / freq = (1MHz / 16) / freq = 62500 / freq
+;; It is the note Tone that will be programmed in the fine&coarse pitch registers.
+;; eg. Tenor Middle C (C3 = do octave 3) is programmed with a Tone of 478,
+;; hence producing a frequency of 62500/478 =~ 131Hz.
+;; To calculate the tone from the frequency of C3 (do octave 3) :
+;; 		freq = 440 * 2^((3 - 4) - ((10-1) / 12)) = 440 * 2^(-1.75) =~ 440 * 0.2973 =~ 130.8 Hz
+;;      Tone = 62500 / 130.8 =~ 478   =>  0x1DE    =>   fine = 0xDE, coarse = 0x01
+;; -----------------------------------------------------------------------------------------------------------
+;; Register AY_NOISE:
+;; For noise : Freq =  (Chip_Clk / 16) / Note_periode = (1MHz / 16) / Note_periode = 62500 / Note_periode
+;; where Note_periode is the value in AY_NOISE[4:0]
+;; -----------------------------------------------------------------------------------------------------------
+;; Register AY_MIXER:
+;; Mixer : bit0, 1, 2 = Channel A, B, C Tone : enable (if '0') / disable (if '1')
+;; 		   bit3, 4, 5 = Channel A, B, C Noise : enable (if '0') / disable (if '1')
+;; 		   bit6 = I/O PortA direction (not for Sounds/Noise/Music)
+;; -----------------------------------------------------------------------------------------------------------
+;; Registers AY_<A|B|C>_VOL:
+;; 		  bits [3:0] = Amplitude (volume)
+;;		  bit[4] : '0' to use the value in bits[3:0]; '1' to use the Hardware Envelope registers
+;;                 (here always '0' because it does Softawre-envp)
+;; -----------------------------------------------------------------------------------------------------------
+;; Other AY-3 registers:
+;; This game will generate Software-Envelopes (ie. it won't use the Hardware registers
+;; AY_ENVP_FINE (0B), AY_ENVP_COARSE (0C) and AY_ENVP_SHAPE (0D) but instead
+;; will update the pitch registers, the volume or the duration to create sounds effects
+;; like bends, vibratoes, etc.).
+;; The register AY_IO_PORT (0E) is used for keyboard scanning, not for Sounds.
+;; -----------------------------------------------------------------------------------------------------------
+
+;; This array store the value to be written to the AY-3 PSG
+.AY_Registers:																; 11 registers
+	10A2 DATABYTE 00 00 00 00 00 00 00 3F 00 00 00
+
+;; -----------------------------------------------------------------------------------------------------------
+.Voice_data_10AD:
+	10AD DATABYTE 81 42 48   												; this is 3 pairs of nibbles 8;1 4;2 4;8
+
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Notes duration:
 ;; 000 : 1	triple croche (1/8 noire)
