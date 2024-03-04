@@ -40,11 +40,11 @@ def Parse_Sound_Data(fw, soundData):
         
         if idx == 0: # first byte
             referenceNote, mainVolumeLevel = byteSplit(dataByte, 2) # first byte[7:2] = ref Note in octave 0 ; # first byte[1:0] = global volume Level
-            octave = int(referenceNote/12)
+            octave = int(referenceNote/12) + 1
             referenceNote = referenceNote % 12
-            print(referenceNote, dataByte)
             fwrite(fw, 2, f"Ref note : {referenceNote} : " + Note_name[referenceNote] + f" octave {octave}")
             fwrite(fw, 2, f"Main Volume Level : {mainVolumeLevel}")
+
         elif idx == 1 or doEnvp: # 2nd byte
             doEnvp = False
             h, l = byteSplit(dataByte, 4) # [7:4] ; # [3:0]
@@ -62,8 +62,8 @@ def Parse_Sound_Data(fw, soundData):
             x, y = byteSplit(int(array_10BE[l], 16), 4) # [7:4] ; # [3:0]
             fwrite(fw, 2, "SND_NB_FX_SLICES = " + hex(x))
             fwrite(fw, 2, "SND_CURR_FX_SLICE = " + hex(x))
-            fwrite(fw, 2, "array__10CE index (SND_VOL_PTR_H, SND_VOL_PTR_L) = " + hex(y))
-            envp_data = array_10CE[y]
+            fwrite(fw, 2, "Volume_Envp_data index (SND_VOL_PTR_H, SND_VOL_PTR_L) = " + hex(y))
+            envp_data = Volume_Envp_data[y]
             fwrite(fw, 2, "Envp data = " + envp_data)
             if (h32 >> 1):
                 fwrite(fw, 2, "only if Voice 0 : ", eol = False)
