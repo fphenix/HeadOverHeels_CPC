@@ -3055,14 +3055,14 @@ f0fd4_1:
 	0FD7 FD CB 00 FE    SET 7,(IY+SND_FLAGS)								; and set bit7 of the status/flags
 	0FDB D1             POP DE												; restore DE (splited 2nd data byte)
 f0fdc_1:
-	0FDC 21 BE 10       LD HL,Voice_data_10BE								; points on 10BE array
+	0FDC 21 BE 10       LD HL,Volume_Envp_Speed_n_Select					; points on Volume_Envp_Speed_n_Select array
 	0FDF 16 00          LD D,00
 	0FE1 19             ADD HL,DE											; add 2nd byte low nibble as an offset
 	0FE2 56             LD D,(HL)											; and get corresponding data (eg. E=#05 get D=#12)
 	0FE3 CD 7F 0F       CALL Get_nibbles_from_D_to_D_and_E					; and split in 2 (eg; D=#12 gives D=#01; E=#02)
 	0FE6 FD 72 05       LD (IY+SND_NB_FX_SLICES),D							; Store D (is a value from 1 to 4) in both array[5] (TODO: init/max number of volume effect parts)
 	0FE9 FD 72 04       LD (IY+SND_CURR_FX_SLICE),D							; ... and array[4] (TODO: Current index volume effect)
-	0FEC CD 3F 10       CALL Func_Sound_103F								; choose volume array (E offset from low byte of data from Voice_data_10BE, can be from 0 to 9)
+	0FEC CD 3F 10       CALL Func_Sound_103F								; choose volume array (E offset from low byte of data from Volume_Envp_Speed_n_Select, can be from 0 to 9)
 	0FEF 3A 53 10       LD A,(Current_sound_voice_number)					; get Current sound voice number
 	0FF2 A7             AND A
 	0FF3 20 04          JR NZ,f0ff9_1										; if not 0 skip to f0ff9_1, else
@@ -3106,7 +3106,7 @@ f0ff9_1:
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Input: E has the offset from the data [3:0] in table at 10BE (can be 0 to 9 from the sound data)
 .Func_Sound_103F:
-	103F 21 CE 10       LD HL,Voice_data_10CE								; points on 10CE array
+	103F 21 CE 10       LD HL,Volume_Envp_ptrs								; points on Volume_Envp_ptrs array
 	1042 16 00          LD D,00
 	1044 19             ADD HL,DE											; add E as an offset
 	1045 5E             LD E,(HL)											; get the offset value from that array
@@ -3288,13 +3288,16 @@ Sound_channels_enable:
 .Noise_data_10B8:
 	10B8 DATABYTE 12 14 10 0C 36 00           								; TODO: Noise ENV; nibbles   1;2  1;4 1;0; 0;c 3;6  0;0
 
-.Voice_data_10BE:
+.Volume_Envp_Speed_n_Select:
 	10BE DATABYTE 22 10 42 11 24 12 41 16 25 13 34 17 26 44 29 18    		; TODO: Sound envp parts and effect number ; nibbles  42: 4 volume effect parts; index 2 in volume effect pointers array
 
-.Voice_data_10CE: ;0  1  2  3  4  5  6  7  8  9								; TODO: Sound Volume effect pointers (offset pointer to volume (enveloppe) array)
+.Volume_Envp_ptrs: ;0  1  2  3  4  5  6  7  8  9							; TODO: Sound Volume effect pointers (offset pointer to volume (enveloppe) array)
 	;    #10?? :  DE D8 DF E1 E4 F0 F4 FF 102 105
 	10CE DATABYTE 10 09 0F 10 12 1D 20 2A 2C 2E
-Voice_data_10D8:
+
+;; when bit 7 is set it's probably the end (stay at last value in [5:0] ??)
+;; when bit 6 is set : ??TODO?? does it mean loop over or redo it in reverse from the end??
+.Volume_Envp_data:
 	10D8 DATABYTE 04 05 07 09 0A 0B											; volume enveloppes effects per parts
 	10DE DATABYTE 8C
 	10DF DATABYTE 0C 08
@@ -3304,7 +3307,7 @@ Voice_data_10D8:
 	10F4 DATABYTE 02 00 00 04 00 00 06 00 00 09 00
 	10FF DATABYTE 0C 00 40
 	1102 DATABYTE 08 0A 0C
-	1105 DATABYTE 0C 0B 0A 09 08 07 06 05 04 03 02 81
+	1105 DATABYTE 0C 0B 0A 09 08 07 06 05 04 03 02 81						; for exemple, this will decrease the note volume at each "tick", if SND_NB_FX_SLICES = 2, then it'll do "0c 0c 0b 0b 0a 0a etc."; Note that it may not reach the end of the data if the note is shorter.
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Sounds ID 0x, 4x, 8x are 1 channel sounds
