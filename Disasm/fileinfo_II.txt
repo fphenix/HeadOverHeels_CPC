@@ -24,13 +24,15 @@ Entry:
 
 ;; -----------------------------------------------------------------------------------------------------------
 current_Room_ID:
-	010E 00 00			DEFW 	#0000						;; Current room ID ; eg. Head's first room = #8A40
+	010E 00 00			DEFW 	#0000										;; Current room ID ; eg. Head's first room = #8A40
 Do_Objects_Phase:
-	0110 00				DEFB 	#00             			;; top bit toggles every "Do_Objects" loop
+	0110 00				DEFB 	#00             							;; top bit toggles every "Do_Objects" loop
 
-Last_Direction:
+;; -----------------------------------------------------------------------------------------------------------
+;; CFSLRDUJ user inputs and directions (Carry,Fire,Swop,Left,Right,Down,Up,Jump)
+Last_User_Inputs:
 	0111 EF				DEFB 	#EF
-Current_Direction:
+Current_User_Inputs:
 	0112 FF 			DEFB 	#FF
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -49,11 +51,12 @@ Current_Direction:
 .FireDonuts_Pressed:										;; Fire Donut
 	0115 00 			DEFB 	#00
 
+;; -----------------------------------------------------------------------------------------------------------
 Frame_counter:
 	0116 01 			DEFB 	#01							;; used as Character speed (or rather how much delay you add)
 Saved_Dir_ptr:
-	0117 FB 			DEFB 	#FB 						;; copy of Heels character_direction
-	0118 FB 			DEFB 	#FB							;; copy of Head character_direction
+	0117 FB 			DEFB 	#FB 						;; copy of Heels LRDU character_direction
+	0118 FB 			DEFB 	#FB							;; copy of Head LRDU character_direction
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Main : Entry point and main loop
@@ -123,7 +126,7 @@ RoomID_Heels_1st:		EQU		#8940
 	016B C0             RET 	NZ											;; if not in Victory Room then RET, else:
 	016C 32 14 01       LD 		(SwopChara_Pressed),A						;; reset SwopChara_Pressed = No swopping allowed (Note: A was set to 0 at addr 0164 in Sub_Check_Victory_Room)
 	016F 3D             DEC 	A											;; A = FF
-	0170 32 12 01       LD 		(Current_Direction),A						;; update Current_Direction (FF = No movement)
+	0170 32 12 01       LD 		(Current_User_Inputs),A						;; reset Current_User_Inputs (FF = No movement/No inputs) CFSLRDUJ
 	0173 21 28 4C       LD 		HL,delay_CannonBall							;; point delay_CannonBall
 	0176 35             DEC 	(HL)										;; count down delay value before we trigger fire a cannon ball
 	0177 7E             LD 		A,(HL)										;; get (HL)=delay_CannonBall; Note that delay_CannonBall value is reset back to #60 when a CannonBall is fired (see ObjFnCannonFire)
@@ -261,7 +264,7 @@ us_skip:
 ;; The value A from Get_user_inputs is:
 ;;		bit7:Carry, Fire, Swop, Left, Right, Down, Up, bit0: Jump (active low)
 .Check_User_Input:
-	0212 CD 01 0B       CALL 	Get_user_inputs								;; get user inputs in A
+	0212 CD 01 0B       CALL 	Get_user_inputs								;; get user inputs in A (CFSLRDUJ)
 	0215 CB 7F          BIT 	7,A											;; was key corresponding to CarryObject feature pressed?
 	0217 21 13 01       LD 		HL,special_key_pressed						;; points on CarryObject_Pressed (index 0)
 	021A CD 62 02       CALL 	Update_key_pro_curr_idx						;; update CarryObject_Pressed from the key pressed in A
@@ -269,9 +272,9 @@ us_skip:
 	021F CD 61 02       CALL 	Update_key_pro_next_idx						;; if needed update SwopChara_Pressed (index 1)
 	0222 CB 77          BIT 	6,A											;; or was if the FireDonuts key?
 	0224 CD 61 02       CALL 	Update_key_pro_next_idx						;; if needed update FireDonuts_Pressed (index 2)
-	0227 4F             LD 		C,A											;; Currently bits are in order : Carry,Fire,Swop,Left,Right,Down,Up,Jump
-	0228 1F             RRA													;; put the "Left,Right,Down,Up" bitmap in bits [3:0]
-	0229 CD 0F 44       CALL 	Get_dir_code_LRDU_bitmap					;; validate the resulting direction from the LRUD (Left/Right/Up/Down) user input
+	0227 4F             LD 		C,A											;; in C bits are in order : CFSLRDUJ (Carry,Fire,Swop,Left,Right,Down,Up,Jump)
+	0228 1F             RRA													;; in A put the "Left,Right,Down,Up" bitmap in bits [3:0]
+	0229 CD 0F 44       CALL 	DirCode_from_LRDU							;; get the resulting direction code 0 to 7 (or FF) from the LRDU (Left/Right/Down/Up) user input
 	022C FE FF          CP 		#FF											;; check vs "no move"
 	022E 28 2C          JR 		Z,No_Key_pressed							;; if nothing pressed (C=FF) goto No_Key_pressed; will RET
 	0230 1F             RRA													;; get in Carry the lsb of the direction code that will indicate if we go in diagonal (if 1)
@@ -279,22 +282,22 @@ smc_sens_routine:
 	0231 DA 49 02       JP 		C,Routine_Low_sensitivity					;; If going in diagonal : do the Routine_High_sensitivity or Routine_Low_sensitivity ; will RET
 	;;0232 DEFW 49 02														; by default : Routine_Low_sensitivity	(0249)
 	0234 79             LD 		A,C											;; (else one direction only): save key state : Carry,Fire,Swop,Left,Right,Down,Up,Jump
-	0235 32 11 01       LD 		(Last_Direction),A							;; update Last_Direction
-	0238 32 12 01       LD 		(Current_Direction),A						;; update Current_Direction
+	0235 32 11 01       LD 		(Last_User_Inputs),A						;; update Last_User_Inputs (CFSLRDUJ)
+	0238 32 12 01       LD 		(Current_User_Inputs),A						;; update Current_User_Inputs CFSLRDUJ
 	023B C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Runs if HIGH Sensitivity is choosen in the menu (value set in smc_sens_routine)
-;; If moving diagonally, set the a direction each time (the other one in the pair creating the diag)
+;; If moving diagonaly, set the a direction each time (the other one in the pair creating the diag)
 ;; Input: C has the "Carry,Fire,Swop,Left,Right,Down,Up,Jump" state (active low)
 .Routine_High_sensitivity:
-	023C 3A 11 01       LD 		A,(Last_Direction)							;; get Last_Direction
-	023F A9             XOR 	C
+	023C 3A 11 01       LD 		A,(Last_User_Inputs)						;; get Last_User_Inputs CFSLRDUJ code
+	023F A9             XOR 	C											;; compare last and current user input
 	0240 2F             CPL													;; invert all bits of A
 	0241 A9             XOR 	C
-	0242 E6 FE          AND 	#FE											;; ignore jump
-	0244 A9             XOR 	C											;; apart from "jump" bit, we have "A XNOR C" here
-	0245 32 12 01       LD 		(Current_Direction),A						;; update Current_Direction
+	0242 E6 FE          AND 	#FE											;; Force reset the Jump
+	0244 A9             XOR 	C											;; change value taken into account
+	0245 32 12 01       LD 		(Current_User_Inputs),A						;; update CFSLRDUJ Current_User_Inputs
 	0248 C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -302,39 +305,40 @@ smc_sens_routine:
 ;; if moving diagonaly, keep the old direction (the same one in the pair creating the diag)
 ;; Input: C has the "Carry,Fire,Swop,Left,Right,Down,Up,Jump" state (active low)
 .Routine_Low_sensitivity:
-	0249 3A 11 01       LD 		A,(Last_Direction)							;; get Last_Direction
+	0249 3A 11 01       LD 		A,(Last_User_Inputs)						;; get Last_User_Inputs CFSLRDUJ
 	024C A9             XOR 	C
-	024D E6 FE          AND 	#FE											;; ignore Jump
+	024D E6 FE          AND 	#FE											;; force reset Jump
 	024F A9             XOR 	C
 	0250 47             LD 		B,A
 	0251 B1             OR 		C
-	0252 B8             CP 		B											;; compare A OR C with A
-	0253 28 03          JR 		Z,rls_1										;; skip to rls_1 if it did not change, else:
-	0255 78             LD 		A,B
-	0256 EE FE          XOR 	#FE											;; invert old A
+	0252 B8             CP 		B
+	0253 28 03          JR 		Z,rls_1										;; if last = curr, skip
+	0255 78             LD 		A,B											;; else keep last value
+	0256 EE FE          XOR 	#FE
 rls_1:
-	0258 32 12 01       LD 		(Current_Direction),A						;; update Current_Direction
+	0258 32 12 01       LD 		(Current_User_Inputs),A						;; update CFSLRDUJ Current_User_Inputs
 	025B C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; Nothing pressed, update Current_Direction with FF
+;; Nothing pressed, update Current_User_Inputs with current CFSLRDUJ (active low)
 ;; Input: C has the "Carry,Fire,Swop,Left,Right,Down,Up,Jump" state
-;;        (active low) which is therfore "FF" if it reached here.
 .No_Key_pressed:
-	025C 79             LD 		A,C											;; is "FF"
-	025D 32 12 01       LD 		(Current_Direction),A						;; refresh Current_Direction
+	025C 79             LD 		A,C											;; dir code was "FF", get the CFSLRDUJ direction from C
+	025D 32 12 01       LD 		(Current_User_Inputs),A						;; and refresh Current_User_Inputs CFSLRDUJ
 	0260 C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Provide 2 functions to update the variables in special_key_pressed array:
 ;; CarryObject_Pressed (index 0),  SwopChara_Pressed (index 1),
 ;; and FireDonuts_Pressed (index 2)
-;;   * Update_key_pro_next_idx will first increment the index in HL
-;;   * Update_key_pro_curr_idx will use the current index in HL
+;;   * Update_key_pro_next_idx will first increment the index in HL (next special_key_pressed item)
+;;   * Update_key_pro_curr_idx will use the current index in HL (curr index special_key_pressed)
 ;; Input : Z set = key pressed; Z reset = no key pressed
 ;; 		a 1 in bit[1] means "key currently pressed"
 ;; 		a 1 in bit[0] means "key recently pressed" (not yet processed)
 ;; 		bit[2] is a copy of bit0 done when ???? TODO ????
+;; Output : special_key_pressed array updated as needed.
+;;          NZ: no or no new key pressed; Z: new key pressed
 .Update_key_pro_next_idx:
 	0261 23             INC 	HL											;; next index
 .Update_key_pro_curr_idx:
@@ -361,7 +365,7 @@ reg_key_feature_1:
 ;;   - Check_Swop : Check if can swop, and if possible, swop
 ;;   - Switch_Character : swop (no checks)
 ;; If the swop key pressed and not yet processed, try to swap.
-;; Note: It's the verb swop (and not swap) that's used in this game.
+;; Note: It's the verb swOp (and not swAp) that's used in this game!
 ;; Note: You cannot swop if:
 ;;     * the Dying anim is playing
 ;;     * the teleport anim is running
@@ -385,7 +389,7 @@ reg_key_feature_1:
 	0290 28 DF          JR 		Z,Play_Sound_NoCanDo						;; if Z Play_Sound_NoCanDo ; will RET
 .Switch_Character:															;; else can swop!
 	0292 CD 6A 03       CALL 	Get_Saved_direction_pointer					;; get Heels select state in Carry, pointer on Saved_Dir_ptr in HL, E = selected_characters and A is "selected_characters >> 1"
-	0295 ED 4B AB 24    LD 		BC,(character_direction)					;; get character_direction in C
+	0295 ED 4B AB 24    LD 		BC,(character_direction)					;; get LRDU character_direction in C
 	0299 30 01          JR 		NC,swc_1									;; if Heels is NOT currently used so jump swc_1
 	029B 71             LD 		(HL),C										;; else Heels selected; save character_direction in Saved_Dir_ptr (Heels)
 swc_1:
@@ -473,7 +477,7 @@ not_aligned:
 	0312 23             INC 	HL											;; else (Head) point on Saved_Dir_ptr+1
 swop_8:
 	0313 7E             LD 		A,(HL)										;; get saved facing direction for current character
-	0314 32 AB 24       LD 		(character_direction),A						;; update character_direction
+	0314 32 AB 24       LD 		(character_direction),A						;; update LRDU character_direction
 	;; If both characters are on the same screen, we just redraw the
     ;; screen periphery (HUD). If they're not, we do restore all the state.
 	0317 3A 85 24       LD 		A,(both_in_same_room)						;; get both_in_same_room
@@ -598,7 +602,7 @@ copy_array_direction:
 	03A0 08             EX 		AF,AF
 	03A1 CD F4 03       CALL 	Copy_Data									;; copy (4 + #1D + #19 + #3F0) bytes to or from Other_Character_state
 	03A4 04 00			DEFW 	#0004										;; Argument 1: length #0004
-	03A6 0E 01			DEFW 	current_Room_ID								;; Argument 2: current_Room_ID, Do_Objects_Phase, Last_Direction and Curr_Direction
+	03A6 0E 01			DEFW 	current_Room_ID								;; Argument 2: current_Room_ID, Do_Objects_Phase, Last_User_Inputs and Curr_Direction
 	03A8 CD F4 03       CALL 	Copy_Data
 	03AB 1D 00			DEFW 	#001D										;; Argument 1: length #001D
 	03AD A2 39 			DEFW 	ObjListIdx									;; Argument 2: ObjListIdx (39A2)
@@ -5554,13 +5558,14 @@ SpriteFlags:
 	1CA2 DEFB #00
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; Given an object pointer in HL, calculate and store the object extents.
+;; Update the object extent
+;; Hl object pointer, calculate and store the object extents.
 .StoreObjExtents:
-	1CA3 23             INC HL
-	1CA4 23             INC HL
-	1CA5 CD 1E 1E       CALL GetObjExtents
-	1CA8 ED 43 9E 1C    LD (ObjXExtent),BC
-	1CAC 22 A0 1C       LD (ObjYExtent),HL
+	1CA3 23             INC 	HL
+	1CA4 23             INC 	HL
+	1CA5 CD 1E 1E       CALL 	GetObjExtents						;; calculate object extent
+	1CA8 ED 43 9E 1C    LD 		(ObjXExtent),BC						;; store Xextent
+	1CAC 22 A0 1C       LD 		(ObjYExtent),HL						;; store Yextent
 	1CAF C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -6062,7 +6067,7 @@ BaseFlags:														;; object flags when builing a room
 ;; Offset F: O_ANIM : Animation code
 ;;				top 5 bits [7:3] are the animation code ([7:0] = ((index in AnimTable * 2) + 2) << 2)
 ;;				bottom 3 bits are the frame number.
-;; Offset 10: O_DIRECTION : Direction code. I think this is not the bit mask.
+;; Offset 10: O_DIRECTION : Direction code. (0:Down,1:South,2:Right,3:East,4:Up,5:North,6:Left,7:West or FF = don't move)
 ;; Offset 11: O_SPECIAL : This may be several things depending on context:
 ;;				Z limits for helipad
 ;;				state for switch
@@ -6097,7 +6102,7 @@ O_SPECIAL:		EQU #11
 	1EA5 DEFB #00				;;	D :
 	1EA6 DEFB #00				;;	E :
 	1EA7 DEFB #00				;;	F : O_ANIM
-	1EA8 DEFB #00				;;	10 : O_DIRECTION
+	1EA8 DEFB #00				;;	10 : O_DIRECTION (dir code (0 to 7 or FF))
 	1EA9 DEFB #00				;;	11 : O_SPECIAL
 
 ;; Bit 0: Do we loop?
@@ -6837,7 +6842,7 @@ stof_2:
 	2265 0D             DEC C
 stof_end:
 	2266 79             LD A,C
-	2267 32 A8 1E       LD (TmpObj_variables+O_DIRECTION),A
+	2267 32 A8 1E       LD (TmpObj_variables+O_DIRECTION),A					;; dir code (0 to 7 or FF)
 	226A C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -7347,7 +7352,7 @@ ReinitThing_reset_data:
 
 ;; -----------------------------------------------------------------------------------------------------------
 ????_2492:
-	2492 DEFB #00						;; ???
+	2492 DEFB #00						;; ??? a stored value of room access code (0=Stay,1=Down,2=Right,3=Up,4=Left,5=Below,6=Above,7=Teleport)
 .EntryPosn:
 	2493 DEFB #00, #00, #00				;; Where we entered the room (for when we die).
 ????_2496:
@@ -7375,12 +7380,12 @@ FiredObj_variables:  			;; #12 = 18
 	24A6 DEFB #00				;;	D :
 	24A7 DEFB #00				;;	E :
 	24A8 DEFB #08				;;	F : O_ANIM
-	24A9 DEFB #00				;;	10 : O_DIRECTION
+	24A9 DEFB #00				;;	10 : O_DIRECTION (dir code 0 to 7 or FF)
 	24AA DEFB #00				;;	11 :
 
 ;; -----------------------------------------------------------------------------------------------------------
 character_direction:
-	24AB DEFB #0F             	;; Bitmask of direction, suitable for passing to LookupDir.
+	24AB DEFB #0F             	;; LRDU direction [3:0] = Left,Right,Down,Up (active low)
 Saved_Objects_List_index:
 	24AC DEFB #00
 Other_sound_ID:
@@ -7409,7 +7414,7 @@ Heels_variables:				;; #12 = 18
 	24BD DEFB #00				;;	D :
 	24BE DEFB #00				;;	E :
 	24BF DEFB #00				;;	F : O_ANIM
-	24C0 DEFB #00				;;	10 : O_DIRECTION
+	24C0 DEFB #00				;;	10 : O_DIRECTION (dir code 0 to 7 or FF)
 	24C1 DEFB #00				;;	11 :
 
 ;; Head_variables addr = Heels_variables + Head_offset
@@ -7430,7 +7435,7 @@ Head_variables:					;; #12 = 18
 	24CF DEFB #00				;;	D :
 	24D0 DEFB #00				;;	E :
 	24D1 DEFB #00				;;	F : O_ANIM
-	24D2 DEFB #00				;;	10 : O_DIRECTION
+	24D2 DEFB #00				;;	10 : O_DIRECTION (dir code 0 to 7 or FF)
 	24D3 DEFB #00				;;	11 :
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -7606,22 +7611,22 @@ decr_head_invuln:
 	2593 3E 03          LD A,3
 	2595 DC 43 41       CALL C,Decrement_counter_and_display
 br_2598
-	2598 3E FF          LD A,-1
-	259A 32 AF 24       LD (Movement),A										stop movement
-	259D 3A 58 46       LD A,(access_new_room_code)							get access_new_room_code
-	25A0 A7             AND A												test
-	25A1 28 13          JR Z,br_25B6										if 0 (stay same room) skip to ??25B6??, else (change room):
-	25A3 3A AC 24       LD A,(Saved_Objects_List_index)						get Saved_Objects_List_index
-	25A6 A7             AND A												test
-	25A7 28 0A          JR Z,br_25B3										if 0 skip to ??25B3??, else:
-	25A9 3A AB 24       LD A,(character_direction)							get character_direction
-	25AC 37             SCF													set Carry
-	25AD 17             RLA													rotate left and set bit0 to 1
-	25AE 32 12 01       LD (Current_Direction),A							update Current_Direction
-	25B1 18 03          JR br_25B6
+	2598 3E FF          LD 		A,-1
+	259A 32 AF 24       LD 		(Movement),A								;; stop movement
+	259D 3A 58 46       LD 		A,(access_new_room_code)					;; get access_new_room_code (0=Stay,1=Down,2=Right,3=Up,4=Left,5=Below,6=Above,7=Teleport)
+	25A0 A7             AND 	A											;; test
+	25A1 28 13          JR 		Z,br_25B6									;; if 0 (stay same room) skip to br_25B6, else (change room):
+	25A3 3A AC 24       LD 		A,(Saved_Objects_List_index)				;; else	get Saved_Objects_List_index
+	25A6 A7             AND 	A											;; test
+	25A7 28 0A          JR 		Z,br_25B3									;; if 0 skip to br_25B3, else:
+	25A9 3A AB 24       LD 		A,(character_direction)						;; else get LRDU character_direction
+	25AC 37             SCF													;; set Carry
+	25AD 17             RLA													;; rotate left and set bit0 to 1 (convert LRDU to ???LRDU1 = CFSLRDUJ format, with jump reset (active low))
+	25AE 32 12 01       LD 		(Current_User_Inputs),A						;; update Current_User_Inputs ; CFSLRDUJ
+	25B1 18 03          JR 		br_25B6										;; skip to br_25B6
 
 br_25B3
-	25B3 32 58 46       LD (access_new_room_code),A							update access_new_room_code
+	25B3 32 58 46       LD 		(access_new_room_code),A					;; update access_new_room_code (0=Stay,1=Down,2=Right,3=Up,4=Left,5=Below,6=Above,7=Teleport)
 br_25B6
 	25B6 CD 87 27       CALL CharThing4
 
@@ -7637,8 +7642,8 @@ br_25B9:
 	25CA 3A BC 1E       LD A,(FloorAboveFlag)
 	25CD A7             AND A
 	25CE 20 05          JR NZ,DoSomething
-	25D0 3E 06          LD A,#06											"go room Above" code
-	25D2 32 58 46       LD (access_new_room_code),A							update access_new_room_code
+	25D0 3E 06          LD A,#06											code 6 = "go room Above"
+	25D2 32 58 46       LD (access_new_room_code),A							update access_new_room_code (0=Stay,1=Down,2=Right,3=Up,4=Left,5=Below,6=Above,7=Teleport)
 .DoSomething:
 	;; Check for Fire being pressed
 	25D5 3A 15 01       LD A,(FireDonuts_Pressed)							get FireDonuts_Pressed
@@ -7668,7 +7673,7 @@ br_25B9:
 	260A F6 19          OR #19												ObjFnFire
 	260C 32 A3 24       LD (FiredObj_variables+O_FUNC),A
 	260F FD 36 04 00    LD (IY+O_FLAGS),0									Init fire obj flags ;
-	2613 3A AB 24       LD A,(character_direction)							get character_direction
+	2613 3A AB 24       LD A,(character_direction)							get LRDU character_direction
 	2616 32 A4 24       LD (FiredObj_variables+0B),A
 	2619 FD 36 0C FF    LD (IY+#0C),#FF										??? displacement if merges ???
 	261D FD 36 0F 20    LD (IY+O_ANIM),#20									anim sprite in [7:3] = #04 and frame = 0
@@ -7690,7 +7695,7 @@ br_25B9:
 	263E CD 71 02       CALL Play_Sound_NoCanDo
 .CheckDying:
 	2641 21 58 46       LD HL,access_new_room_code							point on access_new_room_code
-	2644 7E             LD A,(HL)											get access_new_room_code
+	2644 7E             LD A,(HL)											get access_new_room_code (0=Stay,1=Down,2=Right,3=Up,4=Left,5=Below,6=Above,7=Teleport)
 	2645 E6 7F          AND #7F												ignore bit7
 	2647 C8             RET Z												if (#80 () or #00 (staying in same room)) leave, else (change room):
 	2648 3A 59 46       LD A,(DyingAnimFrameIndex)							get DyingAnimFrameIndex
@@ -7743,8 +7748,8 @@ br_2699:
 	2699 35             DEC (HL)
 	269A 2A 84 24       LD HL,(selected_characters)							get selected_characters and both_in_same_room
 	269D C2 3C 27       JP NZ,CharThing19
-	26A0 3E 07          LD A,#07											Teleport Code
-	26A2 32 58 46       LD (access_new_room_code),A							update access_new_room_code
+	26A0 3E 07          LD A,#07											code 7 = Teleport Code
+	26A2 32 58 46       LD (access_new_room_code),A							update access_new_room_code (0=Stay,1=Down,2=Right,3=Up,4=Left,5=Below,6=Above,7=Teleport)
 	26A5 C3 B9 25       JP br_25B9
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -7830,7 +7835,7 @@ HD_8
 	2725 01 03 00       LD BC,#0003
 	2728 ED B0          LDIR												repeat LD (DE),(HL); DE++, HL++, BC-- until BC=0
 	272A 3A 92 24       LD A,(#2492)
-	272D 32 58 46       LD (access_new_room_code),A							update access_new_room_code
+	272D 32 58 46       LD (access_new_room_code),A							update access_new_room_code (0=Stay,1=Down,2=Right,3=Up,4=Left,5=Below,6=Above,7=Teleport)
 	2730 C3 B9 01       JP Long_move_to_new_room
 
 CharThing18:
@@ -7931,29 +7936,29 @@ br_27DE
 	27E1 E6 02          AND #02
 	27E3 20 06          JR NZ,br_27EB
 br_27E5
-	27E5 3A AB 24       LD A,(character_direction)							;; get character_direction
+	27E5 3A AB 24       LD A,(character_direction)							;; get LRDU character_direction
 	27E8 C3 59 28       JP HandleMove
 
 br_27EB
-	27EB 3A 12 01       LD A,(Current_Direction)							;; get Current_Direction
-	27EE 1F             RRA
-	27EF CD 0F 44       CALL Get_dir_code_LRDU_bitmap
-	27F2 3C             INC A
-	27F3 C2 55 28       JP NZ,br_2855
-	27F6 18 ED          JR br_27E5
+	27EB 3A 12 01       LD 		A,(Current_User_Inputs)						;; get Current_User_Inputs CFWLRDUJ
+	27EE 1F             RRA													;; Move LRDU in bits [3:0] (= LRDU dir)
+	27EF CD 0F 44       CALL 	DirCode_from_LRDU							;; get dir code (0 to 7 or FF), from LRDU
+	27F2 3C             INC 	A											;; was it FF (don't move)?
+	27F3 C2 55 28       JP 		NZ,br_2855									;; no, then moving, goto br_2855
+	27F6 18 ED          JR 		br_27E5										;; else not moving goto br_27E5
 
 br_27F8
 	27F8 FD CB 0B E6    SET 4,(IY+#0B)
 	27FC FD CB 0C EE    SET 5,(IY+#0C)
 	2800 CD 3B 2B       CALL Get_curr_Char_variables						;; HL = pointer on current selected character's variables
-	2803 3A 58 46       LD A,(access_new_room_code)							;; get access_new_room_code
+	2803 3A 58 46       LD A,(access_new_room_code)							;; get access_new_room_code (0=Stay,1=Down,2=Right,3=Up,4=Left,5=Below,6=Above,7=Teleport)
 	2806 A7             AND A												;; test
 	2807 20 09          JR NZ,br_2812
 	2809 CD 64 2C       CALL DoorContact
 	280C D2 14 29       JP NC,CharThing23
 	280F C2 02 29       JP NZ,CharThing22
 br_2812
-	2812 3A 58 46       LD A,(access_new_room_code)							;; get access_new_room_code
+	2812 3A 58 46       LD A,(access_new_room_code)							;; get access_new_room_code (0=Stay,1=Down,2=Right,3=Up,4=Left,5=Below,6=Above,7=Teleport)
 	2815 17             RLA
 	2816 30 04          JR NC,br_281C
 	2818 FD 36 0C FF    LD (IY+#0C),#FF
@@ -7982,9 +7987,9 @@ br_284B
 	284F CD 8A 2A       CALL DoCarry
 	2852 CD 10 2A       CALL DoJump
 br_2855
-	2855 3A 12 01       LD A,(Current_Direction)							;; get Current_Direction
-	2858 1F             RRA
-.HandleMove:																;; Do the movement with direction in A.
+	2855 3A 12 01       LD A,(Current_User_Inputs)							;; get Current_User_Inputs CFSLRDUJ
+	2858 1F             RRA													;; get LRDU in bits [3:0] = LRDU dir
+.HandleMove:																;; Do the movement with LRDU direction in A.
 	2859 CD 78 29       CALL MoveChar
 	285C CD 64 29       CALL Orient
 	285F 08             EX AF,AF
@@ -8123,7 +8128,7 @@ br_292E
 	293D A7             AND A
 	293E 28 15          JR Z,br_2955
 	2940 35             DEC (HL)
-	2941 3A AB 24       LD A,(character_direction)							;; get character_direction
+	2941 3A AB 24       LD A,(character_direction)							;; get LRDU character_direction
 	2944 18 0C          JR br_2952
 
 br_2946
@@ -8131,8 +8136,8 @@ br_2946
 br_2949
 	2949 3E 83          LD A,Sound_ID_Falling								;; TODO: Slower falling noise
 	294B CD 21 2B       CALL SetOtherSound
-	294E 3A 12 01       LD A,(Current_Direction)							;; get Current_Direction
-	2951 1F             RRA
+	294E 3A 12 01       LD A,(Current_User_Inputs)							;; get Current_User_Inputs CFSLRDUJ
+	2951 1F             RRA													;; get LRDU in bits [3:0] = LRDU dir
 br_2952
 	2952 CD 78 29       CALL MoveChar
 br_2955
@@ -8145,13 +8150,13 @@ br_2955
 ;; Sets bit 4 of offset 4 if #02 bit is set (sprite needs flip),
 ;; returns with carry if facing away.
 .Orient:
-	2964 3A AB 24       LD A,(character_direction)							;; get character_direction
-	2967 CD 0F 44       CALL Get_dir_code_LRDU_bitmap
+	2964 3A AB 24       LD 		A,(character_direction)						;; get LRDU character_direction
+	2967 CD 0F 44       CALL 	DirCode_from_LRDU							;; get dir code (0 to 7 or FF), from LRDU
 	296A 1F             RRA
-	296B FD CB 04 A6    RES 4,(IY+O_FLAGS)
+	296B FD CB 04 A6    RES 	4,(IY+O_FLAGS)
 	296F 1F             RRA
-	2970 38 04          JR C,br_2976
-	2972 FD CB 04 E6    SET 4,(IY+O_FLAGS)
+	2970 38 04          JR 		C,br_2976
+	2972 FD CB 04 E6    SET 	4,(IY+O_FLAGS)
 br_2976
 	2976 1F             RRA
 	2977 C9             RET
@@ -8169,7 +8174,7 @@ br_2976
 	2986 3E 80          LD A,Sound_ID_Walking								;; Slower walking sound
 	2988 CD 21 2B       CALL SetOtherSound
 	298B 08             EX AF,AF
-	298C 21 AB 24       LD HL,character_direction							;; points on character_direction
+	298C 21 AB 24       LD HL,character_direction							;; points on LRDU character_direction
 	298F BE             CP (HL)
 	2990 77             LD (HL),A
 	2991 28 05          JR Z,br_2998
@@ -8179,7 +8184,7 @@ br_2993
 br_2998
 	2998 F5             PUSH AF
 	2999 FD A6 0C       AND (IY+#0C)
-	299C CD 0F 44       CALL Get_dir_code_LRDU_bitmap
+	299C CD 0F 44       CALL 	DirCode_from_LRDU							;; get dir code (0 to 7 or FF), from LRDU
 	299F FE FF          CP #FF
 	29A1 28 13          JR Z,br_29B6
 	29A3 CD 3B 2B       CALL Get_curr_Char_variables						;; HL = pointer on current selected character's variables
@@ -8237,7 +8242,7 @@ br_29EE
 	29F0 CD 21 2B       CALL SetOtherSound
 	;; Convert bitmap to direction.
 	29F3 F1             POP AF
-	29F4 CD 0F 44       CALL Get_dir_code_LRDU_bitmap
+	29F4 CD 0F 44       CALL 	DirCode_from_LRDU							;; get dir code (0 to 7 or FF), from LRDU
 	;; Return if not moving...
 	29F7 FE FF          CP #FF
 	29F9 C8             RET Z
@@ -8271,10 +8276,9 @@ djmp_skip:
 	2A1B 3A AC 24       LD A,(Saved_Objects_List_index)						;; get Saved_Objects_List_index
 	2A1E A7             AND A
 	2A1F C0             RET NZ
-	;; Return if jump not pressed.
-	2A20 3A 12 01       LD A,(Current_Direction)							;; get Current_Direction
-	2A23 1F             RRA
-	2A24 D8             RET C
+	2A20 3A 12 01       LD A,(Current_User_Inputs)							;; get Current_User_Inputs CFSLRDUJ
+	2A23 1F             RRA													;; move LRDU in bits [3:0] = LRDU dir (active low)
+	2A24 D8             RET C												;; Jump in Carry (active low, Carry set = No jump, then leave
 	;; Jump button handling case
 	2A25 0E 00          LD C,0
 	2A27 FD 6E 0D       LD L,(IY+#0D)
@@ -8468,14 +8472,14 @@ CharThing15:
 	2B64 E5             PUSH HL
 	2B65 E5             PUSH HL
 	2B66 FD E1          POP IY
-	2B68 3A 58 46       LD A,(access_new_room_code)							get access_new_room_code
-	2B6B 32 92 24       LD (#2492),A										update
+	2B68 3A 58 46       LD A,(access_new_room_code)							;; get access_new_room_code (0=Stay,1=Down,2=Right,3=Up,4=Left,5=Below,6=Above,7=Teleport)
+	2B6B 32 92 24       LD (#2492),A										;; store ???
 	2B6E F5             PUSH AF
-	2B6F D6 01          SUB 1
+	2B6F D6 01          SUB 1												;; at this point the value in A is (0=Down,1=Right,2=Up,3=Left,4=Below,5=Above,6=Teleport)
 	2B71 F5             PUSH AF
-	2B72 FE 04          CP #04												if access_new_room_code >=5 ...
-	2B74 30 17          JR NC,EPIC_86										...then jump EPIC_86, else (A 0 to 3 correspond to access_new_room_code 1 to 4):
-	2B76 EE 01          XOR %00000001										flip bit0 (invert direction?)
+	2B72 FE 04          CP #04												;; if access_new_room_code-1 >=4 (Below,Above,Teleport)
+	2B74 30 17          JR NC,EPIC_86										;; ...then jump EPIC_86, else (A 0 to 3 correspond to access_new_room_code 1 to 4):
+	2B76 EE 01          XOR %00000001										flip bit0 (invert ???)
 	2B78 5F             LD E,A
 	2B79 16 00          LD D,0												DE=A
 	2B7B 21 EE 1E       LD HL,DoorHeights
@@ -8536,7 +8540,7 @@ EPIC_90:
 	2BCF A7             AND A
 	2BD0 28 04          JR Z,EPIC_91
 	2BD2 1A             LD A,(DE)
-	2BD3 D6 06          SUB 6
+	2BD3 D6 06          SUB 6												;; if teleport index 0 in Facing_Entering_new_Room_tab???
 	2BD5 12             LD (DE),A
 EPIC_91:
 	2BD6 06 C8          LD B,Sound_ID_Teleport_Down							;; Sound_ID #C8 ; Teleport beam down noise
@@ -8553,21 +8557,21 @@ EPIC_94:
 	2BE5 ED A0          LDI													copy U ; do : LD (DE),(HL); DE++, HL++, BC--
 	2BE7 ED A0          LDI													copy V
 	2BE9 ED A0          LDI													copy Z
-	2BEB 18 03          JR EPIC_96
+	2BEB 18 03          JR EPIC_96											HL now points on Facing_Entering_new_Room_tab
 
 EPIC_95:
 	2BED 7E             LD A,(HL)
 	2BEE 81             ADD A,C
 	2BEF 12             LD (DE),A
 EPIC_96:
-	2BF0 F1             POP AF
-	2BF1 C6 57          ADD A,tab_2C57 & #00FF								;; #57 = tab_2C57 & #00FF + offset
+	2BF0 F1             POP AF												;; A has the room access code-1 (0==Down,1=Right,2=Up,3=Left,4=Below,5=Above,6=Teleport)
+	2BF1 C6 57          ADD A,Facing_Entering_new_Room_tab & #00FF			;; #57 = Facing_Entering_new_Room_tab & #00FF + offset
 	2BF3 6F             LD L,A
-	2BF4 CE 2C          ADC A,tab_2C57 >> 8									;; #2C = (tab_2C57 & #FF00 ) >> 8
+	2BF4 CE 2C          ADC A,Facing_Entering_new_Room_tab >> 8				;; #2C = (Facing_Entering_new_Room_tab & #FF00 ) >> 8
 	2BF6 95             SUB L
-	2BF7 67             LD H,A												;; HL = tab_2C57 + A
+	2BF7 67             LD H,A												;; HL = Facing_Entering_new_Room_tab + A
 	2BF8 7E             LD A,(HL)
-	2BF9 32 AB 24       LD (character_direction),A							update character_direction
+	2BF9 32 AB 24       LD (character_direction),A							;; update LRDU character_direction when entering the new room (LRDU format)
 EPIC_97:
 	2BFC 3E 80          LD A,#80
 	2BFE 32 58 46       LD (access_new_room_code),A							update access_new_room_code
@@ -8617,8 +8621,14 @@ EPIC_97:
 ???_2c54:											;; UVZ for ???
 	2C54 DEFB #28, #28, GROUND_LEVEL
 
-tab_2C57:											;; Table something to do with charac direction:
-	2C57 DEFB #FD, #FD, #FB, #FE, #F7, #FD, #FD		;; -3,-3,-5,-2,-9,-3,-3 ???
+;; -----------------------------------------------------------------------------------------------------------
+;; From access_new_room_code (but with teleport put at index 0),
+;; get the facing direction when entering a new room from:
+;;		 0 : Teleport then facing Down (south-West side of the screen)
+;;  1 to 4 : Down, Right, Up, Left then resp. facing Down, Right, Up, Left
+;; 5 and 6 : Below,Above then resp. facing Down, Down
+Facing_Entering_new_Room_tab:
+	2C57 DEFB #FD, #FD, #FB, #FE, #F7, #FD, #FD
 
 WallSideBitmap: 									;; index 0 = 8 = bit3, index 1 = 4 = bit2 etc.
 	2C5E DEFW #08, #04, #02, #01
@@ -8696,30 +8706,31 @@ WallSideBitmap: 									;; index 0 = 8 = bit3, index 1 = 4 = bit2 etc.
 	2CD4 18 10          JR RetZero_Cset
 
 HF_1:
-	2CD6 3E 05          LD A,#05											;; Next room below.
-	2CD8 32 58 46       LD (access_new_room_code),A							;; update access_new_room_code
+	2CD6 3E 05          LD A,#05											;; code 5 = "Next room below"
+	2CD8 32 58 46       LD (access_new_room_code),A							;; update access_new_room_code (0=Stay,1=Down,2=Right,3=Up,4=Left,5=Below,6=Above,7=Teleport)
 	2CDB A7             AND A
 	2CDC C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 .DeadlyFloorCase:
-	2CDD FD 4E 09       LD C,(IY+O_SPRFLAGS)
-	2CE0 FD 46 04       LD B,(IY+O_FLAGS)
-	2CE3 CD 38 47       CALL DeadlyContact
+	2CDD FD 4E 09       LD 		C,(IY+O_SPRFLAGS)
+	2CE0 FD 46 04       LD 		B,(IY+O_FLAGS)
+	2CE3 CD 38 47       CALL 	DeadlyContact
 ;; Return with 0 in A, Z set and carry flag set.
 .RetZero_Cset:
-	2CE6 AF             XOR A
+	2CE6 AF             XOR 	A
 	2CE7 37             SCF
 	2CE8 C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; A non-player object has hit the floor...
+;; A non-player object has hit the floor.
+;; If room has no floor, then the object disappear
 .FloorCheck:
-	2CE9 3A BB 1E       LD A,(FloorCode)
-	2CEC FE 07          CP #07												;; No floor?
-	2CEE 20 F6          JR NZ,RetZero_Cset
-	2CF0 FD 36 0A 22    LD (IY+O_FUNC),#22									;; Func = OBJFN_DISAPPEAR ; Then it disappears.
-	2CF3 18 F0       	JR RetZero_Cset
+	2CE9 3A BB 1E       LD 		A,(FloorCode)
+	2CEC FE 07          CP 		#07											;; No floor?
+	2CEE 20 F6          JR 		NZ,RetZero_Cset
+	2CF0 FD 36 0A 22    LD 		(IY+O_FUNC),#22								;; Func = OBJFN_DISAPPEAR ; Then it disappears.
+	2CF3 18 F0       	JR 		RetZero_Cset
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Object (character?) in IY.
@@ -10494,7 +10505,7 @@ initobj_2:
 	3790 28 19          JR 		Z,Animate									;; if 0 Animate and RET (single sprite), else:
 	3792 CD AB 37       CALL 	Animate										;; Need to Move and Animate both stacked sprites (double height)
 	3795 08             EX 		AF,AF										;; save flags (carry)
-	3796 FD 4E 10       LD 		C,(IY+O_DIRECTION)							;; C=facing direction
+	3796 FD 4E 10       LD 		C,(IY+O_DIRECTION)							;; C=facing direction (0 to 7 or FF)
 	3799 11 12 00       LD 		DE,#0012									;; points on ...
 	379C FD E5          PUSH 	IY
 	379E FD 19          ADD 	IY,DE										;; ...next object (the 2nd object in the double stacked/height)
@@ -12268,7 +12279,7 @@ dconti_1:
 	4118 11 5E 42       LD DE,UVZ_coord_Set_UVZ
 	411B 21 5B 42       LD HL,UVZ_origin
 	411E CD 75 22       CALL Set_UVZ
-	4121 3E 08          LD A,#08
+	4121 3E 08          LD A,#08											;; room access code 8 = ???
 	4123 32 58 46       LD (access_new_room_code),A							update access_new_room_code
 	4126 32 87 24       LD (Teleport_down_anim_length),A
 	4129 C9             RET
@@ -12374,8 +12385,8 @@ prntstat_1:
 	417F 3A 58 46       LD A,(access_new_room_code)							;; get access_new_room_code
 	4182 A7             AND A												;; test it
 	4183 7E             LD A,(HL)											;; get counter increment value
-	4184 28 02          JR Z,gcnt_1											;; if access_new_room_code = 0 return counter increment from table
-	4186 3E 03          LD A,3												;; else return increment of 3 in A
+	4184 28 02          JR Z,gcnt_1											;; if access_new_room_code = 0 (stay same room) return counter increment from table
+	4186 3E 03          LD A,3												;; else (access a new room) return increment of 3 in A
 gcnt_1:
 	4188 21 7C 24       LD HL,Counters										;; Points on start of array Counters
 	418B 09             ADD HL,BC											;; and add item offset, now points on the counter
@@ -12575,25 +12586,26 @@ gs_1:
 	440E C9             RET													;; result in HL : HL = HL + (DE * BC)
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; Get the actual direction validated from a user input in A (ignore conflicting inputs).
-;; LRDU -> Dir code (0 to 7 and FF)
+;; Get the direction code from a LRDU user input in A (and ignore conflicting inputs).
+;; In other words: LRDU -> Dir code (0 to 7 and FF)
 ;; Input: a 4-bit bitmask Left,Right,Down,Up (active low)
-;; 	Let's take "A"=active (0), "I"=inactive (1)
-;;  (note: we must ignore conflicting inputs L+R = no x_wise_move)
-;;	LRDU : return_code					LRDU : return_code
-;;	AAAA : FF	(no move)				IAAA : 02	(Right)						Up
-;;  AAAI : 00	(Down)					IAAI : 01	(Down and Right)		 05	04 03
-;;	AAIA : 04	(Up)					IAIA : 03	(Up and Right)		Left 06 FF 02 Right
-;;  AAII : FF 	(no move)				IAII : 02	(Right)					 07 00 01
-;;	AIAA : 06	(Left)					IIAA : FF 	(no move)				   Down
-;;  AIAI : 07	(Down and Left)			IIAI : 00	(Down)
-;;	AIIA : 05	(Up and Left)			IIIA : 04	(Up)
-;;  AIII : 06 	(Left)					IIII : FF 	(no move)
+;; North is the far corner on the game screen, South the near corner
+;; 		Let's take "A"=active (0), "I"=inactive (1)
+;;  	(note: we must ignore conflicting inputs (eg. L+R = no move))              (Back)
+;;		LRDU : return_code					LRDU : return_code			  (Back)	 Up    East (?)
+;;		AAAA : FF	(no move)				IAAA : 02	(Right)				North __________> U
+;;  	AAAI : 00	(Down)					IAAI : 01	(Down and Right)		 |05 04 03
+;;		AAIA : 04	(Up)					IAIA : 03	(Up and Right)		Left |06 FF 02 Right (Front)
+;;  	AAII : FF 	(no move)				IAII : 02	(Right)			  (Back) |07 00 01
+;;		AIAA : 06	(Left)					IIAA : FF 	(no move)				 |  Down   South
+;;  	AIAI : 07	(Down and Left)			IIAI : 00	(Down)          West     Y  (Front)  (Front)
+;;		AIIA : 05	(Up and Left)			IIIA : 04	(Up)			(?)	    V
+;;  	AIII : 06 	(Left)					IIII : FF 	(no move)
 ;; Output in A: the validated direction as described above
-.Get_dir_code_LRDU_bitmap:
-	440F E6 0F          AND 	#0F											;; Only care about 4 lsb : Left,Right,Down,Up
+.DirCode_from_LRDU:
+	440F E6 0F          AND		#0F											;; Only care about 4 lsb : Left,Right,Down,Up
 	4411 C6 1A          ADD 	A,Array_direction_table & #00FF				;; #1A = Array_direction_table & FF
-	4413 6F             LD 		L,A
+	4413 6F             LD		L,A
 	4414 CE 44          ADC 	A,Array_direction_table >> 8				;; #44 = Array_direction_table >> 8
 	4416 95             SUB 	L
 	4417 67             LD 		H,A											;; ... HL = Array_direction_table + A
@@ -12627,13 +12639,13 @@ gs_1:
 ;; First byte is Y delta, second X, third is reverse lookup (Only DirTable[3:0] give direction; DirTable inverse mapping)?
 .DirTable2:
 	443A DEFB #FF, #00, #0D          		;; Ydelta, Xdelta, DirTable FD ; 0:down
-	443D DEFB #FF, #FF, #09          		;; Ydelta, Xdelta, DirTable F9 ; 1:south-east
+	443D DEFB #FF, #FF, #09          		;; Ydelta, Xdelta, DirTable F9 ; 1:south
 	4440 DEFB #00, #FF, #0B          		;; Ydelta, Xdelta, DirTable FB ; 2:right
-	4443 DEFB #01, #FF, #0A       			;; Ydelta, Xdelta, DirTable FA ; 3:north-east
+	4443 DEFB #01, #FF, #0A       			;; Ydelta, Xdelta, DirTable FA ; 3:east
 	4446 DEFB #01, #00, #0E       			;; Ydelta, Xdelta, DirTable FE ; 4:up
-	4449 DEFB #01, #01, #06       			;; Ydelta, Xdelta, DirTable F6 ; 5:north-west
+	4449 DEFB #01, #01, #06       			;; Ydelta, Xdelta, DirTable F6 ; 5:north
 	444C DEFB #00, #01, #07       			;; Ydelta, Xdelta, DirTable F7 ; 6:left
-	444F DEFB #FF, #01, #05					;; Ydelta, Xdelta, DirTable F5 ; 7:south-west
+	444F DEFB #FF, #01, #05					;; Ydelta, Xdelta, DirTable F5 ; 7:west
 
 ;; -----------------------------------------------------------------------------------------------------------
 .UpdateCurrPos:
@@ -12716,32 +12728,33 @@ unused_Read_Loop_word_sub1:
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Pseudo random generator
+;; value in HL
 .Random_gen:
-	4497 2A C8 44       LD HL,(Rand_seed_2)
-	449A 55             LD D,L
-	449B 29             ADD HL,HL
-	449C ED 6A          ADC HL,HL
-	449E 4C             LD C,H
-	449F 2A C6 44       LD HL,(Rand_seed_1)
-	44A2 44             LD B,H
-	44A3 CB 10          RL B
-	44A5 5C             LD E,H
-	44A6 CB 13          RL E
-	44A8 CB 12          RL D
-	44AA 09             ADD HL,BC
-	44AB 22 C6 44       LD (Rand_seed_1),HL
-	44AE 2A C8 44       LD HL,(Rand_seed_2)
-	44B1 ED 5A          ADC HL,DE
-	44B3 CB BC          RES 7,H
-	44B5 22 C8 44       LD (Rand_seed_2),HL
-	44B8 FA C2 44       JP M,rg_2
-	44BB 21 C6 44       LD HL,Rand_seed_1
+	4497 2A C8 44       LD 		HL,(Rand_seed_2)
+	449A 55             LD 		D,L
+	449B 29             ADD 	HL,HL
+	449C ED 6A          ADC 	HL,HL
+	449E 4C             LD 		C,H
+	449F 2A C6 44       LD 		HL,(Rand_seed_1)
+	44A2 44             LD 		B,H
+	44A3 CB 10          RL 		B
+	44A5 5C             LD 		E,H
+	44A6 CB 13          RL 		E
+	44A8 CB 12          RL 		D
+	44AA 09             ADD 	HL,BC
+	44AB 22 C6 44       LD 		(Rand_seed_1),HL
+	44AE 2A C8 44       LD 		HL,(Rand_seed_2)
+	44B1 ED 5A          ADC 	HL,DE
+	44B3 CB BC          RES 	7,H
+	44B5 22 C8 44       LD 		(Rand_seed_2),HL
+	44B8 FA C2 44       JP 		M,rg_2
+	44BB 21 C6 44       LD 		HL,Rand_seed_1
 rg_1:
-	44BE 34             INC (HL)
-	44BF 23             INC HL
-	44C0 28 FC          JR Z,rg_1
+	44BE 34             INC 	(HL)
+	44BF 23             INC 	HL
+	44C0 28 FC          JR 		Z,rg_1
 rg_2:
-	44C2 2A C6 44       LD HL,(Rand_seed_1)
+	44C2 2A C6 44       LD 		HL,(Rand_seed_1)
 	44C5 C9             RET
 
 Rand_seed_1:
@@ -13035,7 +13048,9 @@ Draw_sprite_3x32:
 ????_4657:
 	4657 00 			DEFB 	#00							;; ????
 
-;; Set to 0 if we're staying in the current room.
+;; -----------------------------------------------------------------------------------------------------------
+;; access_new_room_code:
+;; 0 = staying in the current room
 ;; 1 = Down, 2 = Right, 3 = Up, 4 = Left
 ;; 5 = Below, 6 = Above, 7 = Teleport
 ;; 8 = ?? ; #80=??
@@ -13267,7 +13282,7 @@ dco_3:
 	4764 C8             RET Z												;; then Return (invulnerable as Emperor), else
 	4765 36 0C          LD (HL),#0C											;; Set value of DyingAnimFrameIndex to #0C (dying, will count down to 0 while the vape/dying anim is played)
 	4767 3A 58 46       LD A,(access_new_room_code)							;; get access_new_room_code
-	476A A7             AND A												;; test if 0
+	476A A7             AND A												;; test if 0 (stay same room)
 	476B C4 D4 3F       CALL NZ,BoostInvuln2								;; ??? if merged HnH, then heels boost invuln ??? ; call BoostInvuln2 if access_new_room_code not 0 (changing room)
 	476E 06 C6          LD B,Sound_ID_Death									;; Sound_ID #C6 ; Death noise
 	4770 C3 91 0D       JP Play_Sound										;; will RET
@@ -13318,28 +13333,28 @@ cnc_2:
 ;; Second is the function to move that direction.
 ;; Third element is the function to check collisions.
 .MoveTbl:
-	47B7 DEFB #FD          				;; ~#02
+	47B7 DEFB #FD          				;; Moving Down
 	47B8 DEFW #48FE              		;; Down
 	47BA DEFW #48C4 					;; DownCollide
-	47BC DEFB #FF     					;; ~#00
-	47BD DEFW DownRight
+	47BC DEFB #FF     					;; Stop
+	47BD DEFW DownRight					;; DwonRight
 	47BF DEFW #0000
-	47C1 DEFB #FB           			;; ~#04
+	47C1 DEFB #FB           			;; Moving Right
 	47C2 DEFW #4955              		;; Right
 	47C4 DEFW #48E2 					;; RightCollide
-	47C8 DEFB #FF     					;; ~#00
+	47C8 DEFB #FF     					;; Stop
 	47C7 DEFW #4800              		;; UpRight
 	47C9 DEFW #0000
-	47CB DEFB #FE        				;; ~#01
+	47CB DEFB #FE        				;; Moving Up
 	47CC DEFW #49A5              		;; Up
 	47CE DEFW #4868              		;; UpCollide
-	47D0 DEFB #FF           			;; ~#00
+	47D0 DEFB #FF           			;; Stop
 	47D1 DEFW #4824              		;; UpLeft
 	47D3 DEFW #0000
-	47D5 DEFB #F7           			;; ~#08
+	47D5 DEFB #F7           			;; Moving Left
 	47D6 DEFW #49ED           			;; Left
 	47D8 DEFW #48A9              		;; LeftCollide
-	47DA DEFB #FF           			;; ~#00
+	47DA DEFB #FF           			;; Stop
 	47DB DEFW #4847              		;; DownLeft
 	47DD DEFW #0000
 
@@ -14096,48 +14111,48 @@ GSS_2:
 	;; * Control_Code_attribute_5, 6 or 7 (will be followed by parameters (resp. 1, 2 and 1));
 	;; * or, at the end of Control_Codes_more, reset back to Print_Char_base (with no parameter).
 smc_print_string_routine:
-	4AC2 C3 C5 4A       JP Print_Char_base									;; self modified code, the addr is set at Control_Codes_more;
+	4AC2 C3 C5 4A       JP 		Print_Char_base								;; self modified code, the addr is set at Control_Codes_more;
 	;;4AC3 DEFW C5 4A														; default Print_Char_base (4AC5) else (Control_Code_attribute_5, 6 or 7)
 .Print_Char_base:
-	4AC5 FE 80          CP #80												;; compare A with #80; if A < #80 then Carry is set, else Carry is reset
-	4AC7 30 31          JR NC,Sub_Print_String								;; Continue on Sub_Print_String if A >= #80 (will RET), else:
-	4AC9 D6 20          SUB #20												;; to test if was below or above #20
-	4ACB 38 3E          JR C,Control_Codes									;; if code was below 20 go to Control_Codes; will RET
-	4ACD CD 80 05       CALL Char_code_to_Addr								;; else it is a plain char, go to Char_code_to_Addr addr in DE (reminder: a "SUB 20" was done)
-	4AD0 21 04 08       LD HL,#0804											;; sprite size : x=2x4 (2 pix per byte) ; y=8
-	4AD3 3A C0 4A       LD A,(text_size)									;; get Text height size (0:single (Z=1) or 1:double (NZ=1))
-	4AD6 A7             AND A												;; check if size was 0 or 1
-	4AD7 C4 9F 4B       CALL NZ,Double_sized_char							;; if Double size, then call Double_sized_char input:DE=symbol data, output:DE=buffer where the zoomed sprite is, HL=new size
-	4ADA ED 4B BE 4A    LD BC,(Char_cursor_pixel_position)					;; get Char cursor addr position B=y, C=x
-	4ADE 79             LD A,C
-	4ADF C6 04          ADD A,#04											;; col+4 (next pixel x position)
-	4AE1 32 BE 4A       LD (Char_cursor_pixel_position),A					;; write new Char cursor addr position
-	4AE4 3A C1 4A       LD A,(rainbow_mode)									;; get rainbowmode On/Off
-	4AE7 A7             AND A												;; test it
-	4AE8 3A BD 4A       LD A,(current_pen_number)							;; get current pen number
-	4AEB 20 0A          JR NZ,pcb_end										;; if Rainbow mode Off, then jump pcb_end
-	4AED 3C             INC A												;; else Rainbow mode is On so loop color to the next one
-	4AEE E6 03          AND #03												;; clamping it if needed (0,1,2,3 then back to 0 (at this point))
+	4AC5 FE 80          CP 		#80											;; compare A with #80; if A < #80 then Carry is set, else Carry is reset
+	4AC7 30 31          JR 		NC,Sub_Print_String							;; Continue on Sub_Print_String if A >= #80 (will RET), else:
+	4AC9 D6 20          SUB 	#20											;; to test if was below or above #20
+	4ACB 38 3E          JR 		C,Control_Codes								;; if code was below 20 go to Control_Codes; will RET
+	4ACD CD 80 05       CALL 	Char_code_to_Addr							;; else it is a plain char, go to Char_code_to_Addr addr in DE (reminder: a "SUB 20" was done)
+	4AD0 21 04 08       LD 		HL,#0804									;; sprite size : x=2x4 (2 pix per byte) ; y=8
+	4AD3 3A C0 4A       LD 		A,(text_size)								;; get Text height size (0:single (Z=1) or 1:double (NZ=1))
+	4AD6 A7             AND 	A											;; check if size was 0 or 1
+	4AD7 C4 9F 4B       CALL 	NZ,Double_sized_char						;; if Double size, then call Double_sized_char input:DE=symbol data, output:DE=buffer where the zoomed sprite is, HL=new size
+	4ADA ED 4B BE 4A    LD 		BC,(Char_cursor_pixel_position)				;; get Char cursor addr position B=y, C=x
+	4ADE 79             LD 		A,C
+	4ADF C6 04          ADD 	A,#04										;; col+4 (next pixel x position)
+	4AE1 32 BE 4A       LD 		(Char_cursor_pixel_position),A				;; write new Char cursor addr position
+	4AE4 3A C1 4A       LD 		A,(rainbow_mode)							;; get rainbowmode On/Off
+	4AE7 A7             AND 	A											;; test it
+	4AE8 3A BD 4A       LD 		A,(current_pen_number)						;; get current pen number
+	4AEB 20 0A          JR 		NZ,pcb_end									;; if Rainbow mode Off, then jump pcb_end
+	4AED 3C             INC 	A											;; else Rainbow mode is On so loop color to the next one
+	4AEE E6 03          AND 	#03											;; clamping it if needed (0,1,2,3 then back to 0 (at this point))
 	4AF0 37             SCF													;; set carry flag
-	4AF1 20 01          JR NZ,pcb_notr										;; if new color not 0, then go pcb_notr
-	4AF3 3C             INC A												;; else +1 so we are in fact looping 1,2,3,1,2,3...
+	4AF1 20 01          JR 		NZ,pcb_notr									;; if new color not 0, then go pcb_notr
+	4AF3 3C             INC 	A											;; else +1 so we are in fact looping 1,2,3,1,2,3...
 pcb_notr:
-	4AF4 32 BD 4A       LD (current_pen_number),A							;; store current pen number
+	4AF4 32 BD 4A       LD 		(current_pen_number),A						;; store current pen number
 pcb_end:
-	4AF7 C3 B0 08       JP Draw_Sprite										;; will RET
+	4AF7 C3 B0 08       JP 		Draw_Sprite									;; will RET
 
 .Sub_Print_String:
-	4AFA E6 7F          AND #7F												;; A was >= #80, clear bit7 ("substract" #80)
-	4AFC CD 8A 4B       CALL Get_string_address_in_table
+	4AFA E6 7F          AND 	#7F											;; A was >= #80, clear bit7 ("substract" #80)
+	4AFC CD 8A 4B       CALL 	Get_String_code_A
 print_char_until_delimiter
-	4AFF 7E             LD A,(HL)											;; get current Cursor_position_code
-	4B00 FE FF          CP Delimiter										;; has reached Delimiter? (A == #FF?)
-	4B02 C8             RET Z												;; if Delimiter reached then RET
-	4B03 23             INC HL												;; else: next char position
-	4B04 E5             PUSH HL												;; store new char position
-	4B05 CD C2 4A       CALL Print_String
-	4B08 E1             POP HL												;; restores surrent char position
-	4B09 18 F4          JR print_char_until_delimiter						;; loop
+	4AFF 7E             LD 		A,(HL)										;; get current Cursor_position_code
+	4B00 FE FF          CP 		Delimiter									;; has reached Delimiter? (A == #FF?)
+	4B02 C8             RET 	Z											;; if Delimiter reached then RET
+	4B03 23             INC 	HL											;; else: next char position
+	4B04 E5             PUSH 	HL											;; store new char position
+	4B05 CD C2 4A       CALL 	Print_String
+	4B08 E1             POP 	HL											;; restores surrent char position
+	4B09 18 F4          JR 		print_char_until_delimiter					;; loop
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Available string attribute codes:
@@ -14155,16 +14170,16 @@ print_char_until_delimiter
 ;; First part of the string attributes parsing. Handles the codes
 ;; 0 to 4. It'll jump to Control_Codes_more for codes 5 to 7
 .Control_Codes:																;; Handles Codes 0 to 4
-	4B0B C6 20          ADD A,#20											;; We did a SUB 20 before, so add it back!
-	4B0D FE 05          CP #05												;; test if A < 5
-	4B0F 30 31          JR NC,Control_Codes_more							;; jump Control_Codes_more if A >= 5
-	4B11 A7             AND A												;; A == 0?
-	4B12 CA 65 08       JP Z,Draw_wipe_and_Clear_Screen						;; if Code 0 jump Draw_wipe_and_Clear_Screen ; will RET
-	4B15 D6 02          SUB 2												;; Test codes 1 (C set) and 2 (Z set)
-	4B17 38 14          JR C,Control_Code_new_line							;; if Code = 1 jump Control_Code_new_line; will RET; else:
-	4B19 28 05          JR Z,Control_Code_space_erase_end					;; if Code = 2 jump Control_Code_space_erase_end; will RET, else:
-	4B1B 3D             DEC A												;; Test if codes 3 (A=0) or 4 (A=1)
-	4B1C 32 C0 4A       LD (text_size),A									;; Set Text size 0 = single height or 1 = double height
+	4B0B C6 20          ADD 	A,#20										;; We did a SUB 20 before, so add it back!
+	4B0D FE 05          CP 		#05											;; test if A < 5
+	4B0F 30 31          JR 		NC,Control_Codes_more						;; jump Control_Codes_more if A >= 5
+	4B11 A7             AND 	A											;; A == 0?
+	4B12 CA 65 08       JP 		Z,Draw_wipe_and_Clear_Screen				;; if Code 0 jump Draw_wipe_and_Clear_Screen ; will RET
+	4B15 D6 02          SUB 	2											;; Test codes 1 (C set) and 2 (Z set)
+	4B17 38 14          JR 		C,Control_Code_new_line						;; if Code = 1 jump Control_Code_new_line; will RET; else:
+	4B19 28 05          JR 		Z,Control_Code_space_erase_end				;; if Code = 2 jump Control_Code_space_erase_end; will RET, else:
+	4B1B 3D             DEC 	A											;; Test if codes 3 (A=0) or 4 (A=1)
+	4B1C 32 C0 4A       LD 		(text_size),A								;; Set Text size 0 = single height or 1 = double height
 	4B1F C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -14172,88 +14187,88 @@ print_char_until_delimiter
 ;; position to the end of line (erase any old character that could
 ;; remain when text has changed)
 Control_Code_space_erase_end:
-	4B20 3A BE 4A       LD A,(Char_cursor_pixel_position)					;; Char cursor addr position
-	4B23 FE C0          CP #C0												;; has reached right border?
-	4B25 D0             RET NC												;; if yes, RET
-	4B26 3E 20          LD A,#20											;; else : String " "
-	4B28 CD C2 4A       CALL Print_String
-	4B2B 18 F3          JR Control_Code_space_erase_end						;; loop
+	4B20 3A BE 4A       LD 		A,(Char_cursor_pixel_position)				;; Char cursor addr position
+	4B23 FE C0          CP 		#C0											;; has reached right border?
+	4B25 D0             RET 	NC											;; if yes, RET
+	4B26 3E 20          LD 		A,#20										;; else : String " "
+	4B28 CD C2 4A       CALL 	Print_String
+	4B2B 18 F3          JR 		Control_Code_space_erase_end				;; loop
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; This is the string attribute 01: "New line" (go to begining of next line)
 .Control_Code_new_line:
-	4B2D 2A BE 4A       LD HL,(Char_cursor_pixel_position)					;; Char cursor addr position H=y, L=x
-	4B30 3A C0 4A       LD A,(text_size)									;; get Text height size
-	4B33 A7             AND A												;; test if single size (0) or double (1)
-	4B34 7C             LD A,H												;; A = row
-	4B35 28 02          JR Z,ccnewln_single									;; jump over one of the ADD below if single height, else do both!
-	4B37 C6 08          ADD A,#08											;; Next char pixel row   (if double size do it twice)
+	4B2D 2A BE 4A       LD 		HL,(Char_cursor_pixel_position)				;; Char cursor addr position H=y, L=x
+	4B30 3A C0 4A       LD 		A,(text_size)								;; get Text height size
+	4B33 A7             AND 	A											;; test if single size (0) or double (1)
+	4B34 7C             LD 		A,H											;; A = row
+	4B35 28 02          JR 		Z,ccnewln_single							;; jump over one of the ADD below if single height, else do both!
+	4B37 C6 08          ADD 	A,#08										;; Next char pixel row   (if double size do it twice)
 ccnewln_single:
-	4B39 C6 08          ADD A,#08											;; Next char pixel row (if single size do it once)
-	4B3B 67             LD H,A												;; refresh cursor address ...
-	4B3C 2E 40          LD L,#40											;; ... position to ...
-	4B3E 22 BE 4A       LD (Char_cursor_pixel_position),HL					;; ...newline position
+	4B39 C6 08          ADD 	A,#08										;; Next char pixel row (if single size do it once)
+	4B3B 67             LD 		H,A											;; refresh cursor address ...
+	4B3C 2E 40          LD 		L,#40										;; ... position to ...
+	4B3E 22 BE 4A       LD 		(Char_cursor_pixel_position),HL				;; ...newline position
 	4B41 C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Next part of the string attributes parsing. Here it'll handle the
 ;; codes 5, 6 and 7; these are followed by parameters
 .Control_Codes_more:														;; Handles Codes 5, 6 and 7
-	4B42 21 5A 4B       LD HL,Control_Code_attribute_5_setmode				;; prepare jump address Control_Code_attribute_5_setmode
-	4B45 28 0A          JR Z,Update_attribute_jump_address					;; if Code = 5 jump Color_attribute ; Update_attribute_jump_address
-	4B47 FE 07          CP #07												;; test if Code 7
-	4B49 21 55 4B       LD HL,Control_Code_attribute_7_setscheme			;; prepare jump address Control_Code_attribute_7_setscheme
-	4B4C 28 03          JR Z,Update_attribute_jump_address					;; if Code 7 : Update_attribute_jump_address
-	4B4E 21 68 4B       LD HL,Control_Code_attribute_6_getcol				;; else code 6 : jump address Control_Code_attribute_6_getcol
+	4B42 21 5A 4B       LD 		HL,Control_Code_attribute_5_setmode			;; prepare jump address Control_Code_attribute_5_setmode
+	4B45 28 0A          JR 		Z,Update_attribute_jump_address				;; if Code = 5 jump Color_attribute ; Update_attribute_jump_address
+	4B47 FE 07          CP 		#07											;; test if Code 7
+	4B49 21 55 4B       LD 		HL,Control_Code_attribute_7_setscheme		;; prepare jump address Control_Code_attribute_7_setscheme
+	4B4C 28 03          JR 		Z,Update_attribute_jump_address				;; if Code 7 : Update_attribute_jump_address
+	4B4E 21 68 4B       LD 		HL,Control_Code_attribute_6_getcol			;; else code 6 : jump address Control_Code_attribute_6_getcol
 .Update_attribute_jump_address:
-	4B51 22 C3 4A       LD (smc_print_string_routine+1),HL					;; update entry jump address of Print_String self mod code
+	4B51 22 C3 4A       LD 		(smc_print_string_routine+1),HL				;; update entry jump address of Print_String self mod code
 	4B54 C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 .Control_Code_attribute_7_setscheme:
-	4B55 CD 2C 05       CALL Set_colors
-	4B58 18 09          JR Control_Code_attribute_funnel					;; back to default jump address Print_Char_base
+	4B55 CD 2C 05       CALL 	Set_colors
+	4B58 18 09          JR 		Control_Code_attribute_funnel				;; back to default jump address Print_Char_base
 
 .Control_Code_attribute_5_setmode:
-	4B5A A7             AND A												;; test color attribute
-	4B5B 32 C1 4A       LD (rainbow_mode),A									;; update rainbow mode (00 or "not 0")
-	4B5E 28 03          JR Z,Control_Code_attribute_funnel					;; if we had the "05 00" rainbow mode on attribute, then can leave
-	4B60 32 BD 4A       LD (current_pen_number),A							;; else need to set the pen number 1, 2, or 3
+	4B5A A7             AND 	A											;; test color attribute
+	4B5B 32 C1 4A       LD 		(rainbow_mode),A							;; update rainbow mode (00 or "not 0")
+	4B5E 28 03          JR 		Z,Control_Code_attribute_funnel				;; if we had the "05 00" rainbow mode on attribute, then can leave
+	4B60 32 BD 4A       LD 		(current_pen_number),A						;; else need to set the pen number 1, 2, or 3
 .Control_Code_attribute_funnel:
-	4B63 21 C5 4A       LD HL,Print_Char_base								;; back to default jump address Print_Char_base
-	4B66 18 E9          JR Update_attribute_jump_address
+	4B63 21 C5 4A       LD 		HL,Print_Char_base							;; back to default jump address Print_Char_base
+	4B66 18 E9          JR 		Update_attribute_jump_address
 
 .Control_Code_attribute_6_getcol:
-	4B68 21 74 4B       LD HL,Control_Code_attribute_6_getrow				;; next jump address will be Control_Code_attribute_6_getrow
-	4B6B 87             ADD A,A
-	4B6C 87             ADD A,A
-	4B6D C6 40          ADD A,#40											;; next pix pos = 4xcol+#40  (#40 is the minX in pix coord, *4 : 4 pix per bytes)
-	4B6F 32 BE 4A       LD (Char_cursor_pixel_position),A					;; update char pix X address
-	4B72 18 DD          JR Update_attribute_jump_address
+	4B68 21 74 4B       LD 		HL,Control_Code_attribute_6_getrow			;; next jump address will be Control_Code_attribute_6_getrow
+	4B6B 87             ADD 	A,A
+	4B6C 87             ADD 	A,A
+	4B6D C6 40          ADD 	A,#40										;; next pix pos = 4xcol+#40  (#40 is the minX in pix coord, *4 : 4 pix per bytes)
+	4B6F 32 BE 4A       LD 		(Char_cursor_pixel_position),A				;; update char pix X address
+	4B72 18 DD          JR 		Update_attribute_jump_address
 
 .Control_Code_attribute_6_getrow:
-	4B74 87             ADD A,A
-	4B75 87             ADD A,A
-	4B76 87             ADD A,A												;; next pix pox = 8 * row
-	4B77 32 BF 4A       LD (Char_cursor_pixel_position+1),A					;; update char pix Y address
-	4B7A 18 E7          JR Control_Code_attribute_funnel					;; back to default jump address Print_Char_base
+	4B74 87             ADD 	A,A
+	4B75 87             ADD 	A,A
+	4B76 87             ADD 	A,A											;; next pix pox = 8 * row
+	4B77 32 BF 4A       LD 		(Char_cursor_pixel_position+1),A			;; update char pix Y address
+	4B7A 18 E7          JR 		Control_Code_attribute_funnel				;; back to default jump address Print_Char_base
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Produce a String attribute 06 (position "LOCATE")
 ;; Input: BC is the position;
 ;; Output: HL = pointer on Cursor_position_code string attribute.
 .Set_Cursor_position:
-	4B7C ED 43 87 4B    LD (Cursor_position_code+1),BC						;; Update Cursor_position_code position from BC
-	4B80 21 86 4B       LD HL,Cursor_position_code							;; point Cursor_position_code
-	4B83 C3 FF 4A       JP print_char_until_delimiter						;; (will end up with a RET)
+	4B7C ED 43 87 4B    LD 		(Cursor_position_code+1),BC					;; Update Cursor_position_code position from BC
+	4B80 21 86 4B       LD		HL,Cursor_position_code						;; point Cursor_position_code
+	4B83 C3 FF 4A       JP 		print_char_until_delimiter					;; (will end up with a RET)
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; This produce a "String" attribute code 06 (position).
 ;; the position is set by Set_Cursor_position
 .Cursor_position_code:
-	4B86 DEFB #06							;; cursor_position code
-	4B87 DEFW #0000							;; Will be updated at address 4B7C
-	4B89 DEFB Delimiter						;; delimiter code
+	4B86 06				DEFB	#06											;; cursor_position code
+	4B87 00 00 			DEFW	#0000										;; Will be updated at address 4B7C
+	4B89 FF 			DEFB	Delimiter									;; delimiter code
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; This will find the pointer on the String we are looking for.
@@ -14261,39 +14276,39 @@ ccnewln_single:
 ;;  * String ID #80 to #CB come from String_Table_1 index 0 to #4B;
 ;;  * String ID #E0 to #FF come from String_Table_2 index 0 to #1F.
 ;; Output: HL = pointer on the wanted String data.
-.Get_string_address_in_table:
-	4B8A 47             LD B,A												;; B = Index of the String in the table (ID#80 -> B=0, ID#81 -> B=1, etc..)
-	4B8B 21 31 31       LD HL,String_Table_1								;; String_Table_1 base addr (ID #80 to #CB)
-	4B8E D6 60          SUB #60												;; test if code was >= #E0 (reminder: (ID AND 7F) SUB 60)
-	4B90 38 04          JR C,got_tab										;; If code was not from String_Table_2, then (is from String_Table_1) jump got_tab
-	4B92 21 09 09       LD HL,String_Table_2								;; change to table String_Table_2 base addr (ID #E0 to #FF)
-	4B95 47             LD B,A
+.Get_String_code_A:
+	4B8A 47             LD 		B,A											;; B = Index of the String in the table (ID#80 -> B=0, ID#81 -> B=1, etc..)
+	4B8B 21 31 31       LD 		HL,String_Table_1							;; String_Table_1 base addr (ID #80 to #CB)
+	4B8E D6 60          SUB 	#60											;; test if code was >= #E0 (reminder: (ID AND 7F) SUB 60)
+	4B90 38 04          JR 		C,got_tab									;; If code was not from String_Table_2, then (is from String_Table_1) jump got_tab
+	4B92 21 09 09       LD 		HL,String_Table_2							;; change to table String_Table_2 base addr (ID #E0 to #FF)
+	4B95 47             LD 		B,A
 got_tab:
-	4B96 04             INC B												;; jump over 1rst Delimiter (tables start with FF)
+	4B96 04             INC 	B											;; jump over 1rst Delimiter (tables start with FF)
 search_nth_Delimiter:
-	4B97 3E FF          LD A,Delimiter										;; code to look for (Delimiter)
+	4B97 3E FF          LD 		A,Delimiter									;; code to look for (Delimiter)
 loop_search_nth_Delimiter
-	4B99 4F             LD C,A
+	4B99 4F             LD 		C,A
 	4B9A ED B1          CPIR												;; Repeat CPI (CP (HL) ; INC HL ; DEC BC) until BC=0 or A=(HL); find first occurance.
-	4B9C 10 FB          DJNZ loop_search_nth_Delimiter						;; B-- ; Jump if B!=0
+	4B9C 10 FB          DJNZ 	loop_search_nth_Delimiter					;; B-- ; Jump if B!=0
 	4B9E C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; This creates a zoomed char sprite from the original char
 ;; Output: DE will point on the double sized char buffer
 .Double_sized_char:
-	4B9F 06 08          LD B,#08											;; 8 original lines in char symbol
-	4BA1 21 AD 4A       LD HL,Double_size_char_buffer						;; Double_size_char_buffer
+	4B9F 06 08          LD 		B,#08										;; 8 original lines in char symbol
+	4BA1 21 AD 4A       LD 		HL,Double_size_char_buffer					;; Double_size_char_buffer
 dsc_loop:
-	4BA4 1A             LD A,(DE)											;; get char symbol byte
-	4BA5 77             LD (HL),A											;; put it once
-	4BA6 23             INC HL
-	4BA7 77             LD (HL),A											;; put it twice!
-	4BA8 23             INC HL
-	4BA9 13             INC DE												;; next byte
-	4BAA 10 F8          DJNZ dsc_loop
-	4BAC 21 04 10       LD HL,#1004											;; sprite size : x=2x4 (2 pix per byte) ; y=16 (#10)
-	4BAF 11 AD 4A       LD DE,Double_size_char_buffer						;; Double_size_char_buffer
+	4BA4 1A             LD 		A,(DE)										;; get char symbol byte
+	4BA5 77             LD 		(HL),A										;; put it once
+	4BA6 23             INC 	HL
+	4BA7 77             LD 		(HL),A										;; put it twice!
+	4BA8 23             INC 	HL
+	4BA9 13             INC 	DE											;; next byte
+	4BAA 10 F8          DJNZ 	dsc_loop
+	4BAC 21 04 10       LD 		HL,#1004									;; sprite size : x=2x4 (2 pix per byte) ; y=16 (#10)
+	4BAF 11 AD 4A       LD 		DE,Double_size_char_buffer					;; Double_size_char_buffer
 	4BB2 C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -14310,41 +14325,41 @@ dsc_loop:
 ;;                            a "0" means break (no leading 0, so do not need to continue parsing); RET with NC
 .Print_4Digits_LeftAligned:
 	;; Left align, no leading zero.
-	4BB3 01 F8 00       LD BC,#00F8											;; 4 digits Left aligned, No leading "0" (but if 0 print "0 ")
-	4BB6 D5             PUSH DE
-	4BB7 7A             LD A,D
-	4BB8 CD C7 4B       CALL print_2Digits									;; print higher digits
-	4BBB D1             POP DE
-	4BBC 7B             LD A,E
-	4BBD 18 08          JR print_2Digits									;; print lower digits
+	4BB3 01 F8 00       LD 		BC,#00F8									;; 4 digits Left aligned, No leading "0" (but if 0 print "0 ")
+	4BB6 D5             PUSH 	DE
+	4BB7 7A             LD 		A,D
+	4BB8 CD C7 4B       CALL 	print_2Digits								;; print higher digits
+	4BBB D1             POP 	DE
+	4BBC 7B             LD 		A,E
+	4BBD 18 08          JR 		print_2Digits								;; print lower digits
 
 .Print_2Digits_RightAligned:
-	4BBF 01 FE FF       LD BC,#FFFE				 							;; Right aligned (Pad with spaces), No leading "0" (but if 0 print " 0")
-	4BC2 18 03          JR print_2Digits
+	4BBF 01 FE FF       LD 		BC,#FFFE									;; Right aligned (Pad with spaces), No leading "0" (but if 0 print " 0")
+	4BC2 18 03          JR 		print_2Digits
 .Print_2Digits_LeftAligned:
-	4BC4 01 FE 00       LD BC,#00FE											;; Left aligned, No leading "0" (but if 0 print "0 ")
+	4BC4 01 FE 00       LD 		BC,#00FE									;; Left aligned, No leading "0" (but if 0 print "0 ")
 .print_2Digits:
-	4BC7 F5             PUSH AF												;; save A
+	4BC7 F5             PUSH 	AF											;; save A
 	4BC8 1F             RRA
 	4BC9 1F             RRA
 	4BCA 1F             RRA
 	4BCB 1F             RRA													;; int(A >> 4) (get high BCD nibble)
-	4BCC CD D0 4B       CALL Sub_PrintDigit									;; print it
-	4BCF F1             POP AF												;; restore value in A and print the low BCD nibble:
+	4BCC CD D0 4B       CALL 	Sub_PrintDigit								;; print it
+	4BCF F1             POP 	AF											;; restore value in A and print the low BCD nibble:
 .Sub_PrintDigit:
-	4BD0 E6 0F          AND #0F												;; A MOD 16 (get low BCD nibble)
-	4BD2 20 09          JR NZ,print_it										;; if not 0 jump print_it, else:
-	4BD4 CB 09          RRC C												;; get bit0 of C in Carry and Circular Right rotate C
-	4BD6 38 05          JR C,print_it										;; if Carry=1, print the "0" out, else:
-	4BD8 CB 08          RRC B												;; get bit0 of B in Carry and Circular Right rotate B
-	4BDA D0             RET NC												;; if Carry=0, leave with Carry reset, else print out a "Space"
-	4BDB 3E F0          LD A,#F0											;; A = #F0 (after the add 30, it'll become #20 = " ")
+	4BD0 E6 0F          AND 	#0F											;; A MOD 16 (get low BCD nibble)
+	4BD2 20 09          JR 		NZ,print_it									;; if not 0 jump print_it, else:
+	4BD4 CB 09          RRC 	C											;; get bit0 of C in Carry and Circular Right rotate C
+	4BD6 38 05          JR 		C,print_it									;; if Carry=1, print the "0" out, else:
+	4BD8 CB 08          RRC 	B											;; get bit0 of B in Carry and Circular Right rotate B
+	4BDA D0             RET 	NC											;; if Carry=0, leave with Carry reset, else print out a "Space"
+	4BDB 3E F0          LD 		A,#F0										;; A = #F0 (after the add 30, it'll become #20 = " ")
 print_it:
-	4BDD 0E FF          LD C,#FF											;; if Sub_PrintDigit recalled, we will print the "0"s from now ()
-	4BDF C6 30          ADD A,#30											;; Convert number (0 to 9) to corresponding ASCII, and #F0 to " "so if value is "00" we will always at least print "0"
-	4BE1 C5             PUSH BC
-	4BE2 CD C2 4A       CALL Print_String									;; Print it!
-	4BE5 C1             POP BC
+	4BDD 0E FF          LD 		C,#FF										;; if Sub_PrintDigit recalled, we will print the "0"s from now ()
+	4BDF C6 30          ADD 	A,#30										;; Convert number (0 to 9) to corresponding ASCII, and #F0 to " "so if value is "00" we will always at least print "0"
+	4BE1 C5             PUSH 	BC
+	4BE2 CD C2 4A       CALL 	Print_String								;; Print it!
+	4BE5 C1             POP 	BC
 	4BE6 37             SCF													;; leave with Carry set
 	4BE7 C9             RET
 
@@ -14353,45 +14368,49 @@ print_it:
 ;; Bit 1 set = needs redraw
 DrawFlags:
 	4BE8 DEFB #00
+
 Collided:
 	4BE9 DEFB #FF
+
+;; -----------------------------------------------------------------------------------------------------------
+;; TODO : Used when controlling something with a Joystick (ie. in game joystick object)
 RobotDir:
 	4BEA DEFB #FF
 
 ;; -----------------------------------------------------------------------------------------------------------
 ObjFnJoystick:
-	4BEB FD 7E 0C       LD A,(IY+#0C)
-	4BEE FD 36 0C FF    LD (IY+#0C),#FF
-	4BF2 F6 F0          OR #F0
-	4BF4 FE FF          CP #FF
-	4BF6 C8             RET Z
-	4BF7 32 EA 4B       LD (RobotDir),A
+	4BEB FD 7E 0C       LD 		A,(IY+#0C)
+	4BEE FD 36 0C FF    LD 		(IY+#0C),#FF
+	4BF2 F6 F0          OR 		#F0
+	4BF4 FE FF          CP 		#FF
+	4BF6 C8             RET 	Z
+	4BF7 32 EA 4B       LD 		(RobotDir),A
 	4BFA C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 ObjFnRobot:
-	4BFB CD 29 50       CALL ObjAgain8
-	4BFE 21 EA 4B       LD HL,RobotDir
-	4C01 7E             LD A,(HL)
-	4C02 36 FF          LD (HL),#FF
-	4C04 F5             PUSH AF
-	4C05 CD 0F 44       CALL Get_dir_code_LRDU_bitmap
-	4C08 3C             INC A
-	4C09 D6 01          SUB 1
-	4C0B D4 2B 4F       CALL NC,MoveDir
-	4C0E F1             POP AF
-	4C0F CD EF 4F       CALL ObjAgain6
-	4C12 CD DF 4F       CALL FaceAndAnimate
-	4C15 C3 C7 4F       JP ObjDraw
+	4BFB CD 29 50       CALL 	ObjAgain8
+	4BFE 21 EA 4B       LD 		HL,RobotDir
+	4C01 7E             LD 		A,(HL)
+	4C02 36 FF          LD 		(HL),#FF
+	4C04 F5             PUSH 	AF
+	4C05 CD 0F 44       CALL 	DirCode_from_LRDU							;; get dir code (0 to 7 or FF), from LRDU
+	4C08 3C             INC 	A
+	4C09 D6 01          SUB 	1
+	4C0B D4 2B 4F       CALL 	NC,MoveDir
+	4C0E F1             POP 	AF
+	4C0F CD EF 4F       CALL 	ObjAgain6
+	4C12 CD DF 4F       CALL 	FaceAndAnimate
+	4C15 C3 C7 4F       JP 		ObjDraw
 
 ;; -----------------------------------------------------------------------------------------------------------
 ObjFnTeleport:
-	4C18 FD CB 0C 6E    BIT 5,(IY+#0C)
-	4C1C C0             RET NZ
-	4C1D CD DF 4F       CALL FaceAndAnimate
-	4C20 CD C7 4F       CALL ObjDraw
-	4C23 06 47          LD B,Sound_ID_Teleport_waiting						;; Sound_ID #47 : Teleporter waiting noise
-	4C25 C3 91 0D       JP Play_Sound	 									;; will RET
+	4C18 FD CB 0C 6E    BIT 	5,(IY+#0C)
+	4C1C C0             RET 	NZ
+	4C1D CD DF 4F       CALL 	FaceAndAnimate
+	4C20 CD C7 4F       CALL 	ObjDraw
+	4C23 06 47          LD 		B,Sound_ID_Teleport_waiting					;; Sound_ID #47 : Teleporter waiting noise
+	4C25 C3 91 0D       JP 		Play_Sound	 								;; will RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Function OBJFN_CANNONBALL #24 associated to the ObjDefns object #3C :
@@ -14405,18 +14424,18 @@ ObjFnTeleport:
 ;; the Victory room have been destroyed, delay_CannonBall will reach
 ;; 0 and the Victory room celebration will end and go to Game_over.
 delay_CannonBall:
-	4C28 DEFB #60							;; delay_CannonBall #60 by default, receives #40 at init, then #60 in ObjFnCannonFire
+	4C28 60				DEFB 	#60							;; delay_CannonBall #60 by default, receives #40 at init, then #60 in ObjFnCannonFire
 
 ObjFnCannonFire:
-	4C29 21 28 4C       LD HL,delay_CannonBall								;; delay_CannonBall
-	4C2C 7E             LD A,(HL)											;; read value
-	4C2D A7             AND A												;; and test
-	4C2E C0             RET NZ												;; if not 0 leave; else:
-	4C2F 36 60          LD (HL),#60											;; reset delay before firing next Canon Ball;
-	4C31 FD 36 0B F7    LD (IY+#0B),#F7										;; update (IY+#0B),~#08
-	4C35 FD 36 0A 19    LD (IY+O_FUNC),#19									;; update object function #19 = OBJFN_FIRE (cannon ball is similar to firing a donut: fired then destroyed)
-	4C39 3E 05          LD A,Sound_ID_BeepCannon							;; play Cannon fired sound
-	4C3B C3 1C 2B       JP SetSound											;; will RET
+	4C29 21 28 4C       LD		HL,delay_CannonBall							;; delay_CannonBall
+	4C2C 7E             LD 		A,(HL)										;; read value
+	4C2D A7             AND 	A											;; and test
+	4C2E C0             RET 	NZ											;; if not 0 leave; else:
+	4C2F 36 60          LD 		(HL),#60									;; reset delay before firing next Canon Ball;
+	4C31 FD 36 0B F7    LD 		(IY+#0B),#F7								;; update (IY+#0B),~#08
+	4C35 FD 36 0A 19    LD 		(IY+O_FUNC),#19								;; update object function #19 = OBJFN_FIRE (cannon ball is similar to firing a donut: fired then destroyed)
+	4C39 3E 05          LD 		A,Sound_ID_BeepCannon						;; play Cannon fired sound
+	4C3B C3 1C 2B       JP 		SetSound									;; will RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 ObjFn35Val:
@@ -14439,7 +14458,7 @@ ObjFn35b:
 	4C52 FD 7E 0C       LD A,(IY+#0C)
 	4C55 E6 20          AND #20
 	4C57 C0             RET NZ
-	4C58 ED 4B AB 24    LD BC,(character_direction)							;; get character_direction in C
+	4C58 ED 4B AB 24    LD BC,(character_direction)							;; get character_direction LRDU in C
 	4C5C 18 13          JR ObjFnEnd
 
 ObjFn32:
@@ -14492,7 +14511,7 @@ ObjFnEnd4:
 ObjFnSub:
 	4CA7 3A F0 36       LD A,(ObjDir)
 	4CAA FD A6 0C       AND (IY+#0C)
-	4CAD CD 0F 44       CALL Get_dir_code_LRDU_bitmap
+	4CAD CD 0F 44       CALL 	DirCode_from_LRDU							;; get dir code (0 to 7 or FF), from LRDU
 	4CB0 FE FF          CP #FF
 	4CB2 37             SCF
 	4CB3 C8             RET Z
@@ -14504,9 +14523,9 @@ ObjFnSub:
 	4CBD F5             PUSH AF
 	4CBE CD 52 44       CALL UpdateCurrPos
 	4CC1 F1             POP AF
-	4CC2 2A 3E 4C       LD HL,(ObjFn35Val)										;; L = ObjFn35Val byte (0 or FF)
-	4CC5 2C             INC L													;; +1
-	4CC6 C8             RET Z													;; RET if was FF, else:
+	4CC2 2A 3E 4C       LD HL,(ObjFn35Val)									;; L = ObjFn35Val byte (0 or FF)
+	4CC5 2C             INC L												;; +1
+	4CC6 C8             RET Z												;; RET if was FF, else:
 	4CC7 CD D0 4C       CALL MoveCurr
 	4CCA D8             RET C
 	4CCB CD 52 44       CALL UpdateCurrPos
@@ -14604,28 +14623,29 @@ ObjFn19:
 	4D43 C3 C7 4F       JP ObjDraw
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; Rollers in the various directions
+;; Rollers in the various LRDU directions (bits are active low)
 ObjFnRollers1
-	4D46 3E FE          LD A,#FE											;; ~#01
+	4D46 3E FE          LD A,#FE											;; Moving Up
 	4D48 18 0A          JR WriteRollerDir
 ObjFnRollers2:
-	4D4A 3E FD          LD A,#FD											;; ~#02
+	4D4A 3E FD          LD A,#FD											;; Moving Down
 	4D4C 18 06          JR WriteRollerDir
 ObjFnRollers3:
-	4D4E 3E F7          LD A,#F7											;; ~#08
+	4D4E 3E F7          LD A,#F7											;; Moving Left
 	4D50 18 02          JR WriteRollerDir
 ObjFnRollers4:
-	4D52 3E FB          LD A,#FB											;; ~#04
+	4D52 3E FB          LD A,#FB											;; Moving Right
 .WriteRollerDir:
 	4D54 FD 77 0B       LD (IY+#0B),A
 	4D57 FD 36 0A 00    LD (IY+O_FUNC),0
 	4D5B C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
+;; HushPuppies disappear if Head is in the room
 ObjFnHushPuppy:
-	4D5C 3A 84 24       LD A,(selected_characters)							;; get selected_characters
-	4D5F E6 02          AND #02												;; Test bit1 if we have Head (returns early if not)
-	4D61 18 09          JR TestAndFade
+	4D5C 3A 84 24       LD 		A,(selected_characters)						;; get selected_characters
+	4D5F E6 02          AND 	#02											;; Test bit1 if we have Head (TestAndFade returns early if not)
+	4D61 18 09          JR 		TestAndFade
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; TODO: Theory is this is for the dissolving wall grating next to the hooter
@@ -14790,7 +14810,7 @@ ObjFnStuff6:
 .TurnRandomly:
 	4E65 E5             PUSH HL
 	;; Pick a number. If not lucky, follow TurnOnCollision case.
-	4E66 CD 97 44       CALL Random_gen
+	4E66 CD 97 44       CALL Random_gen										;; rnd value in HL
 	4E69 7D             LD A,L
 	4E6A E6 0F          AND #0F
 	4E6C 20 C4          JR NZ,TurnOnColl2
@@ -14877,56 +14897,69 @@ br_4EE7
 br_4EF1
 	4EF1 C3 C7 4F       JP ObjDraw
 
-;; An axis direction different to the current one.
+;; -----------------------------------------------------------------------------------------------------------
+;; Go to a NEW axial direction (different to the current one).
+;; Axial direction is the Up-Down (V axis) and Left-Right (U axis) directions.
 DirAxes:
-	4EF4 CD 97 44       CALL Random_gen
-	4EF7 7D             LD A,L
-	4EF8 E6 06          AND #06
-	4EFA FD BE 10       CP (IY+O_DIRECTION)
-	4EFD 28 F5          JR Z,DirAxes
-	4EFF 18 2A          JR MoveDir
+	4EF4 CD 97 44       CALL 	Random_gen									;; rnd value in HL
+	4EF7 7D             LD 		A,L
+	4EF8 E6 06          AND 	#06											;; select a axial move only
+	4EFA FD BE 10       CP 		(IY+O_DIRECTION)							;; compare with dir code (0 to 7 or FF)
+	4EFD 28 F5          JR 		Z,DirAxes									;; if same then pick another one
+	4EFF 18 2A          JR 		MoveDir										;; else move to new dir
 
-;; A diagonal direction different to the current one.
+;; -----------------------------------------------------------------------------------------------------------
+;; Go to a NEW diagonal direction (different to the current one).
+;; Diagonal are the axis North-South and West-East
 .DirDiag:
-	4F01 CD 97 44       CALL Random_gen
-	4F04 7D             LD A,L
-	4F05 E6 06          AND #06
-	4F07 F6 01          OR #01
-	4F09 FD BE 10       CP (IY+O_DIRECTION)
-	4F0C 28 F3          JR Z,DirDiag
-	4F0E 18 1B          JR MoveDir
+	4F01 CD 97 44       CALL 	Random_gen									;; rnd value in HL
+	4F04 7D             LD 		A,L
+	4F05 E6 06          AND 	#06
+	4F07 F6 01          OR 		#01											;; select a diag direction
+	4F09 FD BE 10       CP 		(IY+O_DIRECTION)							;; compare with current dir code (0 to 7 or FF)
+	4F0C 28 F3          JR 		Z,DirDiag									;; if same then pick another one
+	4F0E 18 1B          JR 		MoveDir										;; else move to new dir
 
-;; Any new direction at all.
+;; -----------------------------------------------------------------------------------------------------------
+;; Turn to any NEW direction.
 .DirAny:
-	4F10 CD 97 44       CALL Random_gen
-	4F13 7D             LD A,L
-	4F14 E6 07          AND #07
-	4F16 FD BE 10       CP (IY+O_DIRECTION)
-	4F19 28 F5          JR Z,DirAny
-	4F1B 18 0E          JR MoveDir
+	4F10 CD 97 44       CALL 	Random_gen									;; rnd value in HL
+	4F13 7D             LD		 A,L
+	4F14 E6 07          AND 	#07											;; L mod 8
+	4F16 FD BE 10       CP 		(IY+O_DIRECTION)							;; compare with current dir code (0 to 7 or FF)
+	4F19 28 F5          JR 		Z,DirAny									;; if same, then choose another one
+	4F1B 18 0E          JR 		MoveDir										;; else move to new dir
 
-;; 90 degrees round clockwise.
+;; -----------------------------------------------------------------------------------------------------------
+;; Turn 90 degrees clockwise.
+;; 		0 (Down), 1 (South), 2 (Right), 3 (East),  4 (Up),    5 (North), 6 (Left), 7 (West)
+;; -2 : 6 (Left), 7 (West),  0 (Down),  1 (South), 2 (Right), 3 (East),  4 (Up),   5 (North)
 .Clockwise:
-	4F1D FD 7E 10       LD A,(IY+O_DIRECTION)
-	4F20 D6 02          SUB #02
-	4F22 18 05          JR ModMoveDir
+	4F1D FD 7E 10       LD 		A,(IY+O_DIRECTION)							;; dir code (0 to 7 or FF)
+	4F20 D6 02          SUB 	2											;; minus 2 if a clockwise 90° turn
+	4F22 18 05          JR 		Mod8MoveDir									;; move to new dir
 
-;; 90 degrees anticlockwise.
+;; -----------------------------------------------------------------------------------------------------------
+;; Turn 90 degrees anticlockwise.
+;; 		0 (Down),  1 (South), 2 (Right), 3 (East),  4 (Up),   5 (North), 6 (Left), 7 (West)
+;; +2 : 2 (Right), 3 (East),  4 (Up), 	 5 (North), 6 (Left), 7 (West),  0 (Down), 1 (South)
 .Anticlockwise:
-	4F24 FD 7E 10       LD A,(IY+O_DIRECTION)
-	4F27 C6 02          ADD A,#02
-.ModMoveDir:
-	4F29 E6 07          AND #07
+	4F24 FD 7E 10       LD 		A,(IY+O_DIRECTION)							;; dir code (0 to 7 or FF)
+	4F27 C6 02          ADD 	A,2											;; plus 2 to turn anti-clockwise 90°
+.Mod8MoveDir:
+	4F29 E6 07          AND		 #07										;; Modulo 8
 .MoveDir:
-	4F2B FD 77 10       LD (IY+O_DIRECTION),A
+	4F2B FD 77 10       LD 		(IY+O_DIRECTION),A							;; update dir : move to new dir
 	4F2E C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; 180 degree half-turn.
+;; Turn 180 degree (half-turn).
+;; 		0 (Down), 1 (South), 2 (Right), 3 (East), 4 (Up), 	5 (North), 6 (Left),  7 (West)
+;; +4 : 4 (Up),   5 (North), 6 (Left),  7 (West), 0 (Down), 1 (South), 2 (Right), 3 (East)
 .HalfTurn:
-	4F2F FD 7E 10       LD A,(IY+O_DIRECTION)
-	4F32 C6 04          ADD A,#04
-	4F34 18 F3          JR ModMoveDir
+	4F2F FD 7E 10       LD 		A,(IY+O_DIRECTION)							;; dir code (0 to 7 or FF)
+	4F32 C6 04          ADD 	A,#04										;; plus 4 gives a 180° turn
+	4F34 18 F3          JR 		Mod8MoveDir									;; move to new dir
 
 ;; -----------------------------------------------------------------------------------------------------------
 ObjFn33:
@@ -14939,8 +14972,8 @@ ObjFn33:
 	4F41 BB             CP E
 	4F42 DA 4F 4F       JP C,NoColl33
 	4F45 79             LD A,C
-	4F46 CD 0F 44       CALL Get_dir_code_LRDU_bitmap
-	4F49 FD 77 10       LD (IY+O_DIRECTION),A
+	4F46 CD 0F 44       CALL 	DirCode_from_LRDU							;; get dir code (0 to 7 or FF), from LRDU
+	4F49 FD 77 10       LD (IY+O_DIRECTION),A								;; dir code (0 to 7 or FF)
 	4F4C C3 59 4E       JP Collision33
 
 .NoColl33:
@@ -14966,7 +14999,7 @@ hmin_1:
 hmin_2:
 	4F67 B1             OR 		C
 .MoveToDirMask:
-	4F68 CD 0F 44       CALL 	Get_dir_code_LRDU_bitmap
+	4F68 CD 0F 44       CALL 	DirCode_from_LRDU							;; get dir code (0 to 7 or FF), from LRDU
 	4F6B 18 BE          JR 		MoveDir
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -15041,10 +15074,10 @@ hmin_2:
 ;; -----------------------------------------------------------------------------------------------------------
 ;; If bit 0 of DrawFlags is not set, set it and set the object extents.
 .UpdateObjExtents:
-	4FB6 3A E8 4B       LD 		A,(DrawFlags)
-	4FB9 CB 47          BIT 	0,A
-	4FBB C0             RET 	NZ
-	4FBC F6 01          OR 		#01
+	4FB6 3A E8 4B       LD 		A,(DrawFlags)								;; get DrawFlags
+	4FB9 CB 47          BIT 	0,A											;; test bit 0 (object extent set or to be set)
+	4FBB C0             RET 	NZ											;; if 1 (already set, leave)
+	4FBC F6 01          OR 		#01											;; else set it
 	4FBE 32 E8 4B       LD 		(DrawFlags),A
 	4FC1 2A EE 36       LD 		HL,(CurrObject)
 	4FC4 C3 A3 1C       JP 		StoreObjExtents
@@ -15082,7 +15115,7 @@ ObjAgain6:
 	4FF2 FE FF          CP #FF
 	4FF4 32 E9 4B       LD (Collided),A
 	4FF7 C8             RET Z
-	4FF8 CD 0F 44       CALL Get_dir_code_LRDU_bitmap
+	4FF8 CD 0F 44       CALL 	DirCode_from_LRDU							;; get dir code (0 to 7 or FF), from LRDU
 	4FFB FE FF          CP #FF
 	4FFD 32 E9 4B       LD (Collided),A
 	5000 C8             RET Z
@@ -15158,13 +15191,15 @@ br_5072
 	5079 C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; from direction code in O_DIRECTION (0 to 7), return coresponding  	   Up              	   		Up
-;; LRDU (Left/Right/Down/Up) value (active low)                    	    05 04 03         	     F6 FE FA
-;;                                                                 Left 06 FF 02 Right      Left F7    FB Right
-;; This is pretty much the reverse of Get_dir_code_LRDU_bitmap          07 00 01         	     F5 FD F9
-;;                                                                 	      Down           	       Down
+;; From direction code in O_DIRECTION (0 to 7 or FF), return                Up   east
+;; the coresponding LRDU (Left/Right/Down/Up) value (active low)   north __________> U              Up
+;;             															|05 04 03         	     F6 FE FA
+;;                                                                 Left |06 FF 02 Right     Left F7    FB Right
+;; This is pretty much the reverse of DirCode_from_LRDU					|07 00 01         	     F5 FD F9
+;; Up is the far corner, Down the near corner                      west |  Down  south     	       Down
+;;                                                                    V Y
 DirCode_to_LRDU:
-	507A FD 7E 10       LD 		A,(IY+O_DIRECTION)
+	507A FD 7E 10       LD 		A,(IY+O_DIRECTION)							;; dir code (0 to 7 or FF)
 	507D C6 86          ADD 	A,DirCode2LRDU_table & #00FF				;; #86 = DirCode2LRDU_table low byte + drection_offset
 	507F 6F             LD 		L,A
 	5080 CE 50          ADC 	A,DirCode2LRDU_table >> 8					;; #50 = DirCode2LRDU_table high byte
@@ -15174,38 +15209,38 @@ DirCode_to_LRDU:
 	5085 C9             RET
 
 .DirCode2LRDU_table:
-	;;        Dwn  s-e  Rght n-e  up   n-w  left s-w
+	;;       Down south Rght east  Up north left west
 	5086 DEFB #FD, #F9, #FB, #FA, #FE, #F6, #F7, #F5
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; IY points on the object's object (variables)
 ;; SetFacingDir : C has the direction
 .SetFacingDirEx:
-	508E FD 4E 10       LD C,(IY+O_DIRECTION)								;; Read direction code
-	5091 CB 49          BIT 1,C												;; Heading 'down'?
-	5093 FD CB 04 A6    RES 4,(IY+O_FLAGS)									;; Set bit 4 of flags, if so.
-	5097 20 04          JR NZ,SetFacingDir
-	5099 FD CB 04 E6    SET 4,(IY+O_FLAGS)
+	508E FD 4E 10       LD 		C,(IY+O_DIRECTION)							;; Read direction code (0 to 7 or FF)
+	5091 CB 49          BIT 	1,C											;; Heading along the V axis if 0 (sw<->ne or n<->s), along the U axis if 1 (nw<->se or e<->w)
+	5093 FD CB 04 A6    RES 	4,(IY+O_FLAGS)								;; Set bit 4 of flags, as NOT(bit1) of direction code.
+	5097 20 04          JR 		NZ,SetFacingDir
+	5099 FD CB 04 E6    SET 	4,(IY+O_FLAGS)
 .SetFacingDir:
-	509D FD 7E 0F       LD A,(IY+O_ANIM)				 					;; Load animation code.
-	50A0 A7             AND A
-	50A1 C8             RET Z												;; Return if not animated
-	50A2 CB 51          BIT 2,C												;; Heading right?
-	50A4 4F             LD C,A
-	50A5 28 07          JR Z,sfd_2
-	50A7 CB 59          BIT 3,C
-	50A9 C0             RET NZ
-	50AA 3E 08          LD A,#08
-	50AC 18 04          JR sfd_1
+	509D FD 7E 0F       LD 		A,(IY+O_ANIM)				 				;; Load animation code.
+	50A0 A7             AND 	A
+	50A1 C8             RET 	Z											;; Return if not animated
+	50A2 CB 51          BIT 	2,C											;; Heading roughly north/Back (w,nw,n,ne) if 1; or south/Front (sw,s,se,e) if 0
+	50A4 4F             LD 		C,A											;; anim code in C
+	50A5 28 07          JR 		Z,sfd_2										;; if Front/South, goto sfd_2
+	50A7 CB 59          BIT 	3,C											;; moving if 0, standing if 1
+	50A9 C0             RET 	NZ											;; leave if standing
+	50AA 3E 08          LD 		A,#08										;; else A = 8
+	50AC 18 04          JR 		sfd_1										;; skip to sfd_1
 sfd_2:
-	50AE CB 59          BIT 3,C
-	50B0 C8             RET Z												;; Ret if sprite currently faces forward.
-	50B1 AF             XOR A
+	50AE CB 59          BIT 	3,C											;; test bit3
+	50B0 C8             RET 	Z											;; leave if sprite currently faces forward.
+	50B1 AF             XOR 	A											;; else A = 0
 sfd_1:
-	50B2 A9             XOR C
-	50B3 E6 0F          AND #0F
-	50B5 A9             XOR C
-	50B6 FD 77 0F       LD (IY+O_ANIM),A
+	50B2 A9             XOR 	C											;; if moving and rearward
+	50B3 E6 0F          AND 	#0F
+	50B5 A9             XOR 	C
+	50B6 FD 77 0F       LD 		(IY+O_ANIM),A
 	50B9 C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
