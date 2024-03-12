@@ -4240,6 +4240,7 @@ Sound_ID_Teleport_Down:		EQU 	#C8 		;; Teleport down
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Redraws the Pillar in PillarBuf, pillar height in A.
+;; In function of the height, the middle part will be stacked as many times as needed
 ;; Output: pointer on result sprite in DE.
 .SetPillarHeight:
 	16FB 32 ED 16       LD 		(PillarHeight),A							;; PillarHeight
@@ -4387,7 +4388,7 @@ EDGE_HEIGHT:			EQU 	#0B
 	17B0 0E 38          LD 		C,SHORT_WALL								;; Wall height for ids 0-3
 	17B2 CB 56          BIT 	2,(HL)
 	17B4 28 02          JR 		Z,dbcflag
-	17B6 0E 4A          LD 		C,TALL_WALL									;; Wall height for ids 4-5
+	17B6 0E 4A          LD 		C,TALL_WALL									;; pillar height for ids 4-5
 .dbcflag:
 	17B8 81             ADD 	A,C											;; Add the wall height on.
 	;; Window Y start now relative to the top of the current wall panel.
@@ -4579,7 +4580,7 @@ DBEdge_Center:
 	1874 01 D3 18       LD 		BC,CornerEdge
 DBEdge_Left:
 	1877 09             ADD 	HL,BC
-	1878 D9             EXX
+	1878 D9             EXX													;; BC, DE, HL exchange with prime regs
 	;; Copies from HL' to DE', number of rows in A.
 	1879 DD E9          JP 		(IX)
 
@@ -4696,22 +4697,23 @@ tei_1:
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Wrap up a call to GetWall, and add in the starting offset from A.
+;; TODO
 .GetOffsetWall:
-	192F F5             PUSH AF
-	1930 7E             LD A,(HL)
+	192F F5             PUSH 	AF											;; stack offset in A
+	1930 7E             LD 		A,(HL)
 	1931 D9             EXX
-	1932 CD 7D 19       CALL GetWall
-	1935 F1             POP AF
-	1936 87             ADD A,A
-	1937 F5             PUSH AF
-	1938 85             ADD A,L												;; this does...
-	1939 6F             LD L,A
-	193A 8C             ADC A,H
-	193B 95             SUB L
-	193C 67             LD H,A												;; ...HL = HL + A
-	193D F1             POP AF
-	193E D0             RET NC
-	193F 24             INC H
+	1932 CD 7D 19       CALL 	GetWall
+	1935 F1             POP 	AF
+	1936 87             ADD 	A,A
+	1937 F5             PUSH 	AF
+	1938 85             ADD 	A,L											;; this does...
+	1939 6F             LD 		L,A
+	193A 8C             ADC 	A,H
+	193B 95             SUB 	L
+	193C 67             LD 		H,A											;; ...HL = HL + A
+	193D F1             POP 	AF
+	193E D0             RET 	NC
+	193F 24             INC 	H
 	1940 C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -4722,108 +4724,104 @@ hasPillarUnderDoor:
 ;; Returns PillarBuf in HL.
 ;; If hasPillarUnderDoor is non-zero, it zeroes the buffer, and the flag.
 .GetEmptyPillarBuf:
-	1942 3A 41 19       LD A,(hasPillarUnderDoor)							;; do we have pillar under the door?
-	1945 A7             AND A
-	1946 21 98 B8       LD HL,PillarBuf
-	1949 C8             RET Z
-	194A E5             PUSH HL
-	194B C5             PUSH BC
-	194C D5             PUSH DE
-	194D 01 28 01       LD BC,#0128											;; Erase block of #0128 bytes
-	1950 CD 67 24       CALL Erase_forward_Block_RAM
-	1953 D1             POP DE
-	1954 C1             POP BC
-	1955 E1             POP HL
-	1956 AF             XOR A
-	1957 32 41 19       LD (hasPillarUnderDoor),A
+	1942 3A 41 19       LD 		A,(hasPillarUnderDoor)						;; do we have pillar under the door?
+	1945 A7             AND 	A											;; test
+	1946 21 98 B8       LD 		HL,PillarBuf								;; HL = #B898 = PillarBuf
+	1949 C8             RET 	Z											;; leave if pillar buffer empty, else:
+	194A E5             PUSH 	HL
+	194B C5             PUSH 	BC
+	194C D5             PUSH 	DE
+	194D 01 28 01       LD 		BC,#0128									;; Erase block of #0128 bytes
+	1950 CD 67 24       CALL 	Erase_forward_Block_RAM
+	1953 D1             POP 	DE
+	1954 C1             POP 	BC
+	1955 E1             POP 	HL
+	1956 AF             XOR 	A
+	1957 32 41 19       LD 		(hasPillarUnderDoor),A						;; reset hasPillarUnderDoor
 	195A C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Called by GetWall for high-index sprites, to draw the space under a door
 ;;   A=5 -> blank space, A=4 -> Pillars
 .GetUnderDoor:
-	195B CB 47          BIT 0,A												;; Low bit nonzero? Return cleared buffer.
-	195D 20 E3          JR NZ,GetEmptyPillarBuf
-	195F 6F             LD L,A
-	;; Otherwise, we're drawing a Pillar
-	1960 3A 41 19       LD A,(hasPillarUnderDoor)
-	1963 A7             AND A
-	1964 CC EE 16       CALL Z,FillPillarBuf
-	1967 3A C0 1A       LD A,(IsPillarBufFlipped)
-	196A AD             XOR L
-	196B 17             RLA
-	;; Carry set if we need to flip and update flag to match request...
-	196C 21 98 B8       LD HL,PillarBuf
-	196F D0             RET NC						 						;; Return PillarBuf if no flip required...
-	1970 3A C0 1A       LD A,(IsPillarBufFlipped)							;; Otherwise, flip flag and buffer.
-	1973 EE 80          XOR %10000000
-	1975 32 C0 1A       LD (IsPillarBufFlipped),A
-	1978 06 4A          LD B,TALL_WALL
-	197A C3 9C 1A       JP FlipPillar
+	195B CB 47          BIT 	0,A											;; Low bit nonzero?
+	195D 20 E3          JR 		NZ,GetEmptyPillarBuf						;; we draw nothing below the door (clear buffer)
+	195F 6F             LD 		L,A											;; else we'll draw a pillar; L = pillar id + flip bit7
+	1960 3A 41 19       LD 		A,(hasPillarUnderDoor)						;; get pillar buffer flag (0=empty, none-0=not empty)
+	1963 A7             AND 	A											;; test
+	1964 CC EE 16       CALL 	Z,FillPillarBuf								;; if buffer empty, fill the buffer with pillar
+	1967 3A C0 1A       LD 		A,(IsPillarBufFlipped)						;; needs to be flipped? in bit7
+	196A AD             XOR 	L											;; match with pillar id bit7 (result bit7 = 0 means pillar id bit7 and IsPillarBufFlipped bit7 identical, result bit7 = 1, different)
+	196B 17             RLA													;; get result bit7 in Carry
+	196C 21 98 B8       LD 		HL,PillarBuf								;; HL = B898 PillarBuf
+	196F D0             RET 	NC						 					;; Return PillarBuf if no flip required...
+	1970 3A C0 1A       LD 		A,(IsPillarBufFlipped)						;; Otherwise...
+	1973 EE 80          XOR 	%10000000									;; flip IsPillarBufFlipped bit7.
+	1975 32 C0 1A       LD 		(IsPillarBufFlipped),A
+	1978 06 4A          LD 		B,TALL_WALL									;; B = #4A
+	197A C3 9C 1A       JP 		FlipPillar									;; and Flip Pillar image
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; Get a wall section thing.
-;; Index in A. Top bit represents whether flip is required.
-;; Pointer to data returned in HL.
+;; Get a wall section/panel (id 0 to 3, cases 4 and 5 are the space under
+;; a door (blank or pillars) and handled by GetUnderDoor).
+;; In A : 0-3 - world-specific, 4 - Pillar, 5 - blank, + #80 to flip.
+;; Top bit represents whether flip is required.
+;; Return: Pointer to data in HL. Panel id in A, Carry if flip required
 .GetWall:
-	197D CB 57          BIT 2,A												;; 4 and 5 handled by GetUnderDoor.
-	197F 20 DA          JR NZ,GetUnderDoor
-	1981 F5             PUSH AF
-	1982 CD 8F 19       CALL NeedsFlip2					 					;; Check if flip is required
-	1985 08             EX AF,AF
-	1986 F1             POP AF
-	1987 CD C1 1A       CALL GetPanelAddr
-	198A 08             EX AF,AF
-	198B D0             RET NC
-	198C C3 9A 1A       JP FlipPanel
+	197D CB 57          BIT 	2,A											;; check bit2 for cases 4 and 5 handled by GetUnderDoor.
+	197F 20 DA          JR 		NZ,GetUnderDoor								;; if bit2=1 (cases 4 or 5) goto GetUnderDoor
+	1981 F5             PUSH 	AF											;; else stack A
+	1982 CD 8F 19       CALL 	NeedsFlip2					 				;; Check if panel flip is required
+	1985 08             EX 		AF,AF										;; save Carry in F'
+	1986 F1             POP 	AF											;; get panel id back
+	1987 CD C1 1A       CALL 	GetPanelAddr								;; HL = corresponding wall panel Sprite id (function of worldId and panel selection id in A)
+	198A 08             EX 		AF,AF										;; get back Carry and panel id
+	198B D0             RET 	NC											;; no flip required, leave
+	198C C3 9A 1A       JP 		FlipPanel									;; else flip sprite ; will ret
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; Takes a sprite index in A. Looks up low three bits in the bitmap.
-;; If the top bit was set, we flip the bit if necessary to match,
-;; and return carry if a bit flip was needed.
+;; Takes a Wall panel id in A.
+;; If the top bit was set (bit7 = needs flip), we flip the bit in
+;; corresponding PanelFlips if necessary,
+;; Return: Carry if a modification in PanelFlips was needed.
+;; Return: A the flip bitmap
 .NeedsFlip2:
-	198F 4F             LD C,A
-	1990 2A 44 3C       LD HL,(Walls_PanelFlipsPtr)
-	1993 E6 03          AND #03
-	;; A = 1 << A
-	1995 47             LD B,A
-	1996 04             INC B
-	1997 3E 01          LD A,#01
-nf2_1:
-	1999 0F             RRCA
-	199A 10 FD          DJNZ nf2_1											;; right shift B times
-	;; Check if that bit of (HL) is set
-	199C 47             LD B,A
-	199D A6             AND (HL)
-	199E 20 08          JR NZ,nf2_2
-	;; It isn't. Was top bit if param set?
-	19A0 CB 11          RL C
-	19A2 D0             RET NC												;; No - return with carry reset
-	;; It was. So, set bit and return with carry flag set.
-	19A3 78             LD A,B
-	19A4 B6             OR (HL)
-	19A5 77             LD (HL),A
-	19A6 37             SCF
+	198F 4F             LD 		C,A											;; In A : 0-3 - world-specific, 4 - Pillar, 5 - blank, + #80 to flip.
+	1990 2A 44 3C       LD 		HL,(Walls_PanelFlipsPtr)					;; get current wall "PanelFlips + WorldId"
+	1993 E6 03          AND 	#03											;; wall panel id
+	1995 47             LD 		B,A											;; B = id
+	1996 04             INC 	B											;; B = id + 1
+	1997 3E 01          LD 		A,%00000001									;; wandering bit starts at bit0
+nf2_wander1loop:
+	1999 0F             RRCA												;; circular right rotate ...
+	199A 10 FD          DJNZ 	nf2_wander1loop								;; ... B times
+	199C 47             LD 		B,A											;; bitmap bit7: id0, bit6: id1, bit5: id2, bit4: id3
+	199D A6             AND 	(HL)										;; compare with Walls_PanelFlipsPtr
+	199E 20 08          JR 		NZ,nf2_2									;; if that bit is set then nf2_2
+	19A0 CB 11          RL 		C											;; else get bit7 in carry
+	19A2 D0             RET 	NC											;; if bit7 was 0, leave with NC, else:
+	19A3 78             LD 		A,B											;; bitmap
+	19A4 B6             OR 		(HL)										;; add set flip bit corresponding to current panel id to "PanelFlips + WorldId"
+	19A5 77             LD 		(HL),A										;; and update "PanelFlips + WorldId" value
+	19A6 37             SCF													;; leave with Carry set in that case
 	19A7 C9             RET
 
 nf2_2:
-	;; Top bit was set. Is bit set?
-	19A8 CB 11          RL C
-	19AA 3F             CCF
-	19AB D0             RET NC												;; Yes - return with carry reset
-	;; No. So reset bit and return with carry flag set.
-	19AC 78             LD A,B
-	19AD 2F             CPL
-	19AE A6             AND (HL)
-	19AF 77             LD (HL),A
-	19B0 37             SCF
+	19A8 CB 11          RL 		C											;; get flip bit (bit7) in Carry
+	19AA 3F             CCF													;; invert it
+	19AB D0             RET 	NC											;; it was 1, so return with NC
+	19AC 78             LD 		A,B											;; else, get bitmap
+	19AD 2F             CPL													;; invert all bits in A
+	19AE A6             AND 	(HL)
+	19AF 77             LD 		(HL),A										;; and turn off the flipping bit for current panel id in "PanelFlips + WorldId"
+	19B0 37             SCF													;; return with Carry set
 	19B1 C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 .DoJumpIX:
-	19B2 DD E9          JP (IX)												;; Call the copying function
+	19B2 DD E9          JP 		(IX)										;; Call the copying function
 .DoJumpIY:
-	19B4 FD E9          JP (IY)												;; Call the clearing function
+	19B4 FD E9          JP 		(IY)										;; Call the clearing function
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Zero a single column of the 6-byte-wide buffer at DE' (A rows).
@@ -4976,16 +4974,16 @@ bf_2:
 ;; D  contains initial offset in rows.
 ;; HL contains pointer to wall sprite id.
 .BlitFloorR:
-	1A31 47             LD B,A
-	1A32 7A             LD A,D
+	1A31 47             LD 		B,A
+	1A32 7A             LD 		A,D
 	;; Move down 8 rows if top bit of (HL) is set.
     ;; Do the second column of the image (the extra +1)
-	1A33 CB 7E          BIT 7,(HL)
+	1A33 CB 7E          BIT 	7,(HL)
 	1A35 D9             EXX
-	1A36 0E 01          LD C,#01
-	1A38 28 0F          JR Z,bfl_1
-	1A3A 0E 11          LD C,#11											;; 2*8+1
-	1A3C 18 0B          JR bfl_1
+	1A36 0E 01          LD 		C,#01
+	1A38 28 0F          JR 		Z,bfl_1
+	1A3A 0E 11          LD 		C,#11										;; 2*8+1
+	1A3C 18 0B          JR 		bfl_1
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Fill a 6-byte-wide buffer at DE' with the left column of background tile.
@@ -5095,42 +5093,44 @@ tcbl_1:
 	1A99 C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; Flip a normal wall panel
-;; Used to flip the wall sprite for the right side of the screen.
+;; Reverse a two-byte-wide image.
+;; * FlipPanel : pointer to data in HL
+;; 		Flip a normal wall panel
+;; 		Used to flip the wall sprite for the right side of the screen.
+;; * FlipColumn : Height in B, pointer to data in HL.
 .FlipPanel:
-	1A9A 06 38          LD B,SHORT_WALL
-;; Reverse a two-byte-wide image. Height in B, pointer to data in HL.
+	1A9A 06 38          LD 		B,SHORT_WALL								;; #38
 .FlipColumn:
-	1A9C D5             PUSH DE
-	1A9D 16 69          LD D,RevTable >> 8									;; #69 = RevTable >> 8
-	1A9F E5             PUSH HL
+	1A9C D5             PUSH 	DE
+	1A9D 16 69          LD 		D,RevTable >> 8								;; #69 = RevTable >> 8
+	1A9F E5             PUSH 	HL
 fcol_1:
-	1AA0 22 B8 1A       LD (smc_dest_addr2+1),HL							;; self mod code at 1AB8, value of LD (...),A
-	1AA3 5E             LD E,(HL)
-	1AA4 1A             LD A,(DE)
-	1AA5 23             INC HL
-	1AA6 5E             LD E,(HL)
-	1AA7 22 B3 1A       LD (smc_dest_addr1+1),HL							;; self mod code at 1AB3, value of LD (...),A
-	1AAA 23             INC HL
-	1AAB 4E             LD C,(HL)
-	1AAC 77             LD (HL),A
-	1AAD 23             INC HL
-	1AAE 1A             LD A,(DE)
-	1AAF 5E             LD E,(HL)
-	1AB0 77             LD (HL),A
-	1AB1 1A             LD A,(DE)
+	1AA0 22 B8 1A       LD 		(smc_dest_addr2+1),HL						;; self mod code at 1AB8, value of LD (...),A
+	1AA3 5E             LD 		E,(HL)
+	1AA4 1A             LD 		A,(DE)
+	1AA5 23             INC 	HL
+	1AA6 5E             LD 		E,(HL)
+	1AA7 22 B3 1A       LD 		(smc_dest_addr1+1),HL						;; self mod code at 1AB3, value of LD (...),A
+	1AAA 23             INC 	HL
+	1AAB 4E             LD 		C,(HL)
+	1AAC 77             LD 		(HL),A
+	1AAD 23             INC 	HL
+	1AAE 1A             LD 		A,(DE)
+	1AAF 5E             LD 		E,(HL)
+	1AB0 77             LD 		(HL),A
+	1AB1 1A             LD 		A,(DE)
 smc_dest_addr1:
-	1AB2 32 00 00       LD (#0000),A										;; addr self modified at 1AA7
+	1AB2 32 00 00       LD 		(#0000),A									;; addr self modified at 1AA7
 	;;1AB3 DEFW 00 00
-	1AB5 59             LD E,C
-	1AB6 1A             LD A,(DE)
+	1AB5 59             LD 		E,C
+	1AB6 1A             LD 		A,(DE)
 smc_dest_addr2:
-	1AB7 32 00 00       LD (#0000),A										;; addr self modified at 1AA0
+	1AB7 32 00 00       LD 		(#0000),A									;; addr self modified at 1AA0
 	;;1AB8 DEFW 00 00
-	1ABA 23             INC HL
-	1ABB 10 E3          DJNZ fcol_1
-	1ABD E1             POP HL
-	1ABE D1             POP DE
+	1ABA 23             INC 	HL
+	1ABB 10 E3          DJNZ 	fcol_1
+	1ABD E1             POP 	HL
+	1ABE D1             POP 	DE
 	1ABF C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -5914,21 +5914,21 @@ goex_1:
 ;; Returns: X extent in BC, Y extent in HL
 .GetShortObjExt:
 	1E36 23             INC HL
-	1E37 23             INC HL
-	1E38 7E             LD A,(HL)
+	1E37 23             INC HL												;; now HL points on O_FLAGS
+	1E38 7E             LD A,(HL)											;; get flags
 	;; Put a flip flag in A if the "switched" bit is set on the object.
     ;; A = (object[4] & 0x10) ? 0x80 : 0x00
 gsobjext_1:
-	1E39 CB 67          BIT 4,A
+	1E39 CB 67          BIT 4,A												;; test bit4
 	1E3B 3E 00          LD A,#00
 	1E3D 28 02          JR Z,gsobjext_2
 	1E3F 3E 80          LD A,#80
 gsobjext_2:
 	1E41 08             EX AF,AF
 	1E42 23             INC HL
-	1E43 CD 77 1E       CALL UVZtoXY				 						;; Called with object + 5
+	1E43 CD 77 1E       CALL UVZtoXY				 						;; Called with HL pointing on O_U
 	1E46 23             INC HL
-	1E47 23             INC HL												;; Now at object + 9
+	1E47 23             INC HL												;; Now at object O_SPRFLAGS
 	1E48 7E             LD A,(HL)
 	1E49 32 A2 1C       LD (SpriteFlags),A
 	1E4C 2B             DEC HL
@@ -5987,29 +5987,30 @@ gsobjext_2:
 	1E76 C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; Given HP pointing to an Object + 5, return X coordinate
-;; in C, Y coordinate in B. Increments HL by 2.
+;; Given HP pointing to an Object + 5 (O_U)
+;; Return X coordinate in C, Y coordinate in B.
+;; Return: Increments HL by 2 (O_Z)
 ;; 		.----------> X
-;; 		|  V   U
-;; 		|   \ /
+;; 		|  V   U							eg. U,V,Z = #24, #0C, #C0
+;; 		|   \ /									BC = #CF98
 ;; 		|    |
 ;; 		|    Z
 ;; 		Y
 .UVZtoXY:
 	1E77 7E             LD 		A,(HL)
-	1E78 57             LD 		D,A											;; U coordinate
+	1E78 57             LD 		D,A											;; D = U coordinate
 	1E79 23             INC 	HL
-	1E7A 5E             LD 		E,(HL)										;; V coordinate
+	1E7A 5E             LD 		E,(HL)										;; E = V coordinate
 	1E7B 93             SUB 	E
-	1E7C C6 80          ADD 	A,#80										;; U - V + 128 = X coordinate
-	1E7E 4F             LD 		C,A
+	1E7C C6 80          ADD 	A,#80
+	1E7E 4F             LD 		C,A											;; C = U - V + 128 = X coordinate
 	1E7F 23             INC 	HL
 	1E80 7E             LD 		A,(HL)										;; Z coordinate
-	1E81 87             ADD 	A,A
+	1E81 87             ADD 	A,A											;; x2 (note that, for exemple, ground level = #C0; #C0*2 = #80 because of the modulo 256)
 	1E82 93             SUB 	E
 	1E83 92             SUB 	D
 	1E84 C6 7F          ADD 	A,#7F
-	1E86 47             LD 		B,A						 					;; 2 * Z - U - V + 127 = Y coordinate
+	1E86 47             LD 		B,A						 					;; B = (2 * Z) - U - V + 127 = Y coordinate
 	1E87 C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -6034,7 +6035,7 @@ BaseFlags:														;; object flags when builing a room
 ;; Offset 4: O_FLAGS : Some flags:
 ;;           	Bits 0-2: Object Dimensions - see GetUVZExtents
 ;;           	Bit 3: Tall (extra 6 height)
-;;           	Bit 4: Holds switch status for a switch.
+;;           	Bit 4: Holds switch status for a switch (from function 3rd byte bit7), the roller direction for rollers.
 ;;           	Bit 5: Used on doors by Case3x56.
 ;;           	For doors, bits 4 and 5 hold the direction.
 ;;           	Bit 6: Object is a special collectable item.
@@ -6044,18 +6045,18 @@ BaseFlags:														;; object flags when builing a room
 ;; Offset 7: O_Z : Z coordinate, C0 = ground
 ;; Offset 8: O_SPRITE : Sprite code
 ;; Offset 9: O_SPRFLAGS : Sprite flags:
-;;           	Bit 0 - perhaps is playable character?
-;;           	Bit 1 set for other bit of double height?
+;;           	Bit 0 - is it a playable character or an object/enemy?
+;;           	Bit 1 - same thant bit0 but for 2ndpart double height? TODO????
 ;;           	Bit 2 = we're Head.
-;;           	Bit 4 = non-deadlyness?
+;;           	Bit 4 = TODO: 0:deadly, 1: harmless
 ;;           	Bit 5 = 0 single height (one sprite) ; 1 double size (i.e. 2 sprites, need to Animate and move both sprites together as a single object);
-;;				bit 6 = 0 : object has function; 1 : do not do function
-;;           	Bit 7 = switched flag
+;;				bit 6 = Function disable : 0 = if object has function do it; 1 = do not do function
+;;           	Bit 7 = selective flag (if set, it turns off object function upon collision between 2 objects)
 ;;           	Gets loaded into SpriteFlags
 ;; Offset A: O_FUNC : Function and Phase
 ;;				Top bit is flag that's checked against Phase
 ;;			 	Lower 6 bits are object function.
-;; Offset B: O_????
+;; Offset B: O_IMPACT
 ;;				Bottom 4 bits are roller direction... last move dir for updated things.
 ;; Offset C: O_????
 ;;				Some form of direction bitmask?
@@ -6068,8 +6069,8 @@ BaseFlags:														;; object flags when builing a room
 ;;				bottom 3 bits [2:0] are the frame number.
 ;; Offset 10: O_DIRECTION : Direction code. (0:Down,1:South,2:Right,3:East,4:Up,5:North,6:Left,7:West or FF = don't move)
 ;; Offset 11: O_SPECIAL : This may be several things depending on context:
-;;				Z limits for helipad
-;;				state for switch
+;;				Z limits for helipad (bit3 = 1:Ascent/0:Descent direction (note that, for instance, if set to 0, but already on the ground, it'll immediatly reverse direction), bit2:0 = low limit, bit7:4 = high limit)
+;;				On/Off state for switch
 ;;				special indexd for specials items.
 ;; -----------------------------------------------------------------------------------------------------------
 O_FLAGS:		EQU #04
@@ -6682,31 +6683,31 @@ FetchedNoDoor:																;; No door case:
 ;; Reset CurrData. Macro id we are searching is passed in A'.
 ;; Returns a pointer to a specific room description macro in Room_Macro_data
 .FindMacro:
-	21C6 3E 80          LD A,#80
-	21C8 32 AD 1E       LD (CurrData),A										;; Clear buffered byte with value #80.
-	21CB 21 D0 50       LD HL,Room_Macro_data								;; point on Macro table
-	21CE 08             EX AF,AF                                            ;; recover the Macro ID stared in A'
-	21CF 16 00          LD D,0
+	21C6 3E 80          LD 		A,#80
+	21C8 32 AD 1E       LD 		(CurrData),A								;; Clear buffered byte with value #80.
+	21CB 21 D0 50       LD 		HL,Room_Macro_data							;; point on Macro table
+	21CE 08             EX 		AF,AF										;; recover the Macro ID stared in A'
+	21CF 16 00          LD 		D,0
 fm_loop:
-	21D1 5E             LD E,(HL)											;; DE=first byte = macro length
-	21D2 23             INC HL												;; next byte, is macro Id
-	21D3 BE             CP (HL)												;; Have we found the macro Id in A' we are looking for?
-	21D4 C8             RET Z												;; yes, leave with Macro pointer in HL
-	21D5 19             ADD HL,DE											;; jump to next macro
-	21D6 18 F9          JR fm_loop											;; loop
+	21D1 5E             LD 		E,(HL)										;; DE=first byte = macro length
+	21D2 23             INC 	HL											;; next byte, is macro Id
+	21D3 BE             CP 		(HL)										;; Have we found the macro Id in A' we are looking for?
+	21D4 C8             RET 	Z											;; yes, leave with Macro pointer in HL
+	21D5 19             ADD 	HL,DE										;; jump to next macro
+	21D6 18 F9          JR 		fm_loop										;; loop
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Checks if the room above the current one exists and has no floor (so we can get in by going up)
 ;; Returns with Carry set if the room above has a floor.
 ;; Returns with Carry reset if the room above has No floor.
 .HasFloorAbove:
-	21D8 ED 4B 0E 01    LD BC,(current_Room_ID)								;; get current_Room_ID
-	21DC 79             LD A,C
-	21DD 3D             DEC A												;; C is low byte of RoomID; 4msb=Z, lsb=0. For exemple : #40-1 = #3F; #3F and #F0 = #30 so new Z=3
-	21DE E6 F0          AND #F0												;; room Z-1 = room above
-	21E0 4F             LD C,A
-	21E1 CD F8 21       CALL FindRoom										;; Look if a room ID U,V,Z-1 exists
-	21E4 D8             RET C												;; if Carry set=room not found, so leave, else:
+	21D8 ED 4B 0E 01    LD 		BC,(current_Room_ID)						;; get current_Room_ID
+	21DC 79             LD 		A,C
+	21DD 3D             DEC 	A											;; C is low byte of RoomID; 4msb=Z, lsb=0. For exemple : #40-1 = #3F; #3F and #F0 = #30 so new Z=3
+	21DE E6 F0          AND 	#F0											;; room Z-1 = room above
+	21E0 4F             LD 		C,A
+	21E1 CD F8 21       CALL 	FindRoom									;; Look if a room ID U,V,Z-1 exists
+	21E4 D8             RET 	C											;; if Carry set=room not found, so leave, else:
 check_floorid_above:
     ;; Room Data Format (excluding size byte) is:
 	;; 12b roomID UVZ, 3b roomDimensions, 3b colorScheme,
@@ -6714,13 +6715,13 @@ check_floorid_above:
 	;; 		uuuuvvvv_zzzzdddc_ccwwwDDD_pppDDDpp_pDDDfffo_ooooooo..
 	;; DE currently pointing on the second byte, so +3 points on the
 	;; byte with the floorId. ORing #F1 checks if floorId is 7 (no floor).
-	21E5 13             INC DE
-	21E6 13             INC DE
-	21E7 13             INC DE												;; DE+3 = point on the data byte with FloorId
-	21E8 1A             LD A,(DE)											;; get data
-	21E9 F6 F1          OR #F1												;; test bits [3:1]
-	21EB 3C             INC A												;; if bits were 3b111, A is now 0 (Floor code 7 means "no floor")
-	21EC C8             RET Z												;; Return with Z set and Carry reset if that room has no floor.
+	21E5 13             INC 	DE
+	21E6 13             INC		DE
+	21E7 13             INC		DE											;; DE+3 = point on the data byte with FloorId
+	21E8 1A             LD 		A,(DE)										;; get data
+	21E9 F6 F1          OR 		#F1											;; test bits [3:1]
+	21EB 3C             INC 	A											;; if bits were 3b111, A is now 0 (Floor code 7 means "no floor")
+	21EC C8             RET 	Z											;; Return with Z set and Carry reset if that room has no floor.
 	21ED 37             SCF													;; else:
 	21EE C9             RET													;; Return with Carry set if there's a floor
 
@@ -6776,45 +6777,45 @@ check_floorid_above:
 ;;      Addr pointer on data in DataPtr
 .Sub_FindRoom:
 	2206 D9             EXX
-	2207 21 61 42       LD HL,RoomMask_buffer								;; HL' points on a 301 bytes buffer (1 per room)
-	220A 0E 01          LD C,%00000001										;; wandering 1 bit mask start bit 0
+	2207 21 61 42       LD 		HL,RoomMask_buffer							;; HL' points on a 301 bytes buffer (1 per room)
+	220A 0E 01          LD 		C,%00000001									;; wandering 1 bit mask start bit 0
 	220C D9             EXX													;; Save as HL' and C', get back HL= pointer on room list 1
 .Sub_FindRoom_more:
-	220D 5E             LD E,(HL)											;; read first byte = length for current room block of data (including room id)
-	220E 1C             INC E
-	220F 1D             DEC E												;; test if value in E (data block length) = 0
+	220D 5E             LD 		E,(HL)										;; read first byte = length for current room block of data (including room id)
+	220E 1C             INC 	E
+	220F 1D             DEC 	E											;; test if value in E (data block length) = 0
 	2210 37             SCF													;; Return with Carry if length byte = 0 (not found and end of list reached)
-	2211 C8             RET Z												;; so if E = 0 leave; else:
-	2212 23             INC HL												;; point on next byte (id high byte) (UV)
-	2213 78             LD A,B												;; compare the id in B...
-	2214 BE             CP (HL)												;; ... with that byte
-	2215 28 0A          JR Z,frin_b_matched									;; if identical jump frin_b_matched, else:
+	2211 C8             RET 	Z											;; so if E = 0 leave; else:
+	2212 23             INC 	HL											;; point on next byte (id high byte) (UV)
+	2213 78             LD 		A,B											;; compare the id in B...
+	2214 BE             CP 		(HL)										;; ... with that byte
+	2215 28 0A          JR 		Z,frin_b_matched							;; if identical jump frin_b_matched, else:
 frin_2:																		;; (B did't match)
-	2217 19             ADD HL,DE											;; skip until next data block
+	2217 19             ADD 	HL,DE										;; skip until next data block
 	2218 D9             EXX													;; get C' (bitmask)
-	2219 CB 01          RLC C												;; move the wandering 1 left; C' bit7 goes in Carry
-	221B 30 01          JR NC,frin_1										;; if bit7 = 0 jump frin_1, else (moved 8 times):
+	2219 CB 01          RLC 	C											;; move the wandering 1 left; C' bit7 goes in Carry
+	221B 30 01          JR 		NC,frin_1									;; if bit7 = 0 jump frin_1, else (moved 8 times):
 	;; We only need 301 bits (a 1 indicating we visited it) but the
 	;; RoomMask_buffer is 301 bytes because of the function used to
 	;; count visited rooms that is shared with other functionalities.
-	221D 23             INC HL												;; increment RoomMask_buffer addr in HL'
+	221D 23             INC 	HL											;; increment RoomMask_buffer addr in HL'
 frin_1:																		;; save C',HL' and ...
 	221E D9             EXX													;; ...recover C (id low byte) and HL (data pointer)
-	221F 18 EC          JR Sub_FindRoom_more								;; loop at Sub_FindRoom_more
+	221F 18 EC          JR 		Sub_FindRoom_more							;; loop at Sub_FindRoom_more
 
 frin_b_matched:																;; B was a match so now check C
-	2221 23             INC HL												;; next byte
-	2222 1D             DEC E												;; so decrement DE
-	2223 7E             LD A,(HL)											;; get id low byte
-	2224 E6 F0          AND #F0												;; and only look at bits [7:4] (Z)
-	2226 B9             CP C												;; compare with id low byte in C (Z part of the roomId)
-	2227 20 EE          JR NZ,frin_2										;; no match, jump to skip to next data block; else found!
-	2229 2B             DEC HL												;; Matched room ID! point back on ID high byte (because of the INC HL in FetchData)
-	222A 22 AB 1E       LD (DataPtr),HL										;; store pointer on data block in DataPtr
-	222D 3E 80          LD A,#80											;; init CurrData with #80 (will make FetchData jump to the is low byte)
-	222F 32 AD 1E       LD (CurrData),A										;; to init the fetching pointer by skipping the 4 upper bits and pointing on the low nibble
-	2232 06 04          LD B,4												;; dummy read first nibble of id low byte
-	2234 C3 B2 22       JP FetchData										;; will point on low nibble of id low byte ; will RET
+	2221 23             INC 	HL											;; next byte
+	2222 1D             DEC 	E											;; so decrement DE
+	2223 7E             LD 		A,(HL)										;; get id low byte
+	2224 E6 F0          AND 	#F0											;; and only look at bits [7:4] (Z)
+	2226 B9             CP 		C											;; compare with id low byte in C (Z part of the roomId)
+	2227 20 EE          JR		 NZ,frin_2									;; no match, jump to skip to next data block; else found!
+	2229 2B             DEC 	HL											;; Matched room ID! point back on ID high byte (because of the INC HL in FetchData)
+	222A 22 AB 1E       LD 		(DataPtr),HL								;; store pointer on data block in DataPtr
+	222D 3E 80          LD 		A,#80										;; init CurrData with #80 (will make FetchData jump to the is low byte)
+	222F 32 AD 1E       LD 		(CurrData),A								;; to init the fetching pointer by skipping the 4 upper bits and pointing on the low nibble
+	2232 06 04          LD 		B,4											;; dummy read first nibble of id low byte
+	2234 C3 B2 22       JP 		FetchData									;; will point on low nibble of id low byte ; will RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 .SetTmpObjFlags:
@@ -6833,10 +6834,10 @@ stof_1:
 	2249 E6 10          AND #10												;; shift it to bit 4
 	224B 4F             LD C,A
 	224C 3A 97 1E       LD A,(BaseFlags+1)									;; get current flag
-	224F A9             XOR C												;; flip bit 4 of BaseFlags+1 if needed
+	224F A9             XOR C												;; if SPR_FLIP set, then invert the orientation bit set by the Rooms data
 	2250 32 9C 1E       LD (TmpObj_variables+O_FLAGS),A						;; and update tmp flags; this bit indicated if the sprite needs flip or not
 	2253 ED 4B 96 1E    LD BC,(BaseFlags)
-	2257 CB 67          BIT 4,A												;; test bit4
+	2257 CB 67          BIT 4,A												;; test bit4 SPR_FLIP???
 	2259 28 0B          JR Z,stof_end										;; If bit4 reset then jump stof_end, else (bit4 set):
 	225B CB 4F          BIT 1,A												;; test bit1
 	225D 28 05          JR Z,stof_2											;; if bit1 reset then jump stof_2, else (bit1 rest):
@@ -7318,7 +7319,6 @@ jump_force____to_be_checked:
 	2483 DEFB 0             			;; Number of boosted Jumps
 
 ;; -----------------------------------------------------------------------------------------------------------
-
 selected_characters:
 	2484 DEFB 3     					;; Note: both can be selected! ; bit0=Heels, Bit1=Head; Bit2=Next character to swop to (0 Heels, 1 Head)
 both_in_same_room:
@@ -7380,7 +7380,7 @@ FiredObj_variables:  			;; #12 = 18
 	24A1 DEFB #24				;;	8 : O_SPRITE
 	24A2 DEFB #08				;;	9 : Sprite flags (bit5: set = double size)
 	24A3 DEFB #12				;;	A : O_FUNC
-	24A4 DEFB #FF				;;	B :
+	24A4 DEFB #FF				;;	B : O_IMPACT
 	24A5 DEFB #FF				;;	C :
 	24A6 DEFB #00				;;	D :
 	24A7 DEFB #00				;;	E :
@@ -7414,7 +7414,7 @@ Heels_variables:				;; #12 = 18
 	24B8 DEFB #18				;;	8 : O_SPRITE
 	24B9 DEFB #21				;;	9 : Sprite flags (bit5: set = double size)
 	24BA DEFB #00				;;	A : O_FUNC
-	24BB DEFB #FF				;;	B :
+	24BB DEFB #FF				;;	B : O_IMPACT
 	24BC DEFB #FF				;;	C :
 	24BD DEFB #00				;;	D :
 	24BE DEFB #00				;;	E :
@@ -7435,7 +7435,7 @@ Head_variables:					;; #12 = 18
 	24CA DEFB #1F				;;	8 : O_SPRITE
 	24CB DEFB #25				;;	9 : Sprite flags (bit5: set = double size)
 	24CC DEFB #00				;;	A : O_FUNC
-	24CD DEFB #FF				;;	B :
+	24CD DEFB #FF				;;	B : O_IMPACT
 	24CE DEFB #FF				;;	C : (displacement when trying to merge (when swop to both))
 	24CF DEFB #00				;;	D :
 	24D0 DEFB #00				;;	E :
@@ -7927,14 +7927,14 @@ br_27AF
 br_27C2
 	27C2 08             EX AF,AF
 	27C3 3E 88          LD A,Sound_ID_Menu_Blip								;; TODO: Menu blip
-	27C5 FD CB 0B 66    BIT 4,(IY+#0B)
-	27C9 FD CB 0B E6    SET 4,(IY+#0B)
+	27C5 FD CB 0B 66    BIT 4,(IY+O_IMPACT)
+	27C9 FD CB 0B E6    SET 4,(IY+O_IMPACT)
 	27CD CC 21 2B       CALL Z,SetOtherSound
 	27D0 08             EX AF,AF
 	27D1 28 0B          JR Z,br_27DE
 br_27D3
-	27D3 FD CB 0B A6    RES 4,(IY+#0B)
-	27D7 FD CB 0B EE    SET 5,(IY+#0B)
+	27D3 FD CB 0B A6    RES 4,(IY+O_IMPACT)
+	27D7 FD CB 0B EE    SET 5,(IY+O_IMPACT)
 	27DB FD 35 07       DEC (IY+O_Z)
 br_27DE
 	27DE 3A 84 24       LD A,(selected_characters)							;; get selected_characters
@@ -7953,7 +7953,7 @@ br_27EB
 	27F6 18 ED          JR 		br_27E5										;; else not moving goto br_27E5
 
 br_27F8
-	27F8 FD CB 0B E6    SET 4,(IY+#0B)
+	27F8 FD CB 0B E6    SET 4,(IY+O_IMPACT)
 	27FC FD CB 0C EE    SET 5,(IY+#0C)
 	2800 CD 3B 2B       CALL Get_curr_Char_variables						;; HL = pointer on current selected character's variables
 	2803 3A 58 46       LD A,(access_new_room_code)							;; get access_new_room_code (0=Stay,1=Down,2=Right,3=Up,4=Left,5=Below,6=Above,7=Teleport)
@@ -7969,8 +7969,8 @@ br_2812
 	2818 FD 36 0C FF    LD (IY+#0C),#FF
 br_281C
 	281C 3E 86          LD A,Sound_ID_High_Blip
-	281E FD CB 0B 6E    BIT 5,(IY+#0B)
-	2822 FD CB 0B EE    SET 5,(IY+#0B)
+	281E FD CB 0B 6E    BIT 5,(IY+O_IMPACT)
+	2822 FD CB 0B EE    SET 5,(IY+O_IMPACT)
 	2826 CC 21 2B       CALL Z,SetOtherSound
 	2829 FD CB 0C 66    BIT 4,(IY+#0C)
 	282D FD CB 0C E6    SET 4,(IY+#0C)
@@ -7985,7 +7985,7 @@ br_281C
 
 EPIC_40:
 	2844 FD 35 07       DEC (IY+O_Z)
-	2847 FD CB 0B A6    RES 4,(IY+#0B)
+	2847 FD CB 0B A6    RES 4,(IY+O_IMPACT)
 br_284B
 	284B AF             XOR A
 	284C 32 8E 24       LD (#248E),A
@@ -8048,10 +8048,10 @@ br_28A8
 	28B0 CD 6F 44       CALL Read_Loop_byte
 	28B3 32 CA 24       LD (Head_variables+O_SPRITE),A
 br_28B6
-	28B6 FD CB 0B EE    SET 5,(IY+#0B)
+	28B6 FD CB 0B EE    SET 5,(IY+O_IMPACT)
 	28BA 18 18          JR UpdateChar
 br_28BC
-	28BC FD CB 0B EE    SET 5,(IY+#0B)
+	28BC FD CB 0B EE    SET 5,(IY+O_IMPACT)
 	;; Update the character animation frames to values in BC, and then
 	;; call UpdateChar.
 .UpdateCharFrame:
@@ -8115,15 +8115,15 @@ CharThing23:
 CharThing24:
 	2919 4F             LD C,A
 	291A CD 0A 2A       CALL ResetTickTock
-	291D FD CB 0B AE    RES 5,(IY+#0B)
+	291D FD CB 0B AE    RES 5,(IY+O_IMPACT)
 	2921 3A 84 24       LD A,(selected_characters)							;; get selected_characters
 	2924 E6 02          AND #02
 	2926 20 06          JR NZ,br_292E
 	2928 0D             DEC C
 	2929 20 1B          JR NZ,br_2946
-	292B FD 34 07       INC (IY+#07)
+	292B FD 34 07       INC (IY+O_Z)
 br_292E
-	292E FD 34 07       INC (IY+#07)
+	292E FD 34 07       INC (IY+O_Z)
 	2931 A7             AND A
 	2932 20 15          JR NZ,br_2949
 	2934 3E 82          LD A,Sound_ID_Desc_seq								;; TODO: Faster falling noise
@@ -8137,7 +8137,7 @@ br_292E
 	2944 18 0C          JR br_2952
 
 br_2946
-	2946 FD 34 07       INC (IY+#07)
+	2946 FD 34 07       INC (IY+O_Z)
 br_2949
 	2949 3E 83          LD A,Sound_ID_Falling								;; TODO: Slower falling noise
 	294B CD 21 2B       CALL SetOtherSound
@@ -8198,16 +8198,16 @@ br_2998
 	29A3 CD 3B 2B       CALL Get_curr_Char_variables						;; HL = pointer on current selected character's variables
 	29A6 CD 5C 46       CALL Move
 	29A9 30 15          JR NC,Sub_Move_Char
-	29AB FD 7E 0B       LD A,(IY+#0B)
+	29AB FD 7E 0B       LD A,(IY+O_IMPACT)
 	29AE F6 F0          OR #F0
 	29B0 3C             INC A
 	29B1 3E 88          LD A,Sound_ID_Menu_Blip								;; TODO: Menu blip
 	29B3 C4 21 2B       CALL NZ,SetOtherSound
 br_29B6
 	29B6 F1             POP AF
-	29B7 FD 7E 0B       LD A,(IY+#0B)
+	29B7 FD 7E 0B       LD A,(IY+O_IMPACT)
 	29BA F6 0F          OR #0F
-	29BC FD 77 0B       LD (IY+#0B),A
+	29BC FD 77 0B       LD (IY+O_IMPACT),A
 	29BF C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -8298,7 +8298,7 @@ djmp_skip:
 	2A32 DD E1          POP IX
 	2A34 DD CB 09 46    BIT 0,(IX+O_SPRFLAGS)
 	2A38 28 07          JR Z,br_2A41
-	2A3A DD 7E 0B       LD A,(IX+#0B)
+	2A3A DD 7E 0B       LD A,(IX+O_IMPACT)
 	2A3D F6 CF          OR #CF
 	2A3F 3C             INC A
 	2A40 C0             RET NZ
@@ -8386,7 +8386,7 @@ purseNope:
 	2AC3 3A AC 24       LD A,(Saved_Objects_List_index)						;; get Saved_Objects_List_index
 	2AC6 A7             AND A
 	2AC7 C2 71 02       JP NZ,Play_Sound_NoCanDo							;; if NZ Play_Sound_NoCanDo
-	2ACA FD 4E 07       LD C,(IY+#07)
+	2ACA FD 4E 07       LD C,(IY+O_Z)
 	2ACD 06 03          LD B,#03
 carryLoop:
 	2ACF CD 3B 2B       CALL Get_curr_Char_variables						;; HL = pointer on current selected character's variables
@@ -8394,8 +8394,8 @@ carryLoop:
 	2AD3 CD 31 2E       CALL ChkSatOn
 	2AD6 C1             POP BC
 	2AD7 38 3D          JR C,NoDrop
-	2AD9 FD 35 07       DEC (IY+#07)
-	2ADC FD 35 07       DEC (IY+#07)
+	2AD9 FD 35 07       DEC (IY+O_Z)
+	2ADC FD 35 07       DEC (IY+O_Z)
 	2ADF 10 EE          DJNZ carryLoop
 	2AE1 2A 97 24       LD HL,(Carrying)
 	2AE4 E5             PUSH HL
@@ -8424,7 +8424,7 @@ carryLoop:
 	2B13 C3 A3 1C       JP StoreObjExtents
 
 .NoDrop:
-	2B16 FD 71 07       LD (IY+#07),C										;; Restore old value
+	2B16 FD 71 07       LD (IY+O_Z),C										;; Restore old value
 	2B19 C3 71 02       JP Play_Sound_NoCanDo								;; will RET
 
 .SetSound:
@@ -8443,25 +8443,25 @@ carryLoop:
 ;; This will add the movement sound to any other music playing
 ;; (for exemple when going though a door : walking+World music)
 .Also_Play_Movement_sound:
-	2B28 3A AD 24       LD A,(Other_sound_ID)								;; get Other_sound_ID
-	2B2B F6 80          OR #80												;; add #80 (if needed) to the Other_sound_ID to make sure values start at #80
-	2B2D 47             LD B,A
-	2B2E FE 85          CP #85												;; >= #85? (some bip and blips)
-	2B30 D2 91 0D       JP NC,Play_Sound									;; yes, then play (will RET), else (#80 to #84 = movement sounds):
-	2B33 3A 86 2F       LD A,(Sound_menu_data)								;; else get Sound_menu_data
-	2B36 A7             AND A												;; test
-	2B37 C0             RET NZ												;; if Sound_menu_data != 0 leave, else play sound in B (movement sounds)
-	2B38 C3 91 0D       JP Play_Sound										;; will RET
+	2B28 3A AD 24       LD 		A,(Other_sound_ID)							;; get Other_sound_ID
+	2B2B F6 80          OR 		#80											;; add #80 (if needed) to the Other_sound_ID to make sure values start at #80
+	2B2D 47             LD 		B,A
+	2B2E FE 85          CP 		#85											;; >= #85? (some bip and blips)
+	2B30 D2 91 0D       JP 		NC,Play_Sound								;; yes, then play (will RET), else (#80 to #84 = movement sounds):
+	2B33 3A 86 2F       LD 		A,(Sound_menu_data)							;; else get Sound_menu_data
+	2B36 A7             AND 	A											;; test
+	2B37 C0             RET 	NZ											;; if Sound_menu_data != 0 leave, else play sound in B (movement sounds)
+	2B38 C3 91 0D       JP 		Play_Sound									;; will RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Get a pointer in HL on the selected character's variables
 ;; ie. if Heels selected HL = Heels_variables else Head_variables
 .Get_curr_Char_variables:
-	2B3B 21 84 24       LD HL,selected_characters							;; points on selected_characters
-	2B3E CB 46          BIT 0,(HL)											;; is Heels selected?
-	2B40 21 B0 24       LD HL,Heels_variables								;; prepare return HL = Heels var
-	2B43 C0             RET NZ												;; if Heels selected then return pointer on Heels_variables
-	2B44 21 C2 24       LD HL,Head_variables
+	2B3B 21 84 24       LD 		HL,selected_characters						;; points on selected_characters
+	2B3E CB 46          BIT 	0,(HL)										;; is Heels selected?
+	2B40 21 B0 24       LD 		HL,Heels_variables							;; prepare return HL = Heels var
+	2B43 C0             RET 	NZ											;; if Heels selected then return pointer on Heels_variables
+	2B44 21 C2 24       LD		 HL,Head_variables
 	2B47 C9             RET													;; else return pointer on Head_variables
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -8498,7 +8498,7 @@ CharThing15:
 	2B84 3A C0 1E       LD A,(Has_no_wall)									get walls status
 	2B87 A6             AND (HL)											apply bitmask
 	2B88 20 03          JR NZ,EPIC_86										NZ jump EPIC_86
-	2B8A FD 71 07       LD (IY+#07),C
+	2B8A FD 71 07       LD (IY+O_Z),C
 EPIC_86:
 	2B8D CD 3B 2B       CALL Get_curr_Char_variables						;; HL = pointer on current selected character's variables
 	2B90 11 05 00       LD DE,#0005
@@ -8591,7 +8591,7 @@ EPIC_97:
 	2C0C ED B0          LDIR												repeat LD (DE),(HL); DE++, HL++, BC-- until BC=0
 	2C0E FD 36 0D 00    LD (IY+#0D),#00
 	2C12 FD 36 0E 00    LD (IY+#0E),#00
-	2C16 FD 36 0B FF    LD (IY+#0B),#FF
+	2C16 FD 36 0B FF    LD (IY+O_IMPACT),#FF
 	2C1A FD 36 0C FF    LD (IY+#0C),#FF
 	2C1E E1             POP HL
 	2C1F CD 3B 3A       CALL Enlist
@@ -8691,7 +8691,7 @@ WallSideBitmap: 									;; index 0 = 8 = bit3, index 1 = 4 = bit2 etc.
 	;; Called HitFloor, not NearHitFloor.
 	2CAB FD CB 09 46    BIT 0,(IY+O_SPRFLAGS)								;; sprite flag bit0
 	2CAF 28 38          JR Z,FloorCheck					 					;; Floor check for non-player objects
-    ;; Right, player has hit floor.
+    ;; else it is the player who has hit floor.
 	2CB1 3A AC 24       LD A,(Saved_Objects_List_index)						;; get Saved_Objects_List_index ; SavedObjListIdx
 	2CB4 A7             AND A												;; test
 	2CB5 20 2F          JR NZ,RetZero_Cset									;; not 0 the leave with NZ and C, else:
@@ -8799,7 +8799,7 @@ HF_1:
 ;; Otherwise, do the same, but single-height.
 DOC_1:
 	2D3E DD CB 0C AE    RES 5,(IX+#0C)
-	2D42 DD 7E 0B       LD A,(IX+#0B)
+	2D42 DD 7E 0B       LD A,(IX+O_IMPACT)
 ;; Mask Offset C of IY with top 3 bits of Offset C of stood-on object.
 DOC_2:
 	2D45 F6 E0          OR #E0
@@ -8916,7 +8916,7 @@ CSIT_7:
 	2DEE DD CB F9 66    BIT 4,(IX-7)										;; (IX-07)
 	2DF2 18 04          JR CSIT_10
 CSIT_9:
-	2DF4 DD CB 0B 66    BIT 4,(IX+#0B)
+	2DF4 DD CB 0B 66    BIT 4,(IX+O_IMPACT)
 CSIT_10:
 	2DF8 20 04          JR NZ,CSIT_11
 	2DFA FD CB 0C A6    RES 4,(IY+#0C)
@@ -9003,7 +9003,7 @@ CSAT_1:
     ;; Top of us = bottom of them, we have a thing on top.
     ;; Copy our movement over to the block on top.
 CSAT_2:
-	2E5D FD 7E 0B       LD A,(IY+#0B)
+	2E5D FD 7E 0B       LD A,(IY+O_IMPACT)
 	2E60 F6 E0          OR #E0
 	2E62 E6 EF          AND #EF
 	2E64 4F             LD C,A
@@ -10378,72 +10378,73 @@ ndflp_1:
 .BottomSprite:
 	36F1 00				DEFB 	#00
 ;; In the ObjDefns, if the 2nd byte ("function") bits [7:6] are not 0, then the object
-;; has amother one attached to it.
+;; has another object attached to it ("double height" object).
 .Bottoms_array:
-	36F2 3D				DEFB	#3D							;; SPR_TAP		top 2 bits of ObjDefns "function" byte = 2b'01
-	36F3 8E				DEFB	#8E							;; ANIM_VAPE3	top 2 bits of ObjDefns "function" byte = 2b'10
-	36F4 3D				DEFB	#3D							;; SPR_TAP		top 2 bits of ObjDefns "function" byte = 2b'11
+	36F2 3D				DEFB	#3D							;; SPR_TAP		top 2 bits of ObjDefns "function" byte (2nd byte) = 2b'01
+	36F3 8E				DEFB	#8E							;; ANIM_VAPE3	top 2 bits of ObjDefns "function" byte (2nd byte) = 2b'10
+	36F4 3D				DEFB	#3D							;; SPR_TAP		top 2 bits of ObjDefns "function" byte (2nd byte) = 2b'11
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Takes an object pointer in IY, an object code in A, and initialises it.
 ;; Doesn't set flags, direction code, or coordinates.
 ;; Must then call AddObject to copy it into the room.
 .InitObj:
-	36F5 FD 36 09 00    LD (IY+O_SPRFLAGS),#00								;; Sprite flags
+	36F5 FD 36 09 00    LD 		(IY+O_SPRFLAGS),#00							;; reset Sprite flags
 	;; Look up A in the ObjDefns table.
-	36F9 6F             LD L,A
-	36FA 5F             LD E,A
-	36FB 16 00          LD D,0												;; DE = object code
-	36FD 62             LD H,D												;; HL=DE=object id code
-	36FE 29             ADD HL,HL											;; *2
-	36FF 19             ADD HL,DE											;; *3 : HL = offset = 3 * object id
-	3700 11 C9 38       LD DE,ObjDefns										;; DE = pointer on Object definition Table (ObjDefns: 3 bytes per entry : <sprite-code> <function> <flag>)
-	3703 19             ADD HL,DE											;; HL = pointer on ObjDefns + (objectid * 3)
-	3704 46             LD B,(HL)											;; get sprite code in B
-	3705 23             INC HL												;; next byte
-	3706 7E             LD A,(HL)											;; A = double height flag + object function
-	3707 E6 3F          AND #3F												;; keep object function (in bits[5:0])
-	3709 FD 77 0A       LD (IY+O_FUNC),A
-	370C 7E             LD A,(HL)											;; get byte again
-	370D 23             INC HL												;; prepare for next byte (flagq)
+	36F9 6F             LD 		L,A
+	36FA 5F             LD 		E,A
+	36FB 16 00          LD 		D,0											;; DE = object code
+	36FD 62             LD 		H,D											;; HL=DE=object id code
+	36FE 29             ADD 	HL,HL										;; *2
+	36FF 19             ADD 	HL,DE										;; *3 : HL = offset = 3 * object id
+	3700 11 C9 38       LD 		DE,ObjDefns									;; DE = pointer on Object definition Table (ObjDefns: 3 bytes per entry : <sprite-code> <function> <flag>)
+	3703 19             ADD		HL,DE										;; HL = pointer on ObjDefns + (objectid * 3)
+	3704 46             LD 		B,(HL)										;; get sprite code in B
+	3705 23             INC 	HL											;; next byte
+	3706 7E             LD 		A,(HL)										;; A = double height flag + object function
+	3707 E6 3F          AND 	#3F											;; keep object function (in bits[5:0])
+	3709 FD 77 0A       LD 		(IY+O_FUNC),A
+	370C 7E             LD 		A,(HL)										;; get 2nd byte again
+	370D 23             INC 	HL											;; prepare for next byte (flags)
 	370E 07             RLCA
-	370F 07             RLCA												;; rotate to get 2 upper bits (double height code) in [1:0]
-	3710 E6 03          AND #03												;; get them
-	3712 28 13          JR Z,initobj_1										;; if they are 0 (normal height), skip to initobj_1, else:
-	3714 C6 F1          ADD A,#F1											;; #F1 = (Bottoms_array-1) & #00FF
-	3716 5F             LD E,A
-	3717 CE 36          ADC A,#36											;; DE = (Bottoms_array-1) >> 8 + offset ; #36F1 + offset (can be +1, 2 or 3, this is why we have "Bottoms_array-1")
-	3719 93             SUB E
-	371A 57             LD D,A
-	371B 1A             LD A,(DE)											;; get bottom sprite in A
-	371C FD CB 09 EE    SET 5,(IY+O_SPRFLAGS)								;; Sprite flag bit5 = double sprites
+	370F 07             RLCA												;; rotate "left" to get 2 upper bits (double height code) in [1:0]
+	3710 E6 03          AND 	#03											;; get them and only them
+	3712 28 13          JR 		Z,initobj_1									;; if they are 0 (normal height), skip to initobj_1, else:
+Bottoms_array_m1:		EQU		Bottoms_array - 1
+	3714 C6 F1          ADD		A,Bottoms_array_m1 & #00FF					;; #F1 = (Bottoms_array-1) & #00FF ; + A (can be 1to3, hence the minus 1)
+	3716 5F             LD		E,A
+	3717 CE 36          ADC		A,Bottoms_array_m1 >> 8						;; DE = (Bottoms_array-1) >> 8 + offset ; #36F1 + offset (can be +1, 2 or 3, this is why we have "Bottoms_array-1")
+	3719 93             SUB		E
+	371A 57             LD		D,A
+	371B 1A             LD		A,(DE)										;; get bottom sprite in A
+	371C FD CB 09 EE    SET		5,(IY+O_SPRFLAGS)							;; Sprite flag bit5 = double sprites
 	;; if bit 2 of the third byte is set, swap A and B.
     ;; (i.e. Stash current sprite in the bottom, and use bottom
     ;; sprite for the current object.)
-	3720 CB 56          BIT 2,(HL)											;; 3rd byte (flags), bit2
-	3722 28 03          JR Z,initobj_1										;; if 0, skip initobj_1, else:
-	3724 48             LD C,B
-	3725 47             LD B,A												;; swap sprites codes
-	3726 79             LD A,C
+	3720 CB 56          BIT 	2,(HL)										;; 3rd byte (flags), bit2
+	3722 28 03          JR 		Z,initobj_1									;; if 0, skip initobj_1, else:
+	3724 48             LD 		C,B
+	3725 47             LD 		B,A											;; swap sprites codes
+	3726 79             LD 		A,C
 initobj_1:
-	3727 32 F1 36       LD (BottomSprite),A									;; save sprite code as bottom
-	372A 78             LD A,B												;; get the other sprite code
-	372B CD 4E 37       CALL SetObjSprite
-	372E 7E             LD A,(HL)											;; 3rd byte in ObjDefns array (flags)
-	372F F6 9F          OR #9F												;; ~#60
-	3731 3C             INC A												;; test if value was #60 (SWITCHED)
-	3732 7E             LD A,(HL)											;; reread the byte
-	3733 20 06          JR NZ,initobj_2										;; if is not #60 the jump initobj_2, else:
-	3735 FD CB 09 FE    SET 7,(IY+O_SPRFLAGS)								;; set sprite flag bit 7
-	3739 E6 BF          AND #BF												;; reset bit6 of the value from ObjDefns (it should be #20 now)
+	3727 32 F1 36       LD 		(BottomSprite),A							;; save sprite code as bottom; 0 if single height
+	372A 78             LD 		A,B											;; get the other sprite code
+	372B CD 4E 37       CALL 	SetObjSprite
+	372E 7E             LD 		A,(HL)										;; 3rd byte in ObjDefns array (flags)
+	372F F6 9F          OR 		#9F											;; ~#60 (test bits6:5 of A are both 1 (SELECTIVE))
+	3731 3C             INC 	A											;; test if value was #60 (SELECTIVE)
+	3732 7E             LD 		A,(HL)										;; read the 3rd byte again
+	3733 20 06          JR 		NZ,initobj_2								;; if bit6:5 not 2b'11, jump initobj_2 (PORTABLE or DEADLY or NONE), else:
+	3735 FD CB 09 FE    SET 	7,(IY+O_SPRFLAGS)							;; else SELECTIVE: set sprite flag bit 7
+	3739 E6 BF          AND 	%10111111									;; reset bit6 of the value from ObjDefns (it should be #20=DEADLY now)
 initobj_2:
-	373B E6 FB          AND #FB												;; reset bit3 of the value from ObjDefns
-	373D FE 80          CP #80												;; compare to #80
-	373F CB BF          RES 7,A												;; reset bit7 from ObjDefns
-	3741 FD 77 FF       LD (IY-1),A											;; TmpObj_variables-1 = BaseFlags+1
-	3744 FD 36 FE 02    LD (IY-2),#02										;; TmpObj_variables-2 = BaseFlags
-	3748 D8             RET C												;; if was < #80 leave, else:
-	3749 FD CB 09 E6    SET 4,(IY+O_SPRFLAGS)								;; set sprite flag bit4
+	373B E6 FB          AND 	%11111011									;; reset bit3 of the value from ObjDefns
+	373D FE 80          CP 		#80											;; compare to #80 (bit7 of 3rd byte set or not)
+	373F CB BF          RES 	7,A											;; reset bit7 from ObjDefns
+	3741 FD 77 FF       LD 		(IY-1),A									;; TmpObj_variables-1 = BaseFlags+1
+	3744 FD 36 FE 02    LD 		(IY-2),#02									;; TmpObj_variables-2 = BaseFlags
+	3748 D8             RET 	C											;; if was < #80 leave, else 3rd byte bit7 = 1:
+	3749 FD CB 09 E6    SET 	4,(IY+O_SPRFLAGS)							;; set sprite flag bit4
 	374D C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -10487,16 +10488,16 @@ initobj_2:
 	3777 6F             LD 		L,A											;; ...(function address) in HL
 	3778 AF             XOR 	A											;; A=0
 	3779 32 E8 4B       LD 		(DrawFlags),A								;; reset drawing flags
-	377C FD 7E 0B       LD 		A,(IY+#0B)									;; ??TODO?? get object facing direction
+	377C FD 7E 0B       LD 		A,(IY+O_IMPACT)								;; ??TODO?? get object facing direction
 	377F 32 F0 36       LD 		(ObjDir),A									;; current Object is flipped or not?
-	3782 FD 36 0B FF    LD 		(IY+#0B),#FF								;; reset the object direction
-	3786 FD CB 09 76    BIT 	6,(IY+O_SPRFLAGS)							;; test object flag bit6
+	3782 FD 36 0B FF    LD 		(IY+O_IMPACT),#FF							;; reset the object direction
+	3786 FD CB 09 76    BIT 	6,(IY+O_SPRFLAGS)							;; test object flag bit6 = function disable (don't do object function if 1)
 	378A C0             RET 	NZ											;; if bit6 is 1 leave, else call object function
 	378B E9             JP 		(HL)										;; if SpriteFlags bit6 is 0, then call the object function
 
 ;; -----------------------------------------------------------------------------------------------------------
 .AnimateObj:
-	378C FD CB 09 6E    BIT 	5,(IY+O_SPRFLAGS)							;; test object sprite flag bit5
+	378C FD CB 09 6E    BIT 	5,(IY+O_SPRFLAGS)							;; test object sprite flag bit5 (single/double sprite)
 	3790 28 19          JR 		Z,Animate									;; if 0 Animate and RET (single sprite), else:
 	3792 CD AB 37       CALL 	Animate										;; Need to Move and Animate both stacked sprites (double height)
 	3795 08             EX 		AF,AF										;; save flags (carry)
@@ -10642,7 +10643,7 @@ OBJFN_SWITCH:   	EQU		#0E
 OBJFN_HELIPLAT3:	EQU 	#10
 OBJFN_FADE:     	EQU		#11
 OBJFN_FIRE:			EQU		#19
-OBJFN_26:			EQU 	#1A
+OBJFN_SPECIAL:		EQU 	#1A
 OBJFN_DISAPPEAR:	EQU		#22
 
 .ObjFnTbl:
@@ -10671,7 +10672,7 @@ OBJFN_DISAPPEAR:	EQU		#22
 	38AB 2E 4D		DEFW 	ObjFnHeliplat2		;; OBJFN_HELIPLAT2:	17 ObjFnHeliplat2 4D2E
 	38AD 63 4D		DEFW 	ObjFnDissolve		;; OBJFN_DISSOLVE: 	18 ObjFnDissolve 4D63
 	38AF 76 4C		DEFW 	ObjFnFire			;; OBJFN_FIRE:     	19 ObjFnFire 4C76
-	38B1 CF 4D		DEFW 	ObjFn26				;; OBJFN_26:       	1a ObjFn26 4DCF
+	38B1 CF 4D		DEFW 	ObjFnSpecial		;; OBJFN_SPECIAL: 	1a ObjFnSpecial 4DCF
 	38B3 18 4C		DEFW 	ObjFnTeleport		;; OBJFN_TELEPORT: 	1b ObjFnTeleport 4C18
 	38B5 98 4D		DEFW 	ObjFnSpring			;; OBJFN_SPRING:   	1c ObjFnSpring 4D98
 	38B7 FB 4B		DEFW 	ObjFnRobot			;; OBJFN_ROBOT:    	1d ObjFnRobot 4BFB
@@ -10684,84 +10685,91 @@ OBJFN_DISAPPEAR:	EQU		#22
 	38C5 29 4C		DEFW 	ObjFnCannonFire		;; OBJFN_CANNONBALL: 24 ObjFnCannonFire 4C29 (victory room)
 	38C7 1B 4E		DEFW 	ObjFnCrowny			;; OBJFN_CROWNY:   	25 ObjFnCrowny	4E1B
 
-;; Flags for double-height stuff
-;; DBL_HEIGHT_1:           EQU #40   ; 1st in Bottoms_array
-;; DBL_HEIGHT_2:           EQU #80   ; 2nd
-;; DBL_HEIGHT_3:           EQU #C0   ; 3rd
+;; Flags for double-height objects (enemies)
+DBL_SPR_TAP_1:      EQU 	1 << 6				;; #40 bottom part (or top if SWAPPED bit set) is the first item in Bottom_array (SPR_TAP)
+DBL_SPR_VAPE3:      EQU 	2 << 6				;; #80 bottom part (or top if SWAPPED bit set) is the 2nd item in Bottom_array (SPR_VAPE3)
+DBL_SPR_TAP_2:      EQU 	3 << 6				;; #C0 bottom part (or top if SWAPPED bit set) is the 3rd item in Bottom_array (SPR_TAP)
 ;;
 ;; Guessing the flags...
-SWAPPED:        EQU #04
-H_FLIP:		   	EQU #10 (to be confirmed)
-DEADLY:         EQU #20
-PORTABLE:       EQU #40
-SWITCHED:       EQU #60
-;; Still unknown: #01, #02, #08
+WIDER:				EQU		%00000001			;; bit0 : #01 ; bit0=0 for 3x32 or 3x24 sprites, bit0=1 for 4x28 sprites
+THINER:				EQU		%00000010			;; TODO????? bit1 : #02 ; ?? but only Gratings have this bit set to 1, maybe "thin" (can enter the square it sits in) to be confirmed!!!!
+SWAPPED:        	EQU 	%00000100			;; bit2 : #04 ; Double height object swap its top&bottom parts
+TALL_OBJ:			EQU		%00001000			;; bit3 : #08 ; if set is a TALL object (double height, 2 sprites)
+SPR_FLIP:		   	EQU 	%00010000 			;; bit4 : #10 ; only for Rollers, Seems to invert (if set) the sprite orientation bit from the rooms data. In other words, apparently the rollers orientation are set in software rather that in data. 180° flip?
+DEADLY:         	EQU 	%00100000			;; bit5 : #20
+PORTABLE:       	EQU 	%01000000			;; bit6 : #40
+;; an object cannot be PORTABLE (ie. CARRY-able by Heels' Purse) and DEADLY at the same time, so when both are set, it means "SELECTIVE" (DEADLY for player only):
+SELECTIVE      		EQU 	%01100000			;; bits6:5 #60 ; TODO : indicates that if the object/enemy collides with another one, the deadly function and effect are disabled; but if it collides with a playable character, then it is DEADLY
+;;Or
+SWITCHEDON			EQU		%01100000			;; bits6:5 #60 ; TODO : or maybe it is turn On (if 1) by default, else can be turn on with a switch or by getting close to it????
+;; Still unknown: #01, #02 (thin??? only Gratings)
 
 ;; Define the objects that can appear in a room definition
+;; "sprite codes" >= #81 are animations
 .ObjDefns:									;; <sprite code> 		<function> 						<flag>
-	38C9 DEFB #88, #1B, #01					;; #00 ANIM_TELEPORT, 	OBJFN_TELEPORT,           		#01
+	38C9 DEFB #88, #1B, #01					;; #00 ANIM_TELEPORT, 	OBJFN_TELEPORT,           		WIDER
 	38CC DEFB #2B, #1C, #40					;; #01 SPR_SPRING,    	OBJFN_SPRING,             		PORTABLE
-	38CF DEFB #31, #00, #02					;; #02 SPR_GRATING,   	0,                        		#02
+	38CF DEFB #31, #00, #02					;; #02 SPR_GRATING,   	0,                        		THINER
 	38D2 DEFB #4A, #01, #40					;; #03 SPR_TRUNKS,    	OBJFN_PUSHABLE,           		PORTABLE
 	38D5 DEFB #9E, #17, #00					;; #04 ANIM_HELIPLAT, 	OBJFN_HELIPLAT2,          		0
-	38D8 DEFB #5D, #00, #01					;; #05 SPR_BOOK,      	0,                        		#01
-	38DB DEFB #56, #02, #11					;; #06 SPR_ROLLERS,   	OBJFN_ROLLERS1,           		H_FLIP | #01
-	38DE DEFB #56, #03, #11					;; #07 SPR_ROLLERS,   	OBJFN_ROLLERS2,           		H_FLIP | #01
-	38E1 DEFB #56, #04, #01					;; #08 SPR_ROLLERS,   	OBJFN_ROLLERS3,           		#01
-	38E4 DEFB #56, #05, #01					;; #09 SPR_ROLLERS,   	OBJFN_ROLLERS4,           		#01
+	38D8 DEFB #5D, #00, #01					;; #05 SPR_BOOK,      	0,                        		WIDER
+	38DB DEFB #56, #02, #11					;; #06 SPR_ROLLERS,   	OBJFN_ROLLERS1,           		SPR_FLIP | WIDER
+	38DE DEFB #56, #03, #11					;; #07 SPR_ROLLERS,   	OBJFN_ROLLERS2,           		SPR_FLIP | WIDER
+	38E1 DEFB #56, #04, #01					;; #08 SPR_ROLLERS,   	OBJFN_ROLLERS3,           		WIDER
+	38E4 DEFB #56, #05, #01					;; #09 SPR_ROLLERS,   	OBJFN_ROLLERS4,           		WIDER
 	38E7 DEFB #46, #01, #40					;; #0A SPR_BONGO,      	OBJFN_PUSHABLE,           		PORTABLE
 	38EA DEFB #4B, #01, #40					;; #0B SPR_DECK,       	OBJFN_PUSHABLE,           		PORTABLE
-	38ED DEFB #90, #8F, #6C					;; #0C ANIM_ROBOMOUSE, 	DBL_HEIGHT_2 | OBJFN_HOMEIN,    SWITCHED | SWAPPED | #08
+	38ED DEFB #90, #8F, #6C					;; #0C ANIM_ROBOMOUSE, 	DBL_SPR_VAPE3 | OBJFN_HOMEIN,   SELECTIVE | SWAPPED | TALL_OBJ
 	38F0 DEFB #4C, #0A, #00					;; #0D SPR_BALL,       	OBJFN_BALL,                		0
-	38F3 DEFB #58, #00, #21					;; #0E SPR_LAVAPIT,    	0,                         		DEADLY | #01
-	38F6 DEFB #5E, #00, #21					;; #0F SPR_TOASTER,    	0,                         		DEADLY | #01
+	38F3 DEFB #58, #00, #21					;; #0E SPR_LAVAPIT,    	0,                         		DEADLY | WIDER
+	38F6 DEFB #5E, #00, #21					;; #0F SPR_TOASTER,    	0,                         		DEADLY | WIDER
 	38F9 DEFB #30, OBJFN_SWITCH, #00		;; #10 SPR_SWITCH,     	OBJFN_SWITCH,              		0
-	38FC DEFB #94, #09, #60					;; #11 ANIM_BEACON,    	OBJFN_RANDB,               		SWITCHED
-	38FF DEFB #96, #4F, #6C					;; #12 ANIM_FACE,      	DBL_HEIGHT_1 | OBJFN_HOMEIN,    SWITCHED | SWAPPED | #08
-	3902 DEFB #9A, #DD, #0C					;; #13 ANIM_CHARLES,   	DBL_HEIGHT_3 | OBJFN_ROBOT,     SWAPPED | #08
+	38FC DEFB #94, #09, #60					;; #11 ANIM_BEACON,    	OBJFN_RANDB,               		SELECTIVE
+	38FF DEFB #96, #4F, #6C					;; #12 ANIM_FACE,      	DBL_SPR_TAP_1 | OBJFN_HOMEIN,   SELECTIVE | SWAPPED | TALL_OBJ
+	3902 DEFB #9A, #DD, #0C					;; #13 ANIM_CHARLES,   	DBL_SPR_TAP_2 | OBJFN_ROBOT,    SWAPPED | TALL_OBJ
 	3905 DEFB #49, #1E, #00					;; #14 SPR_STICK,      	OBJFN_JOYSTICK,           		0
-	3908 DEFB #5A, #01, #01					;; #15 SPR_ANVIL,      	OBJFN_PUSHABLE,           		#01
-	390B DEFB #5F, #00, #01					;; #16 SPR_CUSHION,    	0,                        		#01
-	390E DEFB #5F, #14, #01					;; #17 SPR_CUSHION,   	OBJFN_DISSOLVE2,          		#01
+	3908 DEFB #5A, #01, #01					;; #15 SPR_ANVIL,      	OBJFN_PUSHABLE,           		WIDER
+	390B DEFB #5F, #00, #01					;; #16 SPR_CUSHION,    	0,                        		WIDER
+	390E DEFB #5F, #14, #01					;; #17 SPR_CUSHION,   	OBJFN_DISSOLVE2,          		WIDER
 	3911 DEFB #48, #00, #00					;; #18 SPR_WELL,      	0,                        		0
-	3914 DEFB #92, #0B, #60					;; #19 ANIM_BEE,      	OBJFN_BEE,                		SWITCHED
-	3917 DEFB #31, #18, #02					;; #1A SPR_GRATING,   	OBJFN_DISSOLVE,           		#02
-	391A DEFB #82, #06, #68					;; #1B ANIM_VISORO,   	OBJFN_VISOR1,             		SWITCHED | #08
-	391D DEFB #84, #CC, #6C					;; #1C ANIM_VAPE2,    	DBL_HEIGHT_3 | OBJFN_RANDQ,     SWITCHED | SWAPPED | #08
+	3914 DEFB #92, #0B, #60					;; #19 ANIM_BEE,      	OBJFN_BEE,                		SELECTIVE
+	3917 DEFB #31, #18, #02					;; #1A SPR_GRATING,   	OBJFN_DISSOLVE,           		THINER
+	391A DEFB #82, #06, #68					;; #1B ANIM_VISORO,   	OBJFN_VISOR1,             		SELECTIVE | TALL_OBJ
+	391D DEFB #84, #CC, #6C					;; #1C ANIM_VAPE2,    	DBL_SPR_TAP_2 | OBJFN_RANDQ,    SELECTIVE | SWAPPED | TALL_OBJ
 	3920 DEFB #47, #0A, #20					;; #1D SPR_DRUM,      	OBJFN_BALL,                		DEADLY
-	3923 DEFB #5C, #1F, #01					;; #1E SPR_HUSHPUPPY, 	OBJFN_HUSHPUPPY,           		#01
-	3926 DEFB #55, #15, #01					;; #1F SPR_SANDWICH,  	OBJFN_21,                  		#01
-	3929 DEFB #96, #CD, #6C					;; #20 ANIM_FACE,     	DBL_HEIGHT_3 | OBJFN_RANDR,     SWITCHED | SWAPPED | #08
-	392C DEFB #5B, #00, #21					;; #21 SPR_SPIKES,    	0,                        		DEADLY | #01
-	392F DEFB #5D, #14, #01					;; #22 SPR_BOOK,      	OBJFN_DISSOLVE2,          		#01
-	3932 DEFB #59, #14, #01					;; #23 SPR_PAD,       	OBJFN_DISSOLVE2,          		#01
-	3935 DEFB #59, #00, #01					;; #24 SPR_PAD,       	0,                        		#01
-	3938 DEFB #3D, #20, #60					;; #25 SPR_TAP,       	OBJFN_32,                 		SWITCHED
-	393B DEFB #92, #21, #60					;; #26 ANIM_BEE,      	OBJFN_33,                 		SWITCHED
+	3923 DEFB #5C, #1F, #01					;; #1E SPR_HUSHPUPPY, 	OBJFN_HUSHPUPPY,           		WIDER
+	3926 DEFB #55, #15, #01					;; #1F SPR_SANDWICH,  	OBJFN_21,                  		WIDER
+	3929 DEFB #96, #CD, #6C					;; #20 ANIM_FACE,     	DBL_SPR_TAP_2 | OBJFN_RANDR,    SELECTIVE | SWAPPED | TALL_OBJ
+	392C DEFB #5B, #00, #21					;; #21 SPR_SPIKES,    	0,                        		DEADLY | WIDER
+	392F DEFB #5D, #14, #01					;; #22 SPR_BOOK,      	OBJFN_DISSOLVE2,          		WIDER
+	3932 DEFB #59, #14, #01					;; #23 SPR_PAD,       	OBJFN_DISSOLVE2,          		WIDER
+	3935 DEFB #59, #00, #01					;; #24 SPR_PAD,       	0,                        		WIDER
+	3938 DEFB #3D, #20, #60					;; #25 SPR_TAP,       	OBJFN_32,                 		SELECTIVE
+	393B DEFB #92, #21, #60					;; #26 ANIM_BEE,      	OBJFN_33,                 		SELECTIVE
 	393E DEFB #9E, #12, #00					;; #27 ANIM_HELIPLAT, 	OBJFN_HELIPLAT,           		0
-	3941 DEFB #55, #01, #01					;; #28 SPR_SANDWICH,  	OBJFN_PUSHABLE,           		#01
-	3944 DEFB #5F, #13, #01					;; #29 SPR_CUSHION,   	OBJFN_19,                 		#01
-	3947 DEFB #8C, #07, #60					;; #2A ANIM_MONOCAT,  	OBJFN_MONOCAT,            		SWITCHED
-	394A DEFB #5A, #16, #01					;; #2B SPR_ANVIL,     	OBJFN_22,                 		#01
-	394D DEFB #5D, #08, #01					;; #2C SPR_BOOK,      	OBJFN_ANTICLOCK,          		#01
-	3950 DEFB #55, #23, #01					;; #2D SPR_SANDWICH,  	OBJFN_35,                 		#01
-	3953 DEFB #9C, #CD, #6C					;; #2E ANIM_TRUNK,    	DBL_HEIGHT_3 | OBJFN_RANDR,     SWITCHED | SWAPPED | #08
+	3941 DEFB #55, #01, #01					;; #28 SPR_SANDWICH,  	OBJFN_PUSHABLE,           		WIDER
+	3944 DEFB #5F, #13, #01					;; #29 SPR_CUSHION,   	OBJFN_19,                 		WIDER
+	3947 DEFB #8C, #07, #60					;; #2A ANIM_MONOCAT,  	OBJFN_MONOCAT,            		SELECTIVE
+	394A DEFB #5A, #16, #01					;; #2B SPR_ANVIL,     	OBJFN_22,                 		WIDER
+	394D DEFB #5D, #08, #01					;; #2C SPR_BOOK,      	OBJFN_ANTICLOCK,          		WIDER
+	3950 DEFB #55, #23, #01					;; #2D SPR_SANDWICH,  	OBJFN_35,                 		WIDER
+	3953 DEFB #9C, #CD, #6C					;; #2E ANIM_TRUNK,    	DBL_SPR_TAP_2 | OBJFN_RANDR,    SELECTIVE | SWAPPED | TALL_OBJ
 	3956 DEFB #42, #00, #20					;; #2F SPR_TRUNK,     	0,                        		DEADLY
 	3959 DEFB #47, #0A, #00					;; #30 SPR_DRUM,      	OBJFN_BALL,               		0
 	395C DEFB #2D, #00, #20					;; #31 SPR_FISH1,     	0,                        		DEADLY
-	395F DEFB #56, #14, #01					;; #32 SPR_ROLLERS,   	OBJFN_DISSOLVE2,          		#01
-	3962 DEFB #5D, #0A, #01					;; #33 SPR_BOOK,      	OBJFN_BALL,               		#01
-	3965 DEFB #5D, #01, #01					;; #34 SPR_BOOK,      	OBJFN_PUSHABLE,           		#01
-	3968 DEFB #98, #4F, #6C					;; #35 ANIM_CHIMP,    	DBL_HEIGHT_1 | OBJFN_HOMEIN,    SWITCHED | SWAPPED | #08
-	396B DEFB #98, #CD, #6C					;; #36 ANIM_CHIMP,    	DBL_HEIGHT_3 | OBJFN_RANDR,     SWITCHED | SWAPPED | #08
-	396E DEFB #82, #08, #68					;; #37 ANIM_VISORO,   	OBJFN_ANTICLOCK,          		SWITCHED | #08
+	395F DEFB #56, #14, #01					;; #32 SPR_ROLLERS,   	OBJFN_DISSOLVE2,          		WIDER
+	3962 DEFB #5D, #0A, #01					;; #33 SPR_BOOK,      	OBJFN_BALL,               		WIDER
+	3965 DEFB #5D, #01, #01					;; #34 SPR_BOOK,      	OBJFN_PUSHABLE,           		WIDER
+	3968 DEFB #98, #4F, #6C					;; #35 ANIM_CHIMP,    	DBL_SPR_TAP_1 | OBJFN_HOMEIN,   SELECTIVE | SWAPPED | TALL_OBJ
+	396B DEFB #98, #CD, #6C					;; #36 ANIM_CHIMP,    	DBL_SPR_TAP_2 | OBJFN_RANDR,    SELECTIVE | SWAPPED | TALL_OBJ
+	396E DEFB #82, #08, #68					;; #37 ANIM_VISORO,   	OBJFN_ANTICLOCK,          		SELECTIVE | TALL_OBJ
 	3971 DEFB #36, #00, #20					;; #38 SPR_ROBOMOUSE, 	0,                        		DEADLY
 	3974 DEFB #37, #00, #20					;; #39 SPR_ROBOMOUSEB,	0,                        		DEADLY
 	3977 DEFB #1E, #00, #00					;; #3A SPR_HEAD1,     	0,                        		0
 	397A DEFB #18, #00, #00					;; #3B SPR_HEELS1,    	0,                        		0
 	397D DEFB #4C, #24, #00					;; #3C SPR_BALL,      	OBJFN_CANNONBALL,          		0
-	3980 DEFB #4C, #A5, #2C					;; #3D SPR_BALL,      	DBL_HEIGHT_2 | OBJFN_CROWNY,    DEADLY | SWAPPED | #08
-	3983 DEFB #84, #21, #60					;; #3E ANIM_VAPE2,    	OBJFN_33,                  		SWITCHED
+	3980 DEFB #4C, #A5, #2C					;; #3D SPR_BALL,      	DBL_SPR_VAPE3 | OBJFN_CROWNY,   DEADLY | SWAPPED | TALL_OBJ
+	3983 DEFB #84, #21, #60					;; #3E ANIM_VAPE2,    	OBJFN_33,                  		SELECTIVE
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Reinitialisation size of the array
@@ -10901,7 +10909,7 @@ snkdblob_1:
 	3A21 19             ADD HL,DE
 	3A22 22 A3 39       LD (Object_Destination),HL							;; update Object_Destination
 	;; If bit 5 of offset 9 set, set the sprite on this second object.
-	3A25 FD CB 09 6E    BIT 5,(IY+O_SPRFLAGS)
+	3A25 FD CB 09 6E    BIT 5,(IY+O_SPRFLAGS)								;; single/double spitre object
 	3A29 28 0F          JR Z,addob_1
 	3A2B FD E5          PUSH IY
 	3A2D 11 12 00       LD DE,#0012											;; array size
@@ -11566,41 +11574,39 @@ Walls_DoorZ:
 	3CAF FE 01          CP #01
 	;; Carry set means no door. Stash it in F'
 	3CB1 08             EX AF,AF
-	3CB2 3A BF 1E       LD A,(WorldId)										;; which world? (for panels selection)
-	3CB5 47             LD B,A
-	;; Put PanelFlips + WorldId into Walls_PanelFlipsPtr.
-	3CB6 C6 D8          ADD A,PanelFlips & #00FF							;; #D8 = (PanelFlips & #FF)
-	3CB8 6F             LD L,A
-	3CB9 CE 70          ADC A,PanelFlips >> 8								;; #70 = (PanelFlips >> 8)	; #70D8+offset
-	3CBB 95             SUB L
-	3CBC 67             LD H,A
-	3CBD 22 44 3C       LD (Walls_PanelFlipsPtr),HL
-	;; We use the FetchData mechanism to unpack the Panel_WorldData. Set it up.
-	3CC0 78             LD A,B
-	3CC1 87             ADD A,A
-	3CC2 47             LD B,A												;; B updated to 2x
-	3CC3 87             ADD A,A
-	3CC4 87             ADD A,A												;; A is 8x
-	3CC5 C6 A9          ADD A,#A9											;; +((Panel_WorldData - 1) & FF)
-	3CC7 6F             LD L,A
-	3CC8 CE 3D          ADC A,#3D											;; +((Panel_WorldData - 1) >> 8)	; #3DA9+offset
-	3CCA 95             SUB L
-	3CCB 67             LD H,A												;; HL is Panel_WorldData - 1 + 8xWorldId
-	3CCC 22 AB 1E       LD (DataPtr),HL
-	3CCF 3E 80          LD A,#80
-	3CD1 32 AD 1E       LD (CurrData),A
-	;; Update Walls_PanelBase
-	3CD4 3E 9A          LD A,PanelsBaseAddr & #00FF							;; #9A = PanelsBaseAddr & FF
-	3CD6 80             ADD A,B
-	3CD7 6F             LD L,A
-	3CD8 CE 3D          ADC A,PanelsBaseAddr >> 8							;; #3D = PanelsBaseAddr >> 8 ; #3D9A
-	3CDA 95             SUB L
-	3CDB 67             LD H,A												;; HL is PanelsBaseAddr + 2 x WorldId
-	3CDC 7E             LD A,(HL)
-	3CDD 23             INC HL
-	3CDE 66             LD H,(HL)
-	3CDF 6F             LD L,A
-	3CE0 22 42 3C       LD (Walls_PanelBase),HL								;; Set the panel codes for the current world.
+	3CB2 3A BF 1E       LD 		A,(WorldId)									;; which world? (for panels selection)
+	3CB5 47             LD 		B,A
+	3CB6 C6 D8          ADD 	A,PanelFlips & #00FF						;; #D8 = (PanelFlips & #FF)
+	3CB8 6F             LD 		L,A
+	3CB9 CE 70          ADC 	A,PanelFlips >> 8							;; #70 = (PanelFlips >> 8)	; #70D8+offset
+	3CBB 95             SUB 	L
+	3CBC 67             LD 		H,A											;; HL = PanelFlips + WorldId
+	3CBD 22 44 3C       LD 		(Walls_PanelFlipsPtr),HL					;; in Walls_PanelFlipsPtr
+	3CC0 78             LD 		A,B											;; WorldId
+	3CC1 87             ADD 	A,A											;; A= WorldId x2
+	3CC2 47             LD 		B,A											;; B= WorldId x2
+	3CC3 87             ADD		A,A
+	3CC4 87             ADD 	A,A											;; A = WorldId x 8
+Panel_WorldData_m1:		EQU		Panel_WorldData - 1							;; = #3DA9; minus 1 so that the FetchData2b (using DataPtr and dummy CurrData) will start at Panel_WorldData
+	3CC5 C6 A9          ADD 	A,Panel_WorldData_m1 & #00FF				;; ((A + Panel_WorldData - 1) & FF)
+	3CC7 6F             LD 		L,A
+	3CC8 CE 3D          ADC 	A,Panel_WorldData_m1 >> 8					;; ((A + Panel_WorldData - 1) >> 8) ; #3DA9+offset
+	3CCA 95             SUB 	L
+	3CCB 67             LD 		H,A											;; HL is (Panel_WorldData) + (8 x WorldId) - 1
+	3CCC 22 AB 1E       LD 		(DataPtr),HL
+	3CCF 3E 80          LD 		A,#80										;; dummy data so that first read will start at "Panel_WorldData + (8 x worldID)"
+	3CD1 32 AD 1E       LD 		(CurrData),A
+	3CD4 3E 9A          LD 		A,PanelsBaseAddr & #00FF					;; #9A = PanelsBaseAddr & FF
+	3CD6 80             ADD		A,B											;; add WorldId x2
+	3CD7 6F             LD 		L,A
+	3CD8 CE 3D          ADC 	A,PanelsBaseAddr >> 8						;; #3D = PanelsBaseAddr >> 8 ; #3D9A
+	3CDA 95             SUB 	L
+	3CDB 67             LD 		H,A											;; HL = PanelsBaseAddr + 2 x WorldId
+	3CDC 7E             LD 		A,(HL)
+	3CDD 23             INC 	HL
+	3CDE 66             LD 		H,(HL)
+	3CDF 6F             LD 		L,A											;; HL = Panels Base Addr for current WorldId
+	3CE0 22 42 3C       LD 		(Walls_PanelBase),HL						;; Set the panel codes for the current world.
 	3CE3 3E FF          LD A,#FF
 	;; Recover the no door flag, stick the extent in A, push A and flag.
 	3CE5 08             EX AF,AF
@@ -11751,14 +11757,14 @@ br_3D71
 ;; world. From that base value, the Panel_WorldData will add an offset
 ;; to pick the wall panel we want for each part of the wall.
 .PanelsBaseAddr:								;; panel images base addr
-	3D9A DEFW #70F0 							;; img_wall_deco + #70 * 0   ; 70F0 Blacktooth
-	3D9C DEFW #7390 							;; img_wall_deco + #70 * 3   ; 7390 Market
-	3D9E DEFW #7630 							;; img_wall_deco + #70 * 6   ; 7630 Egyptus
-	3DA0 DEFW #77F0 							;; img_wall_deco + #70 * 8   ; 77F0 Penitentiary
-	3DA2 DEFW #79B0 							;; img_wall_deco + #70 * 10  ; 79B0 Moon base
-	3DA4 DEFW #7D30 							;; img_wall_deco + #70 * 14  ; 7D30 Book world
-	3DA6 DEFW #7EF0 							;; img_wall_deco + #70 * 16  ; 7EF0 Safari
-	3DA8 DEFW #8190 							;; img_wall_deco + #70 * 19  ; 8190 Prison
+	3D9A DEFW #70F0 							;; img_wall_deco + #70 * 0   ; 70F0 Blacktooth	; worldID 0
+	3D9C DEFW #7390 							;; img_wall_deco + #70 * 3   ; 7390 Market		; worldID 1
+	3D9E DEFW #7630 							;; img_wall_deco + #70 * 6   ; 7630 Egyptus		; worldID 2
+	3DA0 DEFW #77F0 							;; img_wall_deco + #70 * 8   ; 77F0 Penitentiary; worldID 3
+	3DA2 DEFW #79B0 							;; img_wall_deco + #70 * 10  ; 79B0 Moon base	; worldID 4
+	3DA4 DEFW #7D30 							;; img_wall_deco + #70 * 14  ; 7D30 Book world	; worldID 5
+	3DA6 DEFW #7EF0 							;; img_wall_deco + #70 * 16  ; 7EF0 Safari		; worldID 6
+	3DA8 DEFW #8190 							;; img_wall_deco + #70 * 19  ; 8190 Prison		; worldID 7
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Used when Wall building.
@@ -11766,14 +11772,14 @@ br_3D71
 ;; to pick for each part of the wall. It is essentially an index to add
 ;; to PanelsBaseAddr
 .Panel_WorldData:
-	3DAA DEFB #46, #91, #65, #94, #A1, #69, #69, #AA    		;; 1 0 1 2 2 1 0 1 ...  Blacktooth
-	3DB2 DEFB #49, #24, #51, #49, #12, #44, #92, #A4    		;; 1 0 2 1 0 2 1 0 ...  Market
-	3DBA DEFB #04, #10, #10, #41, #04, #00, #44, #00    		;; 0 0 1 0 0 1 0 0 ...  Egyptus
-	3DC2 DEFB #04, #10, #10, #41, #04, #00, #10, #00    		;; 0 0 1 0 0 1 0 0 ...  Penitentiary
-	3DCA DEFB #4E, #31, #B4, #E7, #4E, #42, #E4, #99    		;; 1 0 3 2 0 3 0 1 ...  Moon base
-	3DD2 DEFB #45, #51, #50, #51, #54, #55, #55, #55    		;; 1 0 1 1 1 1 0 1 ...  Book world
-	3DDA DEFB #64, #19, #65, #11, #A4, #41, #28, #55    		;; 1 2 1 0 0 1 2 1 ...  Safari
-	3DE2 DEFB #00, #00, #00, #00, #00, #00, #00, #00	 		;; in the Prison we always use the same wall panel 0
+	3DAA DEFB #46, #91, #65, #94, #A1, #69, #69, #AA    		;; 1 0 1 2 2 1 0 1 ...  Blacktooth	; worldID 0
+	3DB2 DEFB #49, #24, #51, #49, #12, #44, #92, #A4    		;; 1 0 2 1 0 2 1 0 ...  Market		; worldID 1
+	3DBA DEFB #04, #10, #10, #41, #04, #00, #44, #00    		;; 0 0 1 0 0 1 0 0 ...  Egyptus		; worldID 2
+	3DC2 DEFB #04, #10, #10, #41, #04, #00, #10, #00    		;; 0 0 1 0 0 1 0 0 ...  Penitentiary; worldID 3
+	3DCA DEFB #4E, #31, #B4, #E7, #4E, #42, #E4, #99    		;; 1 0 3 2 0 3 0 1 ...  Moon base	; worldID 4
+	3DD2 DEFB #45, #51, #50, #51, #54, #55, #55, #55    		;; 1 0 1 1 1 1 0 1 ...  Book world	; worldID 5
+	3DDA DEFB #64, #19, #65, #11, #A4, #41, #28, #55    		;; 1 2 1 0 0 1 2 1 ...  Safari		; worldID 6
+	3DE2 DEFB #00, #00, #00, #00, #00, #00, #00, #00	 		;; in the Prison we always use the same wall panel 0; worldId 7
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Bit mask of worlds saved (5 bits : "1" means got crown for corresponding world).
@@ -11925,61 +11931,60 @@ special_found_end_2:
 ;; This updates which of the 5 crowns will be shown in the victory room
 ;; from the saved_World_Mask value.
 .AddSavedCrowns_and_SpecialItems:
-	3EF7 C5             PUSH BC												;; save curr room_ID
-	3EF8 21 A7 3E       LD HL,victoryRoom_Crowns							;; point on the 5 crowns in the victory room
-	3EFB 3A EA 3D       LD A,(saved_World_Mask)								;; get saved_World_Mask
+	3EF7 C5             PUSH 	BC											;; save curr room_ID
+	3EF8 21 A7 3E       LD 		HL,victoryRoom_Crowns						;; point on the 5 crowns in the victory room
+	3EFB 3A EA 3D       LD 		A,(saved_World_Mask)						;; get saved_World_Mask
 	3EFE 2F             CPL													;; invert all bits of A (so we get 0=saved=match, and 1=not-saved=no-match)
-	3EFF 06 05          LD B,5												;; 5 crowns
-	3F01 11 04 00       LD DE,#0004											;; 4 bytes per entry in the victoryRoom_Crowns table
+	3EFF 06 05          LD 		B,5											;; 5 crowns
+	3F01 11 04 00       LD 		DE,#0004									;; 4 bytes per entry in the victoryRoom_Crowns table
 addcrowns_loop:
-	3F04 CB 1E          RR (HL)												;; This loop replaces the bit 0 of (HL) n°i (i 0 to 4) [= low byte of room ID in the crown search table]....
+	3F04 CB 1E          RR 		(HL)										;; This loop replaces the bit 0 of (HL) n°i (i 0 to 4) [= low byte of room ID in the crown search table]....
 	3F06 1F             RRA													;; ...with the bit n°i in A (saved world (complement))...
-	3F07 CB 16          RL (HL)												;; ...to indicate if we saved the corresponding world (currbit=0, will match during search in victoryRoom_Crowns table)
-	3F09 19             ADD HL,DE											;; ...or if we did not save it (currbit=1 will no longer match during search)
-	3F0A 10 F8          DJNZ addcrowns_loop									;; ...so that, in the victory room, only the saved worlds crowns will be shown.
-	3F0C C1             POP BC												;; When the 5 worlds have been updated, restore curr room id
-	3F0D CD CE 3E       CALL Find_Specials									;; Add special items in the room; if found HL points on 2nd byte in tab_Specials_collectible
+	3F07 CB 16          RL 		(HL)										;; ...to indicate if we saved the corresponding world (currbit=0, will match during search in victoryRoom_Crowns table)
+	3F09 19             ADD 	HL,DE										;; ...or if we did not save it (currbit=1 will no longer match during search)
+	3F0A 10 F8          DJNZ 	addcrowns_loop								;; ...so that, in the victory room, only the saved worlds crowns will be shown.
+	3F0C C1             POP 	BC											;; When the 5 worlds have been updated, restore curr room id
+	3F0D CD CE 3E       CALL 	Find_Specials								;; Add special items in the room; if found HL points on 2nd byte in tab_Specials_collectible
 addspe_loop:
-	3F10 C0             RET NZ												;; RET if not found, else:
-special_found:
-	3F11 E5             PUSH HL
-	3F12 D5             PUSH DE
-	3F13 C5             PUSH BC												;; Save everything (so we can relaunch a search if multiple special items in the room)
-	3F14 FD E5          PUSH IY
-	3F16 CD E3 3E       CALL GetNibbles										;; Fills in E, D from (HL+1) and B, C from (HL+2); HL will be incremented by 2 ; since HL was pointing on 2nd byte of object in tab_Specials_collectible, it gets E = Z, D = SPR, B = U, C = V
-	3F19 FD 21 98 1E    LD IY,TmpObj_variables
-	3F1D 7A             LD A,D												;; Special Sprite ID in D ; (E = Z, D = SPR, B = U, C = V)
-	3F1E FE 0E          CP #0E												;; 0E is the Victory room SPR_CROWN sprite id in SpecialSprites, other special sprites are Purse, Hooter, Donut tray, Fish, Bunnies and World crowns. Note that the worlds crowns are not the victory room crowns.
-	3F20 3E 60          LD A,#60
-	3F22 20 01          JR NZ,br_3F25										;; if Victory room Crown then O_FLAGS = 0, else O_FLAGS = #60
-	3F24 AF             XOR A
+	3F10 C0             RET 	NZ											;; RET if not found, else:
+	;; special item found:
+	3F11 E5             PUSH 	HL
+	3F12 D5             PUSH 	DE
+	3F13 C5             PUSH 	BC											;; Save everything (so we can relaunch a search if multiple special items in the room)
+	3F14 FD E5          PUSH 	IY
+	3F16 CD E3 3E       CALL 	GetNibbles									;; Fills in E, D from (HL+1) and B, C from (HL+2); HL will be incremented by 2 ; since HL was pointing on 2nd byte of object in tab_Specials_collectible, it gets E = Z, D = SPR, B = U, C = V
+	3F19 FD 21 98 1E    LD 		IY,TmpObj_variables
+	3F1D 7A             LD 		A,D											;; Special Sprite ID in D ; (E = Z, D = SPR, B = U, C = V)
+	3F1E FE 0E          CP 		#0E											;; 0E is the Victory room SPR_CROWN sprite id in SpecialSprites, other special sprites are Purse, Hooter, Donut tray, Fish, Bunnies and World crowns. Note that the worlds crowns are not the victory room crowns.
+	3F20 3E 60          LD 		A,#60
+	3F22 20 01          JR 		NZ,br_3F25									;; if Victory room Crown then O_FLAGS = 0, else O_FLAGS = #60
+	3F24 AF             XOR		A
 br_3F25
-	3F25 FD 77 04       LD (IY+O_FLAGS),A            						;; Set flags
-	3F28 FD 72 11       LD (IY+O_SPECIAL),D        							;; Set special item sprite index in SpecialSprites.
-	3F2B FD 36 0A 1A    LD (IY+O_FUNC),OBJFN_26								;; Set the object function OBJFN_26
-	;; Look up D in SpecialSprites to get a sprite id, and set it.
-	3F2F 7A             LD A,D												;; index in SpecialSprites
-	3F30 C6 BB          ADD A,SpecialSprites & #00FF						;; #BB = SpecialSprites & FF
-	3F32 6F             LD L,A
-	3F33 CE 3E          ADC A,SpecialSprites >> 8							;; #3E = SpecialSprites >> 8  ; 3EBB+offset
-	3F35 95             SUB L
-	3F36 67             LD H,A												;; HL = pointer on sprite code in SpecialSprites
-	3F37 7E             LD A,(HL)											;; A = Sprite code for special item
-	3F38 C5             PUSH BC												;; save UVZ
-	3F39 D5             PUSH DE
-	3F3A CD 4E 37       CALL SetObjSprite
-	3F3D D1             POP DE
-	3F3E C1             POP BC												;; restore UVZ, BC = UV
-	3F3F FD E1          POP IY
-	3F41 7B             LD A,E												;; A = Z
-	3F42 CD 6E 22       CALL SetTmpObjUVZ
-	3F45 CD CC 20       CALL AddObjOpt
+	3F25 FD 77 04       LD 		(IY+O_FLAGS),A            					;; Set or reset (for victory room crowns) flags
+	3F28 FD 72 11       LD 		(IY+O_SPECIAL),D        					;; Set special item sprite index in SpecialSprites.
+	3F2B FD 36 0A 1A    LD 		(IY+O_FUNC),OBJFN_SPECIAL					;; Set the object function OBJFN_SPECIAL
+	3F2F 7A             LD		A,D											;; index of special item in SpecialSprites
+	3F30 C6 BB          ADD 	A,SpecialSprites & #00FF					;; #BB = SpecialSprites & FF
+	3F32 6F             LD 		L,A
+	3F33 CE 3E          ADC 	A,SpecialSprites >> 8						;; #3E = SpecialSprites >> 8  ; 3EBB+offset
+	3F35 95             SUB 	L
+	3F36 67             LD 		H,A											;; HL = pointer on sprite code in SpecialSprites ; HL = SpecialSprites + sprite_index
+	3F37 7E             LD 		A,(HL)										;; A = Sprite code for special item
+	3F38 C5             PUSH 	BC											;; save UV
+	3F39 D5             PUSH 	DE											;; and SPR + Z
+	3F3A CD 4E 37       CALL 	SetObjSprite
+	3F3D D1             POP 	DE
+	3F3E C1             POP 	BC											;; restore UVZ+SPR, BC = UV, DE=SPR,Z
+	3F3F FD E1          POP 	IY
+	3F41 7B             LD 		A,E											;; A = Z
+	3F42 CD 6E 22       CALL 	SetTmpObjUVZ
+	3F45 CD CC 20       CALL 	AddObjOpt
 
-	3F48 C1             POP BC
-	3F49 D1             POP DE												;; Restore state and carry on.
-	3F4A E1             POP HL
-	3F4B CD DB 3E       CALL FindSpecCont
-	3F4E 18 C0          JR addspe_loop
+	3F48 C1             POP 	BC
+	3F49 D1             POP 	DE											;; Restore state and carry on.
+	3F4A E1             POP 	HL
+	3F4B CD DB 3E       CALL 	FindSpecCont
+	3F4E 18 C0          JR 		addspe_loop
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Reset the "collected" flag (bit0) on all the specials.
@@ -12005,11 +12010,11 @@ getspe_1:
 	3F65 2B             DEC 	HL											;; this is just to realign HL if we loop
 	3F66 E6 0F          AND 	#0F											;; only look at bits [3:0] : Sprite ID in Special items
 	3F68 BA             CP 		D											;; compare witch the one we want
-	3F69 28 05          JR 		Z,special_found								;; jump special_found if found, else:
+	3F69 28 05          JR 		Z,getspe_found								;; jump getspe_found if found, else:
 	3F6B CD DB 3E       CALL 	FindSpecCont								;; not the one we want, go to the next items until "00"
 	3F6E 18 F2          JR 		getspe_1									;; loop
 
-special_found:
+getspe_found:
 	3F70 2B             DEC 	HL											;; point back on room ID in table
 	3F71 CB C6          SET 	0,(HL)										;; set bit 0 of room ID low byte; so this item is no longer available (we picked it up already)
 	3F73 87             ADD 	A,A											;; *2 (word align)
@@ -12487,49 +12492,49 @@ CounterIncrements:
 ;;        other room with no wall letting us see the next room.
 ;; Output: result in DE
 .PurseHooterCount:
-	438E 21 7B 24       LD HL,Inventory										;; pointer on Inventory
-	4391 CB 96          RES 2,(HL)											;; Lose Donut tray (empty tray)
+	438E 21 7B 24       LD 		HL,Inventory								;; pointer on Inventory
+	4391 CB 96          RES 	2,(HL)										;; Lose Donut tray (empty tray)
 edo1:
 	4393 D9             EXX
-	4394 01 01 00       LD BC,#0001											;; will count the "1" bits in 1 byte (Inventory byte)
-	4397 18 0C          JR countBits										;; count how many bits are set in the item inventory (Purse+Hooter)
+	4394 01 01 00       LD 		BC,#0001									;; will count the "1" bits in 1 byte (Inventory byte)
+	4397 18 0C          JR 		countBits									;; count how many bits are set in the item inventory (Purse+Hooter)
 
 .SavedWorldCount:
-	4399 21 EA 3D       LD HL,saved_World_Mask								;; points on saved_World_Mask
-	439C 18 F5          JR edo1												;; count how many bits are set in the byte at saved_World_Mask
+	4399 21 EA 3D       LD 		HL,saved_World_Mask							;; points on saved_World_Mask
+	439C 18 F5          JR 		edo1										;; count how many bits are set in the byte at saved_World_Mask
 
 .RoomCount:
-	439E 21 61 42       LD HL,RoomMask_buffer								;; point on RoomMask_buffer
+	439E 21 61 42       LD 		HL,RoomMask_buffer							;; point on RoomMask_buffer
 	43A1 D9             EXX
 	;; Due to the way RoomMask_buffer is bitpacked we could set BC to
 	;; 38 (#26) (RoomMask_buffer should always be null from the 39th byte.)
-	43A2 01 2D 01       LD BC,301											;; BC=301 (nb max of bytes to check = rooms (although #0026 (38 bytes) should be fine; see the way RoomMask_buffer is bit packed)
+	43A2 01 2D 01       LD 		BC,301										;; BC=301 (nb max of bytes to check = rooms (although #0026 (38 bytes) should be fine; see the way RoomMask_buffer is bit packed)
 .countBits:
 	43A5 D9             EXX
-	43A6 11 00 00       LD DE,#0000											;; init counter
+	43A6 11 00 00       LD 		DE,#0000									;; init counter
 	43A9 D9             EXX
 cbi1:
 	43AA D9             EXX
-	43AB 4E             LD C,(HL)											;; read bitmask (a bit to 1 = item owned, room visited or world saved)
+	43AB 4E             LD 		C,(HL)										;; read bitmask (a bit to 1 = item owned, room visited or world saved)
 	43AC 37             SCF													;; filler Carry set
-	43AD CB 11          RL C												;; rotate left bitmask value leaving bit in Carry, old carry in bit0
+	43AD CB 11          RL 		C											;; rotate left bitmask value leaving bit in Carry, old carry in bit0
 cbi2:
-	43AF 7B             LD A,E
-	43B0 CE 00          ADC A,0												;; add Carry
+	43AF 7B             LD 		A,E
+	43B0 CE 00          ADC		A,0											;; add Carry
 	43B2 27             DAA
-	43B3 5F             LD E,A
-	43B4 7A             LD A,D
-	43B5 CE 00          ADC A,0												;; DE will be BCD corrected immediately
+	43B3 5F             LD 		E,A
+	43B4 7A             LD 		A,D
+	43B5 CE 00          ADC 	A,0											;; DE will be BCD corrected immediately
 	43B7 27             DAA
-	43B8 57             LD D,A
-	43B9 CB 21          SLA C												;; get next bit
-	43BB 20 F2          JR NZ,cbi2											;; if rest of the byte is null, then leave, else loop upto 8 bits
-	43BD 23             INC HL												;; next byte
+	43B8 57             LD		D,A
+	43B9 CB 21          SLA 	C											;; get next bit
+	43BB 20 F2          JR 		NZ,cbi2										;; if rest of the byte is null, then leave, else loop upto 8 bits
+	43BD 23             INC		HL											;; next byte
 	43BE D9             EXX
-	43BF 0B             DEC BC												;; do it for all rooms
-	43C0 78             LD A,B
-	43C1 B1             OR C
-	43C2 20 E6          JR NZ,cbi1											;; untils last room
+	43BF 0B             DEC 	BC											;; do it for all rooms
+	43C0 78             LD 		A,B
+	43C1 B1             OR 		C
+	43C2 20 E6          JR 		NZ,cbi1										;; untils last room
 	43C4 D9             EXX
 	43C5 C9             RET													;; result in DE
 
@@ -12662,7 +12667,7 @@ gs_1:
 .UpdatePos:
 	4455 E5             PUSH HL
 	4456 CD 2A 44       CALL DirDeltas
-	;; Store the bottom 4 bits of A (dir bitmap) in Object + #0B
+	;; Store the bottom 4 bits of A (dir bitmap) in Object + O_IMPACT
 	4459 11 0B 00       LD DE,#000B
 	445C E1             POP HL
 	445D 19             ADD HL,DE
@@ -12822,7 +12827,7 @@ Rand_seed_2:
 	450B CD EE 44       CALL 	DrawObject
 	450E DD E1          POP 	IX
 	4510 DD CB 04 BE    RES 	7,(IX+O_FLAGS)
-	4514 DD 36 0B FF    LD 		(IX+#0B),#FF
+	4514 DD 36 0B FF    LD 		(IX+O_IMPACT),#FF
 	4518 DD 36 0C FF    LD 		(IX+#0C),#FF
 	451C C9             RET
 
@@ -12850,114 +12855,114 @@ fcsc_skip:
 ;; This is the World/Crowns/Planets screen
 ;; It also provides an function that waits a key press and wipe screen.
 .Show_World_Crowns_screen:
-	4541 3E C6          LD A,Print_StringID_Wipe_BTEmpire					;; String ID #C6 STR_EMPIRE_BLURB
-	4543 CD C2 4A       CALL Print_String
-	4546 CD A5 0B       CALL Play_HoH_Tune									;; Play HoH Theme
-	4549 21 7E 45       LD HL,Planet_Sprites_list							;; pointer on Planet_Sprites_list
-	454C 11 FF 05       LD DE,#05FF											;; 5 planets items to draw, FF = draw all
-	454F CD B1 45       CALL Draw_from_list									;; draw them (3x24)
-	4552 21 8D 45       LD HL,Crown_sprites_list							;; pointer on Crown_sprites_list
-	4555 ED 5B EA 3D    LD DE,(saved_World_Mask)							;; get saved_World_Mask in E as bitmask indicating it item correspongin to bit n will be draw or not
-	4559 16 05          LD D,5												;; up to 5 crowns to draw
-	455B CD B1 45       CALL Draw_from_list									;; draw them (3x24)
+	4541 3E C6          LD 		A,Print_StringID_Wipe_BTEmpire				;; String ID #C6 STR_EMPIRE_BLURB
+	4543 CD C2 4A       CALL 	Print_String
+	4546 CD A5 0B       CALL 	Play_HoH_Tune								;; Play HoH Theme
+	4549 21 7E 45       LD 		HL,Planet_Sprites_list						;; pointer on Planet_Sprites_list
+	454C 11 FF 05       LD 		DE,#05FF									;; 5 planets items to draw, FF = draw all
+	454F CD B1 45       CALL 	Draw_from_list								;; draw them (3x24)
+	4552 21 8D 45       LD 		HL,Crown_sprites_list						;; pointer on Crown_sprites_list
+	4555 ED 5B EA 3D    LD 		DE,(saved_World_Mask)						;; get saved_World_Mask in E as bitmask indicating it item correspongin to bit n will be draw or not
+	4559 16 05          LD 		D,5											;; up to 5 crowns to draw
+	455B CD B1 45       CALL 	Draw_from_list								;; draw them (3x24)
 .WaitKey:
-	455E CD 36 0A       CALL Wait_anykey_released							;; debounce key
-	4561 CD 6C 45       CALL Wait_key_pressed								;; Wait key press or count down over
-	4564 CD 65 08       CALL Draw_wipe_and_Clear_Screen						;; then Wipe and clear screen
-	4567 06 C1          LD B,Sound_ID_Tada									;; Play; Sound ID #C1 = "Tada"
-	4569 C3 91 0D       JP Play_Sound										;; will RET
+	455E CD 36 0A       CALL 	Wait_anykey_released						;; debounce key
+	4561 CD 6C 45       CALL 	Wait_key_pressed							;; Wait key press or count down over
+	4564 CD 65 08       CALL 	Draw_wipe_and_Clear_Screen					;; then Wipe and clear screen
+	4567 06 C1          LD		B,Sound_ID_Tada								;; Play; Sound ID #C1 = "Tada"
+	4569 C3 91 0D       JP 		Play_Sound									;; will RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Wait a key press to leave the screen shown (crown/worlds screen)
 ;; but leave automatically after a while (about 18-20 sec)
 .Wait_key_pressed:
-	456C 21 00 A8       LD HL,#A800											;; delay value (show the screen (crown, ..) about 19sec if no key pressed)
+	456C 21 00 A8       LD 		HL,#A800									;; delay value (show the screen (crown, ..) about 19sec if no key pressed)
 waitkp_loop:
-	456F E5             PUSH HL
-	4570 CD A5 0B       CALL Play_HoH_Tune									;; Play Theme
-	4573 CD 3C 0A       CALL Test_Enter_Shift_keys							;; output : Carry=1 : no key pressed, else Carry=0 and C=0:Enter, C=1:Shift, C=2:other
-	4576 E1             POP HL
-	4577 D0             RET NC												;; RET if a key was pressed
-	4578 2B             DEC HL												;; A7FF, A7FE....
-	4579 7C             LD A,H
-	457A B5             OR L												;; test H=L=0
-	457B 20 F2          JR NZ,waitkp_loop									;; loop if not yet 0
+	456F E5             PUSH 	HL
+	4570 CD A5 0B       CALL 	Play_HoH_Tune								;; Play Theme
+	4573 CD 3C 0A       CALL 	Test_Enter_Shift_keys						;; output : Carry=1 : no key pressed, else Carry=0 and C=0:Enter, C=1:Shift, C=2:other
+	4576 E1             POP		HL
+	4577 D0             RET 	NC											;; RET if a key was pressed
+	4578 2B             DEC 	HL											;; A7FF, A7FE....
+	4579 7C             LD 		A,H
+	457A B5             OR 		L											;; test H=L=0
+	457B 20 F2          JR 		NZ,waitkp_loop								;; loop if not yet 0
 	457D C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Data for the "Crowns/Worlds" screen. Defines the Sprite id and position
 ;; the the planets and crowns sprites on that screen.
 .Planet_Sprites_list:
-	457E DEFB #4C, #54, #78						;; Sprite_ID_Ball (#4C), pix x,y coordinates : Egyptus
-	4581 DEFB #4C, #A4, #78						;; Sprite_ID_Ball (#4C), pix x,y coordinates : Penitentiary
-	4584 DEFB #4C, #54, #E8						;; Sprite_ID_Ball (#4C), pix x,y coordinates : Safari
-	4587 DEFB #4C, #A4, #E8						;; Sprite_ID_Ball (#4C), pix x,y coordinates : Book World
-	458A DEFB #4C, #7C, #B0						;; Sprite_ID_Ball (#4C), pix x,y coordinates : Blacktooth
+	457E 4C 54 78		DEFB 	#4C, #54, #78								;; Sprite_ID_Ball (#4C), pix x,y coordinates : Egyptus
+	4581 4C A4 78		DEFB 	#4C, #A4, #78								;; Sprite_ID_Ball (#4C), pix x,y coordinates : Penitentiary
+	4584 4C 54 E8		DEFB 	#4C, #54, #E8								;; Sprite_ID_Ball (#4C), pix x,y coordinates : Safari
+	4587 4C A4 E8		DEFB 	#4C, #A4, #E8								;; Sprite_ID_Ball (#4C), pix x,y coordinates : Book World
+	458A 4C 7C B0		DEFB 	#4C, #7C, #B0								;; Sprite_ID_Ball (#4C), pix x,y coordinates : Blacktooth
 .Crown_sprites_list:
-	458D DEFB #2F, #54, #60						;; Sprite_ID_Crown (#2F), pix x,y coordinates : Egyptus
-	4590 DEFB #2F, #A4, #60						;; Sprite_ID_Crown (#2F), pix x,y coordinates : Penitentiary
-	4593 DEFB #2F, #54, #D0						;; Sprite_ID_Crown (#2F), pix x,y coordinates : Safari
-	4596 DEFB #2F, #A4, #D0						;; Sprite_ID_Crown (#2F), pix x,y coordinates : Book World
-	4599 DEFB #2F, #7C, #98						;; Sprite_ID_Crown (#2F), pix x,y coordinates : Blacktooth
+	458D 2F 54 60		DEFB 	#2F, #54, #60								;; Sprite_ID_Crown (#2F), pix x,y coordinates : Egyptus
+	4590 2F A4 60		DEFB 	#2F, #A4, #60								;; Sprite_ID_Crown (#2F), pix x,y coordinates : Penitentiary
+	4593 2F 54 D0		DEFB 	#2F, #54, #D0								;; Sprite_ID_Crown (#2F), pix x,y coordinates : Safari
+	4596 2F A4 D0		DEFB 	#2F, #A4, #D0								;; Sprite_ID_Crown (#2F), pix x,y coordinates : Book World
+	4599 2F 7C 98		DEFB 	#2F, #7C, #98								;; Sprite_ID_Crown (#2F), pix x,y coordinates : Blacktooth
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; This draws the game HUD, called the "Periphery".
 ;; It also provide an entry for drawing Head and Heels (Draw_sprites_from_list).
 .Draw_Screen_Periphery:
-	459C CD 39 2C       CALL Draw_carried_objects
-	459F 21 CD 45       LD HL,Inventory_sprite_list							;; pointer on Inventory_sprite_list
-	45A2 ED 5B 7B 24    LD DE,(Inventory)									;; E = bitmask based on Inventory (which are drawn or not)
-	45A6 16 03          LD D,3												;; 3 sprites to draw (Purse, Hooter, Donuts)
-	45A8 CD B1 45       CALL Draw_from_list									;; draw them (3x24)
-	45AB ED 5B 84 24    LD DE,(selected_characters)							;; DE = pointer on selected_characters
-Draw_sprites_from_list														;; E is the bitmask, HL points to the Data : Sprite_code, coordinates (2bytes)
-	45AF 16 02          LD D,2												;; nb of sprites to draw: 2 characters, Head and Heels!
+	459C CD 39 2C       CALL 	Draw_carried_objects
+	459F 21 CD 45       LD		HL,Inventory_sprite_list					;; pointer on Inventory_sprite_list
+	45A2 ED 5B 7B 24    LD 		DE,(Inventory)								;; E = bitmask based on Inventory (which are drawn or not)
+	45A6 16 03          LD 		D,3											;; 3 sprites to draw (Purse, Hooter, Donuts)
+	45A8 CD B1 45       CALL 	Draw_from_list								;; draw them (3x24)
+	45AB ED 5B 84 24    LD 		DE,(selected_characters)					;; DE = pointer on selected_characters
+Draw_sprites_from_list														;; E is the bitmask, HL points to Inventory_sprite_list + index3 * 3 (Heels sprite)
+	45AF 16 02          LD 		D,2											;; nb of sprites to draw: 2 characters, Head and Heels!
 	;; here it does an implicit "JP Draw_from_list" (with the list
 	;; Head and Heels sprites), as it falls in it:
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Draw a list of 3x24 sprites.
 ;; Inputs: D: number of sprites
 ;; 		   E: bitmask indicating to drawn the nth sprite or to shadow it
-;; 		   HL: pointer on Sprites array
+;; 		   HL: pointer on Sprites list/array (like Inventory_sprite_list, EmperorPageSpriteList, Planet_Sprites_list, Crown_sprites_list, etc.)
 ;; The sprites array data should contain for each entry:
 ;;         a Sprite code (1 byte), the Coordinates (2 bytes)
 ;; Important Note: if the bitmap is 0, a sprite is still drawn, but without the
 ;;                 vibrant color, to give a shadowed effect.
 .Draw_from_list:
-	45B1 7E             LD A,(HL)											;; get sprite code of the first sprite
-	45B2 23             INC HL												;; point on coord word
-	45B3 4E             LD C,(HL)
-	45B4 23             INC HL
-	45B5 46             LD B,(HL)											;; get coord in BC = YX
-	45B6 23             INC HL												;; point on data for next sprite
-	45B7 E5             PUSH HL												;; save it
-	45B8 CB 1B          RR E												;; get current bitmap bit
-	45BA D5             PUSH DE
-	45BB 30 09          JR NC,dfl_2											;; if 0, then "shadow" this sprite
-	45BD CD F3 45       CALL Draw_sprite_3x24								;; else draw it
+	45B1 7E             LD 		A,(HL)										;; get sprite code of the first sprite
+	45B2 23             INC 	HL											;; point on pix coord word
+	45B3 4E             LD 		C,(HL)
+	45B4 23             INC 	HL
+	45B5 46             LD 		B,(HL)										;; get coord in BC = YX
+	45B6 23             INC 	HL											;; point on data for next sprite
+	45B7 E5             PUSH 	HL											;; save it
+	45B8 CB 1B          RR 		E											;; get current bitmap bit
+	45BA D5             PUSH 	DE
+	45BB 30 09          JR 		NC,dfl_2									;; if 0, then "shadow" this sprite
+	45BD CD F3 45       CALL 	Draw_sprite_3x24							;; else draw it
 dfl_1:
-	45C0 D1             POP DE
-	45C1 E1             POP HL
-	45C2 15             DEC D												;; count down
-	45C3 20 EC          JR NZ,Draw_from_list								;; if not finished, Draw next one
+	45C0 D1             POP 	DE
+	45C1 E1             POP 	HL
+	45C2 15             DEC 	D											;; count down
+	45C3 20 EC          JR 		NZ,Draw_from_list							;; if not finished, Draw next one
 	45C5 C9             RET
 
 dfl_2:
-	45C6 16 01          LD D,#01											;; if the bitmap is 0, we still draw the sprite
-	45C8 CD DE 45       CALL Draw_sprite_3x24_and_attribute					;; but with a shadow effect. Attribute 1
-	45CB 18 F3          JR dfl_1											;; loop to next sprite.
+	45C6 16 01          LD 		D,#01										;; attribute1:shadow: if the bitmap is 0, we still draw the sprite
+	45C8 CD DE 45       CALL 	Draw_sprite_3x24_and_attribute				;; but with a shadow effect. Attribute 1
+	45CB 18 F3          JR 		dfl_1										;; loop to next sprite.
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; This defines the Sprites IDs and coordinates for the "Periphery"
 ;; part of the game screen (ie. HUD)
-.Sprite_Flipped: EQU  #80
+.Sprite_Flipped: 		EQU  	#80
 
 .Inventory_sprite_list:
-	45CD DEFB #27, #B0, #F0						;; Sprite_ID_Purse, pix x,y coordinates
-	45D0 DEFB #28, #44, #F0						;; Sprite_ID_Hooter, pix coordinates
-	45D3 DEFB #29, #44, #D8						;; Sprite_ID_Donuts, pix coordinates
-	45D6 DEFB #98, #94, #F0						;; Sprite_ID_Heels1 | Sprite_Flipped, pix coordinates
-	45D9 DEFB #1E, #60, #F0						;; Sprite_ID_Head1, pix coordinates
+	45CD 27 B0 F0		DEFB 	#27, #B0, #F0								;; Sprite_ID_Purse, pix x,y coordinates
+	45D0 28 44 F0		DEFB 	#28, #44, #F0								;; Sprite_ID_Hooter, pix coordinates
+	45D3 29 44 D8		DEFB 	#29, #44, #D8								;; Sprite_ID_Donuts, pix coordinates
+	45D6 98 94 F0		DEFB 	#98, #94, #F0								;; Sprite_ID_Heels1 | Sprite_Flipped, pix coordinates
+	45D9 1E 60 F0		DEFB 	#1E, #60, #F0								;; Sprite_ID_Head1, pix coordinates
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Draw a 3 byte x 24 row sprite on clear background, complete with
@@ -12970,45 +12975,45 @@ dfl_2:
 ;; If entering directly at Draw_sprite_3x24_and_attribute, we
 ;; expect the attribute in D.
 .Draw_sprite_3x24_attr3:
-	45DC 16 03          LD D,#03											;; attribute = 3 for Draw_sprite_3x24_and_attribute ("Color" mode)
+	45DC 16 03          LD 		D,#03										;; attribute=3 for Draw_sprite_3x24_and_attribute ("Color" mode)
 .Draw_sprite_3x24_and_attribute:
-	45DE 32 38 35       LD (Sprite_Code),A									;; update current Sprite Code
-	45E1 78             LD A,B												;; Y
-	45E2 D6 48          SUB #48												;; minus 3*24 bytes to get the topleft corner
-	45E4 47             LD B,A												;; now BC is the topleft-left point
-	45E5 D5             PUSH DE
-	45E6 C5             PUSH BC
-	45E7 CD B3 35       CALL Load_sprite_image_address_into_DE				;; get sprite image pinter in DE, B=height, HL=mask data
-	45EA 21 0C 18       LD HL,#180C											;; Size = 24 rows (#18), 24 pix (#0C * 2)
-	45ED C1             POP BC
-	45EE F1             POP AF												;; get the attribute code in A
-	45EF A7             AND A												;; if 0 set Z
-	45F0 C3 B0 08       JP Draw_Sprite										;; Draw the sprite with color attribute in A; will RET
+	45DE 32 38 35       LD 		(Sprite_Code),A								;; update current Sprite Code
+	45E1 78             LD 		A,B											;; Y
+	45E2 D6 48          SUB 	#48											;; minus 3*24 bytes to get the topleft corner
+	45E4 47             LD 		B,A											;; now BC is the topleft-left point
+	45E5 D5             PUSH 	DE
+	45E6 C5             PUSH 	BC
+	45E7 CD B3 35       CALL 	Load_sprite_image_address_into_DE			;; get sprite image pinter in DE, B=height, HL=mask data
+	45EA 21 0C 18       LD 		HL,#180C									;; Size = 24 rows (#18), 24 pix (#0C * 2)
+	45ED C1             POP 	BC
+	45EE F1             POP 	AF											;; get the attribute code in A
+	45EF A7             AND 	A											;; if 0 set Z
+	45F0 C3 B0 08       JP 		Draw_Sprite									;; Draw the sprite with color attribute in A; will RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Draw a 3-byte * 24 rows sprite on clear background
 ;; BC=bottomleft origin (without attribute)
 .Draw_sprite_3x24:
-	45F3 2E 01          LD L,#01											;; L is 1 on CPC, 0 on Spectrum
-	45F5 2D             DEC L												;; This is to ...
-	45F6 2C             INC L												;; ... update the Z flag
-	45F7 28 E3          JR Z,Draw_sprite_3x24_attr3							;; If L = 0 then go to Draw_sprite_3x24_attr3 (it seems it is never on CPC, but always on Spectrum!)
-	45F9 32 38 35       LD (Sprite_Code),A									;; update Sprite Code
-	45FC CD 1A 46       CALL Calculate_Extents_3x24							;; get min and max for x and y 3x24 sprite
-	45FF CD 4E 46       CALL Clear_view_buffer								;; empty the buffer
-	4602 CD B3 35       CALL Load_sprite_image_address_into_DE				;; DE = image data
-	4605 01 00 67       LD BC,ViewBuff										;; buffer 6700
+	45F3 2E 01          LD 		L,#01										;; L is 1 on CPC, 0 on Spectrum
+	45F5 2D             DEC 	L											;; This inc/dec is to ...
+	45F6 2C             INC 	L											;; ... update the Z flag
+	45F7 28 E3          JR 		Z,Draw_sprite_3x24_attr3					;; If L = 0 then go to Draw_sprite_3x24_attr3 (it seems it is never on CPC, but always on Spectrum!)
+	45F9 32 38 35       LD 		(Sprite_Code),A								;; update Sprite Code
+	45FC CD 1A 46       CALL 	Calculate_Extents_3x24						;; get min and max for x and y 3x24 sprite
+	45FF CD 4E 46       CALL 	Clear_view_buffer							;; empty the buffer
+	4602 CD B3 35       CALL 	Load_sprite_image_address_into_DE			;; DE = image data
+	4605 01 00 67       LD 		BC,ViewBuff									;; buffer 6700
 	4608 D9             EXX
-	4609 06 18          LD B,#18											;; height = 24=#18
-	460B CD DD 14       CALL BlitMask3of3									;; blit mask 3of3
-	460E C3 A7 05       JP Blit_screen										;; blit to screen
+	4609 06 18          LD 		B,#18										;; height = 24=#18
+	460B CD DD 14       CALL 	BlitMask3of3								;; blit mask 3of3
+	460E C3 A7 05       JP 		Blit_screen									;; blit to screen
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Clear a 3x24 area
 .Clear_3x24:
-	4611 CD 1A 46       CALL Calculate_Extents_3x24							;; get min and max for x and y 3x24 sprite
-	4614 CD 4E 46       CALL Clear_view_buffer								;; empty the buffer
-	4617 C3 A7 05       JP Blit_screen										;; blit to erase
+	4611 CD 1A 46       CALL 	Calculate_Extents_3x24						;; get min and max for x and y 3x24 sprite
+	4614 CD 4E 46       CALL 	Clear_view_buffer							;; empty the buffer
+	4617 C3 A7 05       JP 		Blit_screen									;; blit to erase
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Calculate the X and Y Extent for a 3x24 sprite
@@ -13098,16 +13103,16 @@ NR_Direction:
 	466C 11 8B 46       LD DE,PostMove										;; addr of PostMove 468B for next RET
 	;; Stick this on the stack to be called upon return.
 	466F D5             PUSH DE
-	4670 4F             LD C,A
-	4671 87             ADD A,A
-	4672 87             ADD A,A
-	4673 81             ADD A,C												;; A*5
-	4674 C6 B7          ADD A,MoveTbl & #00FF								;; #B7 = MoveTbl & #FF
-	4676 6F             LD L,A
-	4677 CE 47          ADC A,MoveTbl >> 8									;; #47 = MoveTbl >> 8 ; #47B7 + offset
-	4679 95             SUB L
-	467A 67             LD H,A												;; Generate index into table
-	467B 7E             LD A,(HL)											;; HL = MoveTbl + A*5
+	4670 4F             LD 		C,A											;; direction code???
+	4671 87             ADD		A,A
+	4672 87             ADD 	A,A
+	4673 81             ADD 	A,C											;; A*5
+	4674 C6 B7          ADD 	A,MoveTbl & #00FF							;; #B7 = MoveTbl & #FF
+	4676 6F             LD 		L,A
+	4677 CE 47          ADC 	A,MoveTbl >> 8								;; #47 = MoveTbl >> 8 ; #47B7 + offset
+	4679 95             SUB 	L
+	467A 67             LD 		H,A											;; HL = MoveTbl + A*5
+	467B 7E             LD A,(HL)											;;
 	467C 32 57 46       LD (#4657),A					 					;; Load first value here LRDU direct of ????
 	467F 23             INC HL
 	4680 5E             LD E,(HL)
@@ -13182,7 +13187,7 @@ NR_Direction:
 ;; TODO: ??? I think it may be checking if the other character
 ;; is relevant? Or the main character???
 .PM_Break:
-	46C8 FD CB 09 46    BIT 0,(IY+O_SPRFLAGS)
+	46C8 FD CB 09 46    BIT 0,(IY+O_SPRFLAGS)								;; playable char or obj/enemy?
 	46CC 28 04          JR Z,PM_Break2
 	46CE FD 7D          LD A,IYl											;; IY low byte
 	46D0 BB             CP E
@@ -13204,7 +13209,7 @@ NR_Direction:
 	46E2 E5             PUSH HL
 	46E3 DD E1          POP IX
 	46E5 3A 57 46       LD A,(#4657)
-	46E8 DD CB 09 4E    BIT 1,(IX+O_SPRFLAGS)								;; Second of double-height character?
+	46E8 DD CB 09 4E    BIT 1,(IX+O_SPRFLAGS)								;; Second part of double-height is character or object?
 	46EC 28 08          JR Z,PM_Found2
     ;; Adjust first, then.
 	46EE DD A6 FA       AND (IX+#FA)										;; (IX+#0C-18)
@@ -13234,10 +13239,10 @@ NR_Direction:
 ;; IX and IY are both objects, may be characters.
 ;; Something is in A.
 .ContactAux:
-	470D FD CB 09 46    BIT 0,(IY+O_SPRFLAGS)								;; test bit0 of IY+9 (sprite flags???)
-	4711 20 0C          JR NZ,cactaux_1										;; no set jump over, else:
-	4713 DD CB 09 46    BIT 0,(IX+O_SPRFLAGS)								;; test bit0 of IX+9 (sprite flag)
-	4717 28 76          JR Z,ContactNonChar									;; if 0 then ContactNonChar, else:
+	470D FD CB 09 46    BIT 0,(IY+O_SPRFLAGS)								;; 1st object: test if playable char or not
+	4711 20 0C          JR NZ,cactaux_1										;; yes, jump cactaux_1, else:
+	4713 DD CB 09 46    BIT 0,(IX+O_SPRFLAGS)								;; 2nd object: test if playable char or not
+	4717 28 76          JR Z,ContactNonChar									;; no then ContactNonChar, else:
 	4719 FD E5          PUSH IY
 	471B DD E3          EX (SP),IX											;; these 3 lines swap IY and IX
 	471D FD E1          POP IY
@@ -13250,7 +13255,7 @@ cactaux_1:
 	472E 20 43          JR NZ,CollectSpecial								;; is set then go CollectSpecial, else:
 	4730 A7             AND A												;; test value in A????
 	4731 28 05          JR Z,DeadlyContact									;; if 0 then DeadlyContact (deadly floor or object), else:
-	4733 DD CB 09 66    BIT 4,(IX+O_SPRFLAGS)								;; test bit 4 of IX+9
+	4733 DD CB 09 66    BIT 4,(IX+O_SPRFLAGS)								;; test bit4 of O_SPRFLAGS = 0:object is deadly, 1:object harmless
 	4737 C0             RET NZ												;; leave if set, else:
 ;; IY holds character sprite. We've hit a deadly floor or object.
 ;; C is character's sprite flags (IY offset 9)
@@ -13306,7 +13311,7 @@ dco_3:
 	477E E6 80          AND 	#80											;; keep phase bit
 	4780 F6 11          OR 		OBJFN_FADE									;; set Fade function (to make it disappear)
 	4782 DD 77 0A       LD 		(IX+O_FUNC),A
-	4785 DD CB 09 B6    RES 	6,(IX+O_SPRFLAGS)							;; Clear special collectable item status.
+	4785 DD CB 09 B6    RES 	6,(IX+O_SPRFLAGS)							;; enable item function
 	4789 DD 7E 11       LD 		A,(IX+O_SPECIAL)							;; Extract the item id for the call to GetSpecial.
 	478C C3 5E 3F       JP 		GetSpecial
 
@@ -13319,20 +13324,19 @@ dco_3:
 	4799 C8             RET Z
 	479A FD E5          PUSH IY
 	479C DD E1          POP IX
-	;; Object in IX has bit 3 of sprite flags set.
+	;; Object in IX has bit 3 of sprite-flags set.
     ;; If we're second part of double-height object, find the first part.
 cnc_1:
 	479E DD CB 09 4E    BIT 1,(IX+O_SPRFLAGS)
 	47A2 28 05          JR Z,cnc_2
 	47A4 11 EE FF       LD DE,#FFEE
 	47A7 DD 19          ADD IX,DE
-;; Return if bit 7 reset
+	;; Return if bit 7 reset, else disable function and reset impact
 cnc_2:
-	47A9 DD CB 09 7E    BIT 7,(IX+O_SPRFLAGS)
+	47A9 DD CB 09 7E    BIT 7,(IX+O_SPRFLAGS)									;; SELECTIVE flag : if set, turn off the object function when 2 objects collide
 	47AD C8             RET Z
-	;; Set bit 6, clear movement (?)
-	47AE DD CB 09 F6    SET 6,(IX+O_SPRFLAGS)
-	47B2 DD 36 0B FF    LD (IX+#0B),#FF
+	47AE DD CB 09 F6    SET 6,(IX+O_SPRFLAGS)									;; object function disabled
+	47B2 DD 36 0B FF    LD (IX+O_IMPACT),#FF
 	47B6 C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -13341,22 +13345,22 @@ cnc_2:
 ;; Second is the function to move in that direction.
 ;; Third element is the function to check collisions.
 .MoveTbl:
-	47B7 FD 			DEFB	#FD          					;; Moving Down
-	47B8 FE 48 C4 48	DEFW	MoveT_Down, CollideT_Down  		;; MoveT_Down 48FE, CollideT_Down 48C4
-	47BC FF 			DEFB	#FF     						;; Stop
-	47BD DF 47 00 00	DEFW	MoveT_DownRight, #0000			;; MoveT_DownRight 47DF, 0
-	47C1 FB 			DEFB	#FB           					;; Moving Right
-	47C2 55 49 E2 48 	DEFW	MoveT_Right, CollideT_Right		;; MoveT_Right 4955, CollideT_Right 48E2
-	47C8 FF 			DEFB	#FF     						;; Stop
-	47C7 00 48 00 00	DEFW	MoveT_UpRight, #0000         	;; MoveT_UpRight 4800, 0
-	47CB FE 			DEFB	#FE        						;; Moving Up
-	47CC A5 49 68 48	DEFW	MoveT_Up, CollideT_Up      		;; MoveT_Up 49A5, CollideT_Up 4868
-	47D0 FF 			DEFB	#FF           					;; Stop
-	47D1 24 48 00 00	DEFW 	MoveT_UpLeft, #0000        		;; MoveT_UpLeft 4824, 0
-	47D5 F7				DEFB	#F7           					;; Moving Left
-	47D6 ED 49 A9 48	DEFW	MoveT_Left, CollideT_Left		;; MoveT_Left 49ED, CollideT_Left 48A9
-	47DA FF 			DEFB	#FF           					;; Stop
-	47DB 47 48 00 00	DEFW	MoveT_DownLeft, #0000           ;; MoveT_DownLeft 4847, 0
+	47B7 FD 			DEFB	#FD          					;; dir code 0 : Moving Down (south west)
+	47B8 FE 48 C4 48	DEFW	MoveT_Down, CollideT_Down  		;; 				MoveT_Down 48FE, CollideT_Down 48C4
+	47BC FF 			DEFB	#FF     						;; dir code 1 (diag) : Stop (South = Down/Right)
+	47BD DF 47 00 00	DEFW	MoveT_DownRight, #0000			;; 				MoveT_DownRight 47DF, 0
+	47C1 FB 			DEFB	#FB           					;; dir code 2 : Moving Right (south east)
+	47C2 55 49 E2 48 	DEFW	MoveT_Right, CollideT_Right		;; 				MoveT_Right 4955, CollideT_Right 48E2
+	47C8 FF 			DEFB	#FF     						;; dir code 3 (diag) : Stop (East = Up/Right)
+	47C7 00 48 00 00	DEFW	MoveT_UpRight, #0000         	;; 				MoveT_UpRight 4800, 0
+	47CB FE 			DEFB	#FE        						;; dir code 4 : Moving Up (north east)
+	47CC A5 49 68 48	DEFW	MoveT_Up, CollideT_Up      		;; 				MoveT_Up 49A5, CollideT_Up 4868
+	47D0 FF 			DEFB	#FF           					;; dir code 5 (diag) : Stop (North = Up/Left)
+	47D1 24 48 00 00	DEFW 	MoveT_UpLeft, #0000        		;; 				MoveT_UpLeft 4824, 0
+	47D5 F7				DEFB	#F7           					;; dir code 6 : Moving Left (north west)
+	47D6 ED 49 A9 48	DEFW	MoveT_Left, CollideT_Left		;; 				MoveT_Left 49ED, CollideT_Left 48A9
+	47DA FF 			DEFB	#FF           					;; dir code 7 (diag) : Stop (West = Down/Left)
+	47DB 47 48 00 00	DEFW	MoveT_DownLeft, #0000           ;; 				MoveT_DownLeft 4847, 0
 
 ;; The diagonal movement functions rearrange things:
 ;; * They remove two elements of the stack, removing the call to
@@ -13666,7 +13670,7 @@ dlft_1:
 ;; Up, Down, Left and Right
 ;;
 ;; Takes U extent in DE, V extent in HL.
-;; U/D work in U direction, L/R work in V direction.
+;; U/D work in U direction, L/R work in V direction. ???????Check if this is right?????????TODO
 ;;
 ;; Sets NZ and C if you can move in a direction.
 ;; Sets Z and C if you cannot.
@@ -14013,9 +14017,9 @@ dhc_1:
 ;; function is zero'd.
 .ChkCantLeave:
 	4A7D DD 21 C2 1E    LD 		IX,Max_min_UV_Table							;; MinU
-	4A81 FD CB 09 46    BIT 	0,(IY+O_SPRFLAGS)							;; Low bit of sprite flag (TODO: Is player?)
-	4A85 C8             RET 	Z											;; If it's zero, can't leave room.
-	4A86 FD 7E 0A       LD 		A,(IY+O_FUNC)								;; Check the object function...
+	4A81 FD CB 09 46    BIT 	0,(IY+O_SPRFLAGS)							;; Is it a player?
+	4A85 C8             RET 	Z											;; If it's not the player, can't leave room.
+	4A86 FD 7E 0A       LD 		A,(IY+O_FUNC)								;; else, Check the object function...
 	4A89 E6 7F          AND 	#7F											;; don't look phase bit
 	4A8B D6 01          SUB 	1											;; test if function was 0
 	4A8D D8             RET 	C											;; If func was 0, C set, leave with FF
@@ -14369,15 +14373,15 @@ print_it:
 ;; Bit 0 set = have updated object extents
 ;; Bit 1 set = needs redraw
 DrawFlags:
-	4BE8 DEFB #00
+	4BE8 00 			DEFB	#00
 
 Collided:
-	4BE9 DEFB #FF
+	4BE9 FF 			DEFB 	#FF
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; TODO : Used when controlling something with a Joystick (ie. in game joystick object)
 RobotDir:
-	4BEA DEFB #FF
+	4BEA FF 			DEFB 	#FF
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Get the (in game object) Joystick direction and save its
@@ -14436,7 +14440,7 @@ ObjFnCannonFire:
 	4C2D A7             AND 	A											;; and test
 	4C2E C0             RET 	NZ											;; if not 0 leave; else:
 	4C2F 36 60          LD 		(HL),#60									;; reset delay before firing next Canon Ball;
-	4C31 FD 36 0B F7    LD 		(IY+#0B),#F7								;; update (IY+#0B),~#08
+	4C31 FD 36 0B F7    LD 		(IY+O_IMPACT),#F7							;; update (IY+#0B),~#08
 	4C35 FD 36 0A 19    LD 		(IY+O_FUNC),OBJFN_FIRE						;; update object function #19 = OBJFN_FIRE (cannon ball is similar to firing a donut: fired then destroyed)
 	4C39 3E 05          LD 		A,Sound_ID_BeepCannon						;; play Cannon fired sound
 	4C3B C3 1C 2B       JP 		SetSound									;; will RET
@@ -14454,7 +14458,6 @@ ObjFn35:
 	4C49 36 00          LD (HL),#00
 	4C4B C9             RET
 
-;; -----------------------------------------------------------------------------------------------------------
 ObjFn35b:
 	4C4C 3A F0 36       LD A,(ObjDir)
 	4C4F 3C             INC A
@@ -14465,7 +14468,8 @@ ObjFn35b:
 	4C58 ED 4B AB 24    LD BC,(character_direction)							;; get character_direction LRDU in C
 	4C5C 18 13          JR ObjFnEnd
 
-ObjFn32:
+;; -----------------------------------------------------------------------------------------------------------
+ObjFn32:		;; this seems to be TAP activated when passing by it.
 	4C5E 3A F0 36       LD A,(ObjDir)
 	4C61 3C             INC A
 	4C62 20 2E          JR NZ,ObjFnEnd2
@@ -14492,11 +14496,14 @@ ObjFF2:
 	4C81 DA 6D 4D       JP C,Fadeify
 	4C84 18 12          JR ObjDraw2
 
+;; -----------------------------------------------------------------------------------------------------------
+;; when pushed, the object will "roll" like a ball until it collides with something.
+;; can be pushed by playable characters or moving enemies
 ObjFnBall:
-	4C86 3A F0 36       LD A,(ObjDir)
+	4C86 3A F0 36       LD A,(ObjDir)										;; get diraction
 	4C89 3C             INC A
-	4C8A 20 06          JR NZ,ObjFnEnd2
-	4C8C FD 7E 0C       LD A,(IY+#0C)
+	4C8A 20 06          JR NZ,ObjFnEnd2										;; if not FF jump ObjFnEnd2
+	4C8C FD 7E 0C       LD A,(IY+#0C)										;; else:
 	4C8F 3C             INC A
 	4C90 28 09          JR Z,ObjFnEnd4
 ObjFnEnd2:
@@ -14509,7 +14516,7 @@ ObjFnEnd4:
 	4C9B FD E5          PUSH IY
 	4C9D CD DC 4D       CALL ObjFnPushable
 	4CA0 FD E1          POP IY
-	4CA2 FD 36 0B FF    LD (IY+#0B),#FF
+	4CA2 FD 36 0B FF    LD (IY+O_IMPACT),#FF
 	4CA6 C9             RET
 
 ObjFnSub:
@@ -14542,6 +14549,10 @@ ObjFnSub:
 	4CD3 C3 5C 46       JP Move
 
 ;; -----------------------------------------------------------------------------------------------------------
+;; Switch button object.
+;; it'll turn on/off the movement of the attached object, but also will
+;; flip the function disable bit (O_SPRFLAGS bit6) of all objects
+;; (eg. a Dissolve2 object will become undissolvable if in the same room)
 ObjFnSwitch:
     ;; First check if we're touched. If not, clear #11 and return.
 	4CD6 FD 7E 0C       LD A,(IY+#0C)
@@ -14588,6 +14599,8 @@ objfnsw_3:
 	4D0F FD 77 04       LD (IY+O_FLAGS),A
 	4D12 C3 C7 4F       JP ObjDraw
 
+;; for each object in the room (ObjectLists + 2 list), that is not
+;; the switch itself, neither is fading, apply the switch if needed
 .PerObjSwitch:
 	4D15 DD 7E 0A       LD 		A,(IX+O_FUNC)								;; get function code
 	4D18 E6 7F          AND 	#7F											;; ignore phase bit
@@ -14596,27 +14609,27 @@ objfnsw_3:
 	4D1D FE 11          CP 		OBJFN_FADE									;; else is it OBJFN_FADE?
 	4D1F C8             RET 	Z											;; leave if yes
 	;; If neither bit 3 or 1 of #09 is set, toggle bit 7.
-	4D20 DD 7E 09       LD A,(IX+O_SPRFLAGS)
-	4D23 4F             LD C,A
-	4D24 E6 09          AND #09
-	4D26 C0             RET NZ
-	4D27 79             LD A,C
-	4D28 EE 40          XOR #40
-	4D2A DD 77 09       LD (IX+O_SPRFLAGS),A
+	4D20 DD 7E 09       LD 		A,(IX+O_SPRFLAGS)							;; read O_SPRFLAGS
+	4D23 4F             LD 		C,A											;; stash value in C
+	4D24 E6 09          AND 	#09
+	4D26 C0             RET 	NZ											;; leave if either bits 3 ot 0 are set
+	4D27 79             LD 		A,C											;; recover O_SPRFLAGS
+	4D28 EE 40          XOR 	#40											;; flip bit6 of the object O_SPRFLAGS : object function disabled/enabled
+	4D2A DD 77 09       LD 		(IX+O_SPRFLAGS),A							;; update value
 	4D2D C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Peculiarity: If comming from ObjFnHeliplat, the LD A,#52 is done.
 ;; But if coming from ObjFnHeliplat2, the 01 at 4D30 will take the "3E 52"
 ;; as data in a dummy instruction "LD BC,#523E" to cancel the "LD A,#52".
-ObjFnHeliplat2:
-	4D2E 3E 90          LD 		A,#90
+ObjFnHeliplat2: ;; room 616
+	4D2E 3E 90          LD 		A,#90										;; low limit = 0, high limit = 9, dir = 0 (decent)
 	4D30 01				DEFB 	#01		;;LD BC,...							; LD BC,nnnn, to cancel the next instruction "LD,#52"!
 ObjFnHeliplat:
 	;; if comming from ObjFnHeliplat2, the "LD A,#52" does not exist
 	;; as it became a dummy "LD BC,#523E"
-	4D31 3E 52       	LD 		A,#52
-	4D33 FD 77 11       LD 		(IY+O_SPECIAL),A
+	4D31 3E 52       	LD 		A,#52										;; low limit = 2, high limit = 5, dir = 0 (decent)
+	4D33 FD 77 11       LD 		(IY+O_SPECIAL),A							;; for heliplat, the O_SPECIAL is the limit heigths & dir flags
 	4D36 FD 36 0A 10    LD 		(IY+O_FUNC),OBJFN_HELIPLAT3					;; #10 = OBJFN_HELIPLAT3
 	4D3A C9          	RET
 
@@ -14640,7 +14653,7 @@ ObjFnRollers3:
 ObjFnRollers4:
 	4D52 3E FB          LD 		A,#FB										;; Moving Right
 .writeRollerDir:
-	4D54 FD 77 0B       LD 		(IY+#0B),A									;; Rollers direction in #0B
+	4D54 FD 77 0B       LD 		(IY+O_IMPACT),A								;; Rollers direction in #0B, will impact the direction of who or what is on the rollers
 	4D57 FD 36 0A 00    LD 		(IY+O_FUNC),0								;; reset function
 	4D5B C9             RET
 
@@ -14652,31 +14665,36 @@ ObjFnHushPuppy:
 	4D61 18 09          JR 		TestAndFade
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; TODO: Theory is this is for the dissolving wall grating next to the hooter
+;; Make an object dissolve upon contact
+;; * ObjFnDissolve: : dissolving grating (eg. room 476)
+;; * ObjFnDissolve2: : dissolving cushion, pad, book and rollers
+;;		Note: 2 cushions in the room 526 are set as Dissolve2, but when
+;;	 	the switch in the room is turned off, it freezes the Beacon, but
+;;	 	also makes the cushions no longer dissolvable.
+;; * TestAndFade : dissolving hushpuppies if Head is in the room (no contact needed here, just entering)
 ObjFnDissolve:
 	4D63 3E C0          LD 		A,#C0
 	4D65 01				DEFB 	#01 	;;LD BC,...
-ObjFnDissolve2:
+ObjFnDissolve2: ;; dissolving cushion, pad, book and rollers
 	;; if comming from ObjFnDissolve, the "LD A,#CF" does not exist
 	;; as it became a dummy "LD BC,#CF3E"
-	4D66 3E CF       	LD	A,#CF											;; LD BC,nn , NOPs next instruction! ; ObjFnDissolve2: LD	A,#CF
-	4D68 FD B6 0C       OR (IY+#0C)
-	4D6B 3C             INC A
+	4D66 3E CF       	LD		A,#CF										;; LD BC,nn , NOPs next instruction! ; ObjFnDissolve2: LD	A,#CF
+	4D68 FD B6 0C       OR 		(IY+#0C)
+	4D6B 3C             INC 	A											;; test and leave if bits 5&4 (if coming from ObjFnDissolve2) or bits 5:0 (if from ObjFnDissolve) were all 1s
 .TestAndFade:
-	4D6C C8             RET 	Z											;; if it is Heels, then nothing to do, else:
-;; Set to use ObjFnFade
+	4D6C C8             RET 	Z											;; if comming from ObjFnHushPuppy if it is Heels, then nothing to do, else:
 Fadeify:																	;; Make the HushPuppies disappear if Head enters the room
 	4D6D 3E 05          LD 		A,Sound_ID_BeepCannon						;; cannon sound
 	4D6F CD 1C 2B       CALL 	SetSound
-	4D72 FD 7E 0A       LD 		A,(IY+O_FUNC)								;; get object function
-	4D75 E6 80          AND 	#80											;; keep phase bit (only)
+	4D72 FD 7E 0A       LD 		A,(IY+O_FUNC)								;; get object function code but...
+	4D75 E6 80          AND 	#80											;; ...keep phase bit (only)
 	4D77 F6 11          OR 		OBJFN_FADE									;; set function as Fade
 	4D79 FD 77 0A       LD 		(IY+O_FUNC),A
 	4D7C FD 36 0F 08    LD 		(IY+O_ANIM),#08								;; ANIM_VAPE1 : anim code [7:3] = 1 (index0 in AnimTable = ANIM_VAPE1); frame [2:0]=0
 ObjFnFade:
 	4D80 FD 36 04 80    LD 		(IY+O_FLAGS),#80
 	4D84 CD B6 4F       CALL 	UpdateObjExtents
-	4D87 CD E2 4F       CALL	 AnimateMe
+	4D87 CD E2 4F       CALL	AnimateMe
 	4D8A FD 7E 0F       LD 		A,(IY+O_ANIM)								;; [7:3] = anim code, [2:0] = frame
 	4D8D E6 07          AND 	#07											;; keep frame index
 	4D8F C2 C7 4F       JP 		NZ,ObjDraw									;; if not 0, draw
@@ -14685,54 +14703,57 @@ ObjFnDisappear:
 	4D95 C3 CA 44       JP 		RemoveObject								;; remove it from the objects list
 
 ;; -----------------------------------------------------------------------------------------------------------
+;;
 ObjFnSpring:
 	4D98 FD 46 08       LD B,(IY+O_SPRITE)
-	4D9B FD CB 0C 6E    BIT 5,(IY+#0C)
-	4D9F FD CB 0C EE    SET 5,(IY+#0C)
-	4DA3 3E 2C          LD A,#2C
-	4DA5 28 1C          JR Z,br_4DC3
-	4DA7 FD 7E 0F       LD A,(IY+O_ANIM)									;; [7:3] = anim code, [2:0] = frame
+	4D9B FD CB 0C 6E    BIT 5,(IY+#0C)										;; test bit5
+	4D9F FD CB 0C EE    SET 5,(IY+#0C)										;; and set it
+	4DA3 3E 2C          LD A,#2C											;; SPR_SPRUNG
+	4DA5 28 1C          JR Z,ofn_spring_end									;; if previous bit5 was 0, jump to ofn_spring_end
+	4DA7 FD 7E 0F       LD A,(IY+O_ANIM)									;; else : [7:3] = anim code, [2:0] = frame
 	4DAA A7             AND A
 	4DAB 20 10          JR NZ,br_4DBD
-	4DAD 3E 2C          LD A,#2C
+	4DAD 3E 2C          LD A,#2C											;; SPR_SPRUNG
 	4DAF B8             CP B
 	4DB0 20 2A          JR NZ,ObjFnPushable
 	4DB2 FD 36 0F 50    LD (IY+O_ANIM),#50									;; [7:3] = anim code = #0A (index9 in AnimTable = ANIM_SPRING), [2:0] = frame = 0
-	4DB6 3E 04          LD A,#04
+	4DB6 3E 04          LD A,#04											;; noise when we land on the spring?
 	4DB8 CD 1C 2B       CALL SetSound
 	4DBB 18 19          JR ObjFnStuff
 
 br_4DBD
 	4DBD E6 07          AND #07
 	4DBF 20 15          JR NZ,ObjFnStuff
-	4DC1 3E 2B          LD A,#2B
-br_4DC3
+	4DC1 3E 2B          LD A,#2B											;; SPR_SPRING
+ofn_spring_end
 	4DC3 FD 77 08       LD (IY+O_SPRITE),A
 	4DC6 FD 36 0F 00    LD (IY+O_ANIM),0									;; reset [7:3] = anim code = 0, [2:0] = frame = 0
 	4DCA B8             CP B
 	4DCB 28 0F          JR Z,ObjFnPushable
 	4DCD 18 07          JR ObjFnStuff
 
-ObjFn26:
+;; -----------------------------------------------------------------------------------------------------------
+ObjFnSpecial:
 	4DCF FD 7E 0F       LD A,(IY+O_ANIM)									;; [7:3] = anim code, [2:0] = frame
 	4DD2 E6 F0          AND #F0
 	4DD4 28 06          JR Z,ObjFnPushable
 ObjFnStuff:
 	4DD6 CD B6 4F       CALL UpdateObjExtents
 	4DD9 CD E2 4F       CALL AnimateMe
-.ObjFnPushable:
+.ObjFnPushable:		;; can be pushed
 	4DDC CD 29 50       CALL ObjAgain8
 	4DDF 3E FF          LD A,#FF
 	4DE1 CD EF 4F       CALL ObjAgain6
 	4DE4 C3 C7 4F       JP ObjDraw
 
-ObjFn22:
+;; -----------------------------------------------------------------------------------------------------------
+ObjFn22:	;; used by the Anvil
 	4DE7 21 2F 4F       LD HL,HalfTurn
 	4DEA C3 2B 4E       JP ObjFnStuff2
-ObjFn21:
+ObjFn21:	;; used by sandwish room #2400
 	4DED 21 1D 4F       LD HL,Clockwise
 	4DF0 C3 2B 4E       JP ObjFnStuff2
-ObjFnVisor1:
+ObjFnVisor1: ;; eg. robot in room 786, it moves back and forth on one lane.
 	4DF3 21 2F 4F       LD HL,HalfTurn
 	4DF6 18 39          JR TurnOnCollision
 ObjFnMonocat:
@@ -14741,22 +14762,22 @@ ObjFnMonocat:
 ObjFnAnticlock:
 	4DFD 21 24 4F       LD HL,Anticlockwise
 	4E00 18 2F          JR TurnOnCollision
-ObjFnBee
+ObjFnBee	;; used by bee (eg. room 476), move to any random direction
 	4E02 21 10 4F       LD HL,DirAny
 	4E05 18 2A          JR TurnOnCollision
 ;; Random direction change
 ObjFnRandQ:
 	4E07 21 10 4F       LD HL,DirAny
 	4E0A 18 59          JR TurnRandomly
-;; Random direction change, like a rook.
+;; Random direction change, axially (like a rook).
 ObjFnRandR:
 	4E0C 21 F4 4E       LD HL,DirAxes
 	4E0F 18 54          JR TurnRandomly
-;; Random direction change, like a bishop.
-ObjFnRandB:
+;; Random direction change, in diagonal (like a bishop).
+ObjFnRandB:		;; eg. Beacon room 516
 	4E11 21 01 4F       LD HL,DirDiag
 	4E14 18 4F          JR TurnRandomly
-;; Home in, like a robomouse.
+;; Home in, like a robomouse (attracted by the player if close enough, but can also go in lines, like a rook).
 ObjFnHomeIn:
 	4E16 21 55 4F       LD HL,HomeIn
 	4E19 18 36          JR GoThatWay
@@ -14826,6 +14847,7 @@ ObjFnStuff6:
 	4E7B CD EF 4F       CALL ObjAgain6
 	4E7E C3 C7 4F       JP ObjDraw
 
+;; -----------------------------------------------------------------------------------------------------------
 .HeliPadDir:
 	4E81 00 			DEFB 	#00
 
@@ -14834,71 +14856,68 @@ ObjFnHeliplat3:
 	4E82 3E 01          LD A,#01											;; Sound_ID 01
 	4E84 CD 1C 2B       CALL SetSound
 	4E87 CD DF 4F       CALL FaceAndAnimate
-	4E8A FD 7E 11       LD A,(IY+O_SPECIAL)
+	4E8A FD 7E 11       LD A,(IY+O_SPECIAL)									;; height limits and dir
 	4E8D 47             LD B,A
-	4E8E CB 5F          BIT 3,A
-	4E90 28 3C          JR Z,br_4ECE
-	;; Bit 3 is set...
-    ;; Calculate #C0 - (6 * A >> 4) - opposite direction in top bits!
+	4E8E CB 5F          BIT 3,A												;; test Up/Down direction
+	4E90 28 3C          JR Z,ofn_hp3_descent								;; if bit3 = 0, jump ofn_hp3_descent
+ofn_hp3_ascent:																;; else ascent (b3 = 1) : get high limit from O_SPECIAL byte
 	4E92 1F             RRA
 	4E93 1F             RRA
-	4E94 E6 3C          AND #3C
-	4E96 4F             LD C,A
-	4E97 0F             RRCA
-	4E98 81             ADD A,C
-	4E99 ED 44          NEG
-	4E9B C6 C0          ADD A,GROUND_LEVEL
-	4E9D FD BE 07       CP (IY+O_Z)
-	;; Above this level? Go to
-	4EA0 30 16          JR NC,#4EB8
+	4E94 E6 3C          AND %00111100
+	4E96 4F             LD C,A												;; C = (4 * high nibble) of O_SPECIAL
+	4E97 0F             RRCA												;; (4 * high nibble)/2
+	4E98 81             ADD A,C												;; A = 1,5 (4 * high nibble) = 6 * high nibble
+	4E99 ED 44          NEG													;; invert sign
+	4E9B C6 C0          ADD A,GROUND_LEVEL									;; #C0 - (6 * high nibble) = Z coord; 6 is the objects unit height, #C0 the ground level
+	4E9D FD BE 07       CP (IY+O_Z)											;; compare with O_Z
+	4EA0 30 16          JR NC,ofn_hp3_limit									;; if A >=O_Z jump ofn_hp3_limit, else
 	4EA2 2A EE 36       LD HL,(CurrObject)
-	4EA5 CD 31 2E       CALL ChkSatOn
-	4EA8 FD CB 0B A6    RES 4,(IY+#0B)
-	4EAC 30 02          JR NC,#4EB0
-	4EAE 28 41          JR Z,br_4EF1
+	4EA5 CD 31 2E       CALL ChkSatOn										;; character or object on it? (if so, also need to update their height accordingly)
+	4EA8 FD CB 0B A6    RES 4,(IY+O_IMPACT)									;; TODO : maybe check if blocked by something??
+	4EAC 30 02          JR NC,hp3_do_ascent
+	4EAE 28 41          JR Z,ofn_h3_draw_end
 	;; Ascend.
-	4EB0 CD B6 4F       CALL UpdateObjExtents
-	4EB3 FD 35 07       DEC (IY+O_Z)
-	4EB6 18 39          JR br_4EF1
+hp3_do_ascent
+	4EB0 CD B6 4F       CALL UpdateObjExtents								;; convert UVZ into pixel x,y
+	4EB3 FD 35 07       DEC (IY+O_Z)										;; going up (Z axis goes Down, so the higher, the smaller Z is)
+	4EB6 18 39          JR ofn_h3_draw_end
 
-br_4EB8
-	4EB8 21 81 4E       LD HL,HeliPadDir
-	;; Every other time (alternates 0/1):
-	4EBB 7E             LD A,(HL)
+ofn_hp3_limit:
+	4EB8 21 81 4E       LD HL,HeliPadDir									;; if reached a limit (high or low), flip the direction bit
+	4EBB 7E             LD A,(HL)											;; it waits to go one further before reversing
 	4EBC A7             AND A
 	4EBD 20 02          JR NZ,br_4EC1
-	4EBF 36 02          LD (HL),#02
+	4EBF 36 02          LD (HL),2											;; reset to 2
 br_4EC1
-	4EC1 35             DEC (HL)
-	4EC2 20 2D          JR NZ,br_4EF1
-	;; Flip the movement direction
+	4EC1 35             DEC (HL)											;; get either 1 or 0
+	4EC2 20 2D          JR NZ,ofn_h3_draw_end
+ofn_hp3_flipdir:
 	4EC4 78             LD A,B
-	4EC5 EE 08          XOR #08
-	4EC7 FD 77 11       LD (IY+O_SPECIAL),A
-	4ECA E6 08          AND #08
-	4ECC 18 23          JR br_4EF1
+	4EC5 EE 08          XOR %00001000
+	4EC7 FD 77 11       LD (IY+O_SPECIAL),A									;; flip O_SPECIAL bit3 : for HELIPLAT it is the direction (ascent/decent)
+	4ECA E6 08          AND %00001000
+	4ECC 18 23          JR ofn_h3_draw_end
 
-br_4ECE
-	;; Calculate #BF - 6 * (A & 7): convert height to Z coord.
-	4ECE E6 07          AND #07
-	4ED0 87             ADD A,A
+ofn_hp3_descent
+	4ECE E6 07          AND %00000111										;; get low limit from O_SPECIAL byte
+	4ED0 87             ADD A,A												;; low 3bits * 2
 	4ED1 4F             LD C,A
-	4ED2 87             ADD A,A
-	4ED3 81             ADD A,C
-	4ED4 ED 44          NEG
-	4ED6 C6 BF          ADD A,#BF
-	4ED8 FD BE 07       CP (IY+O_Z)											;; Below this level?
-	4EDB 38 DB          JR C,br_4EB8
+	4ED2 87             ADD A,A												;; low 3bits * 4
+	4ED3 81             ADD A,C												;; A = low 3bits * 6
+	4ED4 ED 44          NEG													;; invert sign
+	4ED6 C6 BF          ADD A,GROUND_LEVEL - 1								;; A = #C0 - (6 * low 3bits) - 1 = Z ccord
+	4ED8 FD BE 07       CP (IY+O_Z)											;; reached low limit?
+	4EDB 38 DB          JR C,ofn_hp3_limit
 	4EDD 2A EE 36       LD HL,(CurrObject)
-	4EE0 CD F6 2C       CALL DoContact2
-	4EE3 30 02          JR NC,br_4EE7
-	4EE5 28 0A          JR Z,br_4EF1
-br_4EE7
+	4EE0 CD F6 2C       CALL DoContact2										;; is it blocked by something? (even if it didn't reach the low limit, a character may be under or something has been pushed below)
+	4EE3 30 02          JR NC,hp3_do_descent
+	4EE5 28 0A          JR Z,ofn_h3_draw_end
+hp3_do_descent
 	;; Descend
 	4EE7 CD B6 4F       CALL UpdateObjExtents
-	4EEA FD CB 0B AE    RES 5,(IY+#0B)
-	4EEE FD 34 07       INC (IY+O_Z)
-br_4EF1
+	4EEA FD CB 0B AE    RES 5,(IY+O_IMPACT)
+	4EEE FD 34 07       INC (IY+O_Z)										;; going down (Z axis goes down on the screen, so increasing Z makes visually go down)
+ofn_h3_draw_end
 	4EF1 C3 C7 4F       JP ObjDraw
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -15013,7 +15032,7 @@ hmin_2:
 ;; MoveTowards : Move enemy towards target
 .MoveAway:
 	4F6D CD 79 4F       CALL 	CharDistAndDir								;; get enemy direction towards character
-	4F70 EE 0F          XOR 	#0F											;; invert it (note that for exemple, a ??11 will become ??00 that produced a confliction Down/Up hence probably ignored as it it was ??11)
+	4F70 EE 0F          XOR 	#0F											;; invert it (flip all [3:0] bits; note that for exemple, a ??11 will become ??00, thus producing a confliction Down/Up hence (probably) ignored as it it were ??11)
 	4F72 18 F4          JR 		MoveToDirMask								;; Move away
 
 .MoveTowards:
@@ -15166,13 +15185,13 @@ OA9b:
 	5041 FD CB 0C 66    BIT 4,(IY+#0C)
 	5045 37             SCF
 	5046 20 05          JR NZ,OA9c
-	5048 FD CB 0B A6    RES 4,(IY+#0B)
+	5048 FD CB 0B A6    RES 4,(IY+O_IMPACT)
 	504C C9             RET
 
 OA9c:
 	504D F5             PUSH AF
 	504E CD B6 4F       CALL UpdateObjExtents
-	5051 FD CB 0B AE    RES 5,(IY+#0B)
+	5051 FD CB 0B AE    RES 5,(IY+O_IMPACT)
 	5055 FD 34 07       INC (IY+O_Z)
 	5058 3E 03          LD A,Sound_ID_Didididip
 	505A CD 1C 2B       CALL SetSound
@@ -15185,7 +15204,7 @@ OA9c:
 ObjAgain10:
 	5064 2A EE 36       LD HL,(CurrObject)
 	5067 CD 31 2E       CALL ChkSatOn
-	506A FD CB 0B A6    RES 4,(IY+#0B)
+	506A FD CB 0B A6    RES 4,(IY+O_IMPACT)
 	506E 30 02          JR NC,br_5072
 	5070 3F             CCF
 	5071 C8             RET Z
@@ -15702,7 +15721,7 @@ KeyScanningBuffer:
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Again, everything below this point has been moved by #0AD8 at init (70D8 was placed at 6600 before Entry).
 .PanelFlips:
-	70D8 DEFB 8, #00
+	70D8 DEFS 8, #00
 .SpriteFlips_buffer:														;; flipped sprite
 	70E0 DEFS 16, #00
 
