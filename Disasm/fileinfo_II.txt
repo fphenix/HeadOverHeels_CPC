@@ -9873,7 +9873,7 @@ Teleport_data:
 	349C DEFW #4100, #2980 				;; Room ID 4100 end up at Room ID 2980 : Blacktooth to Moonbase (2 in one room) (heels only) (both way)
 	34A0 DEFW #A100, #2600 				;; Room ID A100 end up at Room ID 2600 : Moonbase to Moonbase Main (both way)
 	34A4 DEFW #8100, #E980 				;; Room ID 8100 end up at Room ID E980 : Blacktooth to Moonbase (head only) (both way)
-	34A8 DEFW #8400, #0B10 				;; Room ID 8400 end up at Room ID B100 : Moonbase Main to Penitentiary (both way)
+	34A8 DEFW #8400, #B100 				;; Room ID 8400 end up at Room ID B100 : Moonbase Main to Penitentiary (both way)
 	34AC DEFW #8500, #EF20 				;; Room ID 8500 end up at Room ID EF20 : Moonbase Main to Bookworld (both way)
 	34B0 DEFW #A400, #00F0 				;; Room ID A400 end up at Room ID 00F0 : Moonbase Main to Safari (both way)
 	34B4 DEFW #A500, #88D0 				;; Room ID A500 end up at Room ID 88D0 : Moonbase Main to Egyptus (both way)
