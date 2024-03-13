@@ -99,7 +99,7 @@ play_a_sound:																;; play a sound (if one exists)
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Sub function of Victory_Room
 ;; Set Z if in Victory room, else Z is reset ("NZ" set):
-RoomID_Victory:			EQU		#8D30
+RoomID_Victory:			EQU		#8D30					;; we also see room 8E30 when in 8D30
 RoomID_Head_1st:		EQU		#8A40
 RoomID_Heels_1st:		EQU		#8940
 
@@ -9873,7 +9873,7 @@ Teleport_data:
 	349C DEFW #4100, #2980 				;; Room ID 4100 end up at Room ID 2980 : Blacktooth to Moonbase (2 in one room) (heels only) (both way)
 	34A0 DEFW #A100, #2600 				;; Room ID A100 end up at Room ID 2600 : Moonbase to Moonbase Main (both way)
 	34A4 DEFW #8100, #E980 				;; Room ID 8100 end up at Room ID E980 : Blacktooth to Moonbase (head only) (both way)
-	34A8 DEFW #8400, #B100 				;; Room ID 8400 end up at Room ID B100 : Moonbase Main to Penitentiary (both way)
+	34A8 DEFW #8400, #0B10 				;; Room ID 8400 end up at Room ID B100 : Moonbase Main to Penitentiary (both way)
 	34AC DEFW #8500, #EF20 				;; Room ID 8500 end up at Room ID EF20 : Moonbase Main to Bookworld (both way)
 	34B0 DEFW #A400, #00F0 				;; Room ID A400 end up at Room ID 00F0 : Moonbase Main to Safari (both way)
 	34B4 DEFW #A500, #88D0 				;; Room ID A500 end up at Room ID 88D0 : Moonbase Main to Egyptus (both way)
@@ -10665,25 +10665,25 @@ OBJFN_DISAPPEAR:	EQU		#22
 	389D 82 4E		DEFW 	ObjFnHeliplat3		;; OBJFN_HELIPLAT3:	10 ObjFnHeliplat3 4E82
 	389F 80 4D		DEFW 	ObjFnFade			;; OBJFN_FADE:     	11 ObjFnFade 4D80
 	38A1 31 4D		DEFW 	ObjFnHeliplat		;; OBJFN_HELIPLAT: 	12 ObjFnHeliplat 4D31
-	38A3 3B 4D		DEFW 	ObjFn19				;; OBJFN_19:       	13 ObjFn19 4D3B
+	38A3 3B 4D		DEFW 	ObjFnColapse		;; OBJFN_COLAPSE:   13 ObjFnColapse 4D3B
 	38A5 66 4D		DEFW 	ObjFnDissolve2		;; OBJFN_DISSOLVE2:	14 ObjFnDissolve2 4D66
-	38A7 ED 4D		DEFW 	ObjFn21				;; OBJFN_21:       	15 ObjFn21 4DED
-	38A9 E7 4D		DEFW 	ObjFn22				;; OBJFN_22:       	16 ObjFn22 4DE7
+	38A7 ED 4D		DEFW 	ObjFnSquarePatrol	;; OBJFN_SQPATROL:  15 ObjFnSquarePatrol 4DED
+	38A9 E7 4D		DEFW 	ObjFnLinePatrol		;; OBJFN_LNPATROL: 	16 ObjFnLinePatrol 4DE7
 	38AB 2E 4D		DEFW 	ObjFnHeliplat2		;; OBJFN_HELIPLAT2:	17 ObjFnHeliplat2 4D2E
 	38AD 63 4D		DEFW 	ObjFnDissolve		;; OBJFN_DISSOLVE: 	18 ObjFnDissolve 4D63
 	38AF 76 4C		DEFW 	ObjFnFire			;; OBJFN_FIRE:     	19 ObjFnFire 4C76
 	38B1 CF 4D		DEFW 	ObjFnSpecial		;; OBJFN_SPECIAL: 	1a ObjFnSpecial 4DCF
 	38B3 18 4C		DEFW 	ObjFnTeleport		;; OBJFN_TELEPORT: 	1b ObjFnTeleport 4C18
 	38B5 98 4D		DEFW 	ObjFnSpring			;; OBJFN_SPRING:   	1c ObjFnSpring 4D98
-	38B7 FB 4B		DEFW 	ObjFnRobot			;; OBJFN_ROBOT:    	1d ObjFnRobot 4BFB
+	38B7 FB 4B		DEFW 	ObjFnJoyControlled	;; OBJFN_JCTRLED:   1d ObjFnJoyControlled 4BFB
 	38B9 EB 4B		DEFW 	ObjFnJoystick		;; OBJFN_JOYSTICK: 	1e ObjFnJoystick 4BEB
 	38BB 5C 4D		DEFW 	ObjFnHushPuppy		;; OBJFN_HUSHPUPPY:	1f ObjFnHushPuppy 4D5C
-	38BD 5E 4C		DEFW 	ObjFn32				;; OBJFN_32:       	20 ObjFn32 4C5E
-	38BF 36 4F		DEFW 	ObjFn33				;; OBJFN_33:       	21 ObjFn33 4F36
+	38BD 5E 4C		DEFW 	ObjFnRadarBeams		;; OBJFN_RADARBEAM 	20 ObjFnRadarBeams 4C5E
+	38BF 36 4F		DEFW 	ObjFnBoxRadar		;; OBJFN_BOXRADAR:	21 ObjFnBoxRadar 4F36
 	38C1 92 4D		DEFW 	ObjFnDisappear		;; OBJFN_DISAPPEAR:	22 ObjFnDisappear 4D92
-	38C3 3F 4C		DEFW 	ObjFn35				;; OBJFN_35:       	23 ObjFn35 4C3F
+	38C3 3F 4C		DEFW 	ObjFnDriven			;; OBJFN_DRIVEN:   	23 ObjFnDriven 4C3F
 	38C5 29 4C		DEFW 	ObjFnCannonFire		;; OBJFN_CANNONBALL: 24 ObjFnCannonFire 4C29 (victory room)
-	38C7 1B 4E		DEFW 	ObjFnCrowny			;; OBJFN_CROWNY:   	25 ObjFnCrowny	4E1B
+	38C7 1B 4E		DEFW 	ObjFnRespectful		;; OBJFN_RESPECT:   25 ObjFnRespectful	4E1B (Emperor's Guard)
 
 ;; Flags for double-height objects (enemies)
 DBL_SPR_TAP_1:      EQU 	1 << 6				;; #40 bottom part (or top if SWAPPED bit set) is the first item in Bottom_array (SPR_TAP)
@@ -10726,7 +10726,7 @@ SWITCHEDON			EQU		%01100000			;; bits6:5 #60 ; TODO : or maybe it is turn On (if
 	38F9 DEFB #30, OBJFN_SWITCH, #00		;; #10 SPR_SWITCH,     	OBJFN_SWITCH,              		0
 	38FC DEFB #94, #09, #60					;; #11 ANIM_BEACON,    	OBJFN_RANDB,               		SELECTIVE
 	38FF DEFB #96, #4F, #6C					;; #12 ANIM_FACE,      	DBL_SPR_TAP_1 | OBJFN_HOMEIN,   SELECTIVE | SWAPPED | TALL_OBJ
-	3902 DEFB #9A, #DD, #0C					;; #13 ANIM_CHARLES,   	DBL_SPR_TAP_2 | OBJFN_ROBOT,    SWAPPED | TALL_OBJ
+	3902 DEFB #9A, #DD, #0C					;; #13 ANIM_CHARLES,   	DBL_SPR_TAP_2 | OBJFN_JCTRLED,	SWAPPED | TALL_OBJ
 	3905 DEFB #49, #1E, #00					;; #14 SPR_STICK,      	OBJFN_JOYSTICK,           		0
 	3908 DEFB #5A, #01, #01					;; #15 SPR_ANVIL,      	OBJFN_PUSHABLE,           		WIDER
 	390B DEFB #5F, #00, #01					;; #16 SPR_CUSHION,    	0,                        		WIDER
@@ -10738,21 +10738,21 @@ SWITCHEDON			EQU		%01100000			;; bits6:5 #60 ; TODO : or maybe it is turn On (if
 	391D DEFB #84, #CC, #6C					;; #1C ANIM_VAPE2,    	DBL_SPR_TAP_2 | OBJFN_RANDQ,    SELECTIVE | SWAPPED | TALL_OBJ
 	3920 DEFB #47, #0A, #20					;; #1D SPR_DRUM,      	OBJFN_BALL,                		DEADLY
 	3923 DEFB #5C, #1F, #01					;; #1E SPR_HUSHPUPPY, 	OBJFN_HUSHPUPPY,           		WIDER
-	3926 DEFB #55, #15, #01					;; #1F SPR_SANDWICH,  	OBJFN_21,                  		WIDER
+	3926 DEFB #55, #15, #01					;; #1F SPR_SANDWICH,  	OBJFN_SQPATROL,           		WIDER
 	3929 DEFB #96, #CD, #6C					;; #20 ANIM_FACE,     	DBL_SPR_TAP_2 | OBJFN_RANDR,    SELECTIVE | SWAPPED | TALL_OBJ
 	392C DEFB #5B, #00, #21					;; #21 SPR_SPIKES,    	0,                        		DEADLY | WIDER
 	392F DEFB #5D, #14, #01					;; #22 SPR_BOOK,      	OBJFN_DISSOLVE2,          		WIDER
 	3932 DEFB #59, #14, #01					;; #23 SPR_PAD,       	OBJFN_DISSOLVE2,          		WIDER
 	3935 DEFB #59, #00, #01					;; #24 SPR_PAD,       	0,                        		WIDER
-	3938 DEFB #3D, #20, #60					;; #25 SPR_TAP,       	OBJFN_32,                 		SELECTIVE
-	393B DEFB #92, #21, #60					;; #26 ANIM_BEE,      	OBJFN_33,                 		SELECTIVE
+	3938 DEFB #3D, #20, #60					;; #25 SPR_TAP,       	OBJFN_RADARBEAM,           		SELECTIVE
+	393B DEFB #92, #21, #60					;; #26 ANIM_BEE,      	OBJFN_BOXRADAR,					SELECTIVE
 	393E DEFB #9E, #12, #00					;; #27 ANIM_HELIPLAT, 	OBJFN_HELIPLAT,           		0
 	3941 DEFB #55, #01, #01					;; #28 SPR_SANDWICH,  	OBJFN_PUSHABLE,           		WIDER
-	3944 DEFB #5F, #13, #01					;; #29 SPR_CUSHION,   	OBJFN_19,                 		WIDER
+	3944 DEFB #5F, #13, #01					;; #29 SPR_CUSHION,   	OBJFN_COLAPSE,             		WIDER
 	3947 DEFB #8C, #07, #60					;; #2A ANIM_MONOCAT,  	OBJFN_MONOCAT,            		SELECTIVE
-	394A DEFB #5A, #16, #01					;; #2B SPR_ANVIL,     	OBJFN_22,                 		WIDER
+	394A DEFB #5A, #16, #01					;; #2B SPR_ANVIL,     	OBJFN_LNPATROL,            		WIDER
 	394D DEFB #5D, #08, #01					;; #2C SPR_BOOK,      	OBJFN_ANTICLOCK,          		WIDER
-	3950 DEFB #55, #23, #01					;; #2D SPR_SANDWICH,  	OBJFN_35,                 		WIDER
+	3950 DEFB #55, #23, #01					;; #2D SPR_SANDWICH,  	OBJFN_DRIVEN,              		WIDER
 	3953 DEFB #9C, #CD, #6C					;; #2E ANIM_TRUNK,    	DBL_SPR_TAP_2 | OBJFN_RANDR,    SELECTIVE | SWAPPED | TALL_OBJ
 	3956 DEFB #42, #00, #20					;; #2F SPR_TRUNK,     	0,                        		DEADLY
 	3959 DEFB #47, #0A, #00					;; #30 SPR_DRUM,      	OBJFN_BALL,               		0
@@ -10768,8 +10768,8 @@ SWITCHEDON			EQU		%01100000			;; bits6:5 #60 ; TODO : or maybe it is turn On (if
 	3977 DEFB #1E, #00, #00					;; #3A SPR_HEAD1,     	0,                        		0
 	397A DEFB #18, #00, #00					;; #3B SPR_HEELS1,    	0,                        		0
 	397D DEFB #4C, #24, #00					;; #3C SPR_BALL,      	OBJFN_CANNONBALL,          		0
-	3980 DEFB #4C, #A5, #2C					;; #3D SPR_BALL,      	DBL_SPR_VAPE3 | OBJFN_CROWNY,   DEADLY | SWAPPED | TALL_OBJ
-	3983 DEFB #84, #21, #60					;; #3E ANIM_VAPE2,    	OBJFN_33,                  		SELECTIVE
+	3980 DEFB #4C, #A5, #2C					;; #3D SPR_BALL,      	DBL_SPR_VAPE3 | OBJFN_RESPECT,  DEADLY | SWAPPED | TALL_OBJ
+	3983 DEFB #84, #21, #60					;; #3E ANIM_VAPE2,    	OBJFN_BOXRADAR,					SELECTIVE						; Emperor!
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Reinitialisation size of the array
@@ -11799,52 +11799,52 @@ br_3D71
 .tab_Specials_collectible:
 	;; <roomID word little-endian> <low byte : Z|SPR#> <high byte : UV> x 47
 	3DEB DEFW #1470, #7200				;; speId 0 : room id 1470 : U,V,Z = 7,2,0 + sprite Id 0 in SpecialSprites = SPR_PURSE
-	3DEF DEFW #3060, #4001
-	3DF3 DEFW #2EB0, #3409
-	3DF7 DEFW #00B0, #001A
-	3DFB DEFW #9AF0, #700B
-	3DFF DEFW #A740, #441C
-	3E03 DEFW #3730, #377D
-	3E07 DEFW #1570, #3468
+	3DEF DEFW #3060, #4001				;; Hooter
+	3DF3 DEFW #2EB0, #3409				;; Egyptus Crown
+	3DF7 DEFW #00B0, #001A				;; Penitentiary Crown
+	3DFB DEFW #9AF0, #700B				;; Safari Crown
+	3DFF DEFW #A740, #441C				;; Book World Crown
+	3E03 DEFW #3730, #377D				;; Emperor Crown
+	3E07 DEFW #1570, #3468				;; Fish
 	3E0B DEFW #8960, #4748
 	3E0F DEFW #C560, #7668
 	3E13 DEFW #1B80, #7668
 	3E17 DEFW #BCD0, #3528
-	3E1B DEFW #1CD0, #7128
+	3E1B DEFW #1CD0, #7128				;; ...
 	3E1F DEFW #87F0, #7438
 	3E23 DEFW #FB20, #7128
 	3E27 DEFW #3160, #0548
 	3E2B DEFW #E2C0, #5438
-	3E2F DEFW #6920, #0768
-	3E33 DEFW #5260, #7762
+	3E2F DEFW #6920, #0768				;; Fish
+	3E33 DEFW #5260, #7762				;; Donuts Tray
 	3E37 DEFW #4760, #2772
 	3E3B DEFW #E3C0, #0742
-	3E3F DEFW #63F0, #7012
+	3E3F DEFW #63F0, #7012				;; ...
 	3E43 DEFW #AA20, #0522
-	3E47 DEFW #6C30, #4622
-	3E4B DEFW #4760, #5773
-	3E4F DEFW #FA80, #6763
+	3E47 DEFW #6C30, #4622				;; Donuts Tray
+	3E4B DEFW #4760, #5773				;; Bunny Speed
+	3E4F DEFW #FA80, #6763				;; ...
 	3E53 DEFW #70F0, #6013
-	3E57 DEFW #7B10, #3173
-	3E5B DEFW #6460, #7074
-	3E5F DEFW #1A80, #4544
-	3E63 DEFW #46F0, #7474
-	3E67 DEFW #C560, #7466
+	3E57 DEFW #7B10, #3173				;; Bunny Speed
+	3E5B DEFW #6460, #7074				;; Bunny Spring
+	3E5F DEFW #1A80, #4544				;; ...
+	3E63 DEFW #46F0, #7474				;; Bunny Spring
+	3E67 DEFW #C560, #7466				;; Bunny Lives
 	3E6B DEFW #9870, #0076
 	3E6F DEFW #3200, #5076
-	3E73 DEFW #2980, #4076
+	3E73 DEFW #2980, #4076				;; ...
 	3E77 DEFW #E0A0, #4016
 	3E7B DEFW #0FA0, #4766
 	3E7F DEFW #03B0, #4426
 	3E83 DEFW #83F0, #1736
-	3E87 DEFW RoomID_Head_1st, #0606	;; speID 39 roomID #8A40 : UVZ=060 + Sprite6 in SpecialSprites = BUNNY; Initial Head's Room
-	3E8B DEFW #9920, #1476
-	3E8F DEFW #C560, #7565
+	3E87 DEFW RoomID_Head_1st, #0606	;; speId 39 roomID #8A40 : UVZ=060 + Sprite6 in SpecialSprites = BUNNY (lives); Initial Head's Room
+	3E8B DEFW #9920, #1476				;; Bunny Lives
+	3E8F DEFW #C560, #7565				;; Bunny Shield
 	3E93 DEFW #7760, #4475
 	3E97 DEFW #3600, #6675
-	3E9B DEFW #FEA0, #2275
+	3E9B DEFW #FEA0, #2275				;; ...
 	3E9F DEFW #42F0, #6165
-	3EA3 DEFW #AE20, #0475				;; speId 46
+	3EA3 DEFW #AE20, #0475				;; speId 46 : Bunny Shield
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; This is used when drawing the Victory Room to show (or not) a crown
@@ -13317,25 +13317,26 @@ dco_3:
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Contact between two non-character objects.
+;; First object in IX, second in IY
 .ContactNonChar:
 	478F FD CB 09 5E    BIT 3,(IY+O_SPRFLAGS)
 	4793 20 09          JR NZ,cnc_1
 	4795 DD CB 09 5E    BIT 3,(IX+O_SPRFLAGS)
 	4799 C8             RET Z
-	479A FD E5          PUSH IY
+	479A FD E5          PUSH IY												;;
 	479C DD E1          POP IX
 	;; Object in IX has bit 3 of sprite-flags set.
     ;; If we're second part of double-height object, find the first part.
 cnc_1:
 	479E DD CB 09 4E    BIT 1,(IX+O_SPRFLAGS)
 	47A2 28 05          JR Z,cnc_2
-	47A4 11 EE FF       LD DE,#FFEE
-	47A7 DD 19          ADD IX,DE
+	47A4 11 EE FF       LD DE,-18											;; adding #FFEE is substracting 18 (the length of an object variables array)
+	47A7 DD 19          ADD IX,DE											;; Take the object before
 	;; Return if bit 7 reset, else disable function and reset impact
 cnc_2:
-	47A9 DD CB 09 7E    BIT 7,(IX+O_SPRFLAGS)									;; SELECTIVE flag : if set, turn off the object function when 2 objects collide
+	47A9 DD CB 09 7E    BIT 7,(IX+O_SPRFLAGS)								;; SELECTIVE flag : if set, turn off the object function when 2 objects collide
 	47AD C8             RET Z
-	47AE DD CB 09 F6    SET 6,(IX+O_SPRFLAGS)									;; object function disabled
+	47AE DD CB 09 F6    SET 6,(IX+O_SPRFLAGS)								;; object function disabled
 	47B2 DD 36 0B FF    LD (IX+O_IMPACT),#FF
 	47B6 C9             RET
 
@@ -14379,34 +14380,38 @@ Collided:
 	4BE9 FF 			DEFB 	#FF
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; TODO : Used when controlling something with a Joystick (ie. in game joystick object)
-RobotDir:
+;; Used to store the force direction when controlling something with
+;; a Joystick (ie. in game object "joystick" SPR_STICK)
+ObjJoystickDir:
 	4BEA FF 			DEFB 	#FF
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; Get the (in game object) Joystick direction and save its
-;; direction in RobotDir
+;; Get the (in game object SPR_STICK) Joystick direction and save its
+;; direction in ObjJoystickDir
 ObjFnJoystick:
 	4BEB FD 7E 0C       LD 		A,(IY+#0C)									;; get object direction
 	4BEE FD 36 0C FF    LD 		(IY+#0C),#FF								;; reset it
 	4BF2 F6 F0          OR 		#F0
 	4BF4 FE FF          CP 		#FF											;; was the object direction #FF?
 	4BF6 C8             RET 	Z											;; leave if so
-	4BF7 32 EA 4B       LD 		(RobotDir),A								;; else save that direction in RobotDir
+	4BF7 32 EA 4B       LD 		(ObjJoystickDir),A							;; else save that direction in ObjJoystickDir
 	4BFA C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
-ObjFnRobot:
+;; Charles is ontrolled by (in game object SPR_STICK) Joysticks. eg. Room #B87
+;; Charles follows the direction of the force applied to the joystick, if that
+;; direction is available to it.
+ObjFnJoyControlled:
 	4BFB CD 29 50       CALL 	ObjAgain8
-	4BFE 21 EA 4B       LD 		HL,RobotDir									;; point...
-	4C01 7E             LD 		A,(HL)										;; ...and get RobotDir direction value
+	4BFE 21 EA 4B       LD 		HL,ObjJoystickDir							;; points on...
+	4C01 7E             LD 		A,(HL)										;; ...and get ObjJoystickDir direction value
 	4C02 36 FF          LD 		(HL),#FF									;; and reset it
-	4C04 F5             PUSH 	AF											;; save inital RobotDir direction
-	4C05 CD 0F 44       CALL 	DirCode_from_LRDU							;; get dir code (0 to 7 or FF), from LRDU direction
+	4C04 F5             PUSH 	AF											;; save inital ObjJoystickDir direction
+	4C05 CD 0F 44       CALL 	DirCode_from_LRDU							;; get dir code (0 to 7 or FF), from initial LRDU direction
 	4C08 3C             INC 	A
 	4C09 D6 01          SUB 	1											;; test value, if it was FF then Carry set, else (real direction) Carry=NC
 	4C0B D4 2B 4F       CALL 	NC,MoveDir									;; if a dir is set, then MoveDir
-	4C0E F1             POP 	AF											;; restore inital RobotDir direction
+	4C0E F1             POP 	AF											;; restore inital ObjJoystickDir direction
 	4C0F CD EF 4F       CALL 	ObjAgain6									;; TODO ????
 	4C12 CD DF 4F       CALL 	FaceAndAnimate
 	4C15 C3 C7 4F       JP 		ObjDraw
@@ -14446,19 +14451,23 @@ ObjFnCannonFire:
 	4C3B C3 1C 2B       JP 		SetSound									;; will RET
 
 ;; -----------------------------------------------------------------------------------------------------------
-ObjFn35Val:
-	4C3E 00				DEFB	#00
+;; Used by some of the sandwiches (eg. Room #239). It is immobile by default.
+;; When the player stands on it, the sandwich will move in the same direction
+;; the player is facing until an obstacle and stops. Seems to ignore any new
+;; direction until it reached a stopping point.
+ObjFn35Bool:
+	4C3E 00				DEFB	#00											;; can be 0 or FF (FF during Sub_FnDriven is processed, else 0)
 
-ObjFn35:
-	4C3F 21 3E 4C       LD HL,ObjFn35Val
+ObjFnDriven:
+	4C3F 21 3E 4C       LD HL,ObjFn35Bool
 	4C42 36 FF          LD (HL),#FF
 	4C44 E5             PUSH HL
-	4C45 CD 4C 4C       CALL ObjFn35b
+	4C45 CD 4C 4C       CALL Sub_FnDriven
 	4C48 E1             POP HL
 	4C49 36 00          LD (HL),#00
 	4C4B C9             RET
 
-ObjFn35b:
+Sub_FnDriven:
 	4C4C 3A F0 36       LD A,(ObjDir)
 	4C4F 3C             INC A
 	4C50 20 40          JR NZ,ObjFnEnd2
@@ -14469,7 +14478,11 @@ ObjFn35b:
 	4C5C 18 13          JR ObjFnEnd
 
 ;; -----------------------------------------------------------------------------------------------------------
-ObjFn32:		;; this seems to be TAP activated when passing by it.
+;; Used by TAP in the room #220 or #320, they activate (ie. moves forward
+;; until an obstacle) only when passing "in front" of them (raytracing
+;; radar beams on all 4 sides).
+;; If we are standing in their diagonal we are invisible to them)
+ObjFnRadarBeams:
 	4C5E 3A F0 36       LD A,(ObjDir)
 	4C61 3C             INC A
 	4C62 20 2E          JR NZ,ObjFnEnd2
@@ -14534,8 +14547,8 @@ ObjFnSub:
 	4CBD F5             PUSH AF
 	4CBE CD 52 44       CALL UpdateCurrPos
 	4CC1 F1             POP AF
-	4CC2 2A 3E 4C       LD HL,(ObjFn35Val)									;; L = ObjFn35Val byte (0 or FF)
-	4CC5 2C             INC L												;; +1
+	4CC2 2A 3E 4C       LD HL,(ObjFn35Bool)									;; L = ObjFn35Bool boolean (0 or FF)
+	4CC5 2C             INC L												;; +1 to test if was FF
 	4CC6 C8             RET Z												;; RET if was FF, else:
 	4CC7 CD D0 4C       CALL MoveCurr
 	4CCA D8             RET C
@@ -14550,8 +14563,8 @@ ObjFnSub:
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Switch button object.
-;; it'll turn on/off the movement of the attached object, but also will
-;; flip the function disable bit (O_SPRFLAGS bit6) of all objects
+;; It'll turn on/off the movement and flip the function disable bit (O_SPRFLAGS bit6)
+;; of all objects in the room.
 ;; (eg. a Dissolve2 object will become undissolvable if in the same room)
 ObjFnSwitch:
     ;; First check if we're touched. If not, clear #11 and return.
@@ -14619,6 +14632,7 @@ objfnsw_3:
 	4D2D C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
+;; Heliplat are used to lift the player upwards.
 ;; Peculiarity: If comming from ObjFnHeliplat, the LD A,#52 is done.
 ;; But if coming from ObjFnHeliplat2, the 01 at 4D30 will take the "3E 52"
 ;; as data in a dummy instruction "LD BC,#523E" to cancel the "LD A,#52".
@@ -14633,7 +14647,13 @@ ObjFnHeliplat:
 	4D36 FD 36 0A 10    LD 		(IY+O_FUNC),OBJFN_HELIPLAT3					;; #10 = OBJFN_HELIPLAT3
 	4D3A C9          	RET
 
-ObjFn19:
+;; -----------------------------------------------------------------------------------------------------------
+;; This makes an elevated object - on which the player stands - gently
+;; colapse to the ground (in other words it loses altitude as pressure is applied on it).
+;; It does not go back up when pressure is released.
+;; The cushions around the room #ABD (all but the ones under the doors)
+;; use this feature.
+ObjFnColapse:
 	4D3B FD CB 0C 6E    BIT		5,(IY+#0C)
 	4D3F C0             RET		NZ
 	4D40 CD 2F 50       CALL	ObjAgain9
@@ -14703,7 +14723,7 @@ ObjFnDisappear:
 	4D95 C3 CA 44       JP 		RemoveObject								;; remove it from the objects list
 
 ;; -----------------------------------------------------------------------------------------------------------
-;;
+;;The Spring stool will give the player extra jumping force
 ObjFnSpring:
 	4D98 FD 46 08       LD B,(IY+O_SPRITE)
 	4D9B FD CB 0C 6E    BIT 5,(IY+#0C)										;; test bit5
@@ -14747,57 +14767,60 @@ ObjFnStuff:
 	4DE4 C3 C7 4F       JP ObjDraw
 
 ;; -----------------------------------------------------------------------------------------------------------
-ObjFn22:	;; used by the Anvil
+;; The Different ways an object can move.
+ObjFnLinePatrol:	;; used by the Anvil : Moves formard until an obstacle, then turns around (180° turn), and starts advancing again.
 	4DE7 21 2F 4F       LD HL,HalfTurn
 	4DEA C3 2B 4E       JP ObjFnStuff2
-ObjFn21:	;; used by sandwish room #2400
+ObjFnSquarePatrol:	;; used by sandwich room #240 : it moves forward clockwise until an obstacle, then makes a 90° turn clockwise and starts advancing again.
 	4DED 21 1D 4F       LD HL,Clockwise
 	4DF0 C3 2B 4E       JP ObjFnStuff2
-ObjFnVisor1: ;; eg. robot in room 786, it moves back and forth on one lane.
+ObjFnVisor1: 		;; ObjFnLinePatrol but ???? TODO ; eg. robot in room #786, it moves back and forth on one lane.
 	4DF3 21 2F 4F       LD HL,HalfTurn
 	4DF6 18 39          JR TurnOnCollision
-ObjFnMonocat:
+ObjFnMonocat:		;; ObjFnSquarePatrol but ???? TODO
 	4DF8 21 1D 4F       LD HL,Clockwise
 	4DFB 18 34          JR TurnOnCollision
-ObjFnAnticlock:
+ObjFnAnticlock:		;; ObjFnMonocat but in the other direction
 	4DFD 21 24 4F       LD HL,Anticlockwise
 	4E00 18 2F          JR TurnOnCollision
-ObjFnBee	;; used by bee (eg. room 476), move to any random direction
+ObjFnBee			;; used by bee (eg. room 476), move to any random direction
 	4E02 21 10 4F       LD HL,DirAny
 	4E05 18 2A          JR TurnOnCollision
-;; Random direction change
-ObjFnRandQ:
+ObjFnRandQ:			;; Random direction change (any like a Chess King)
 	4E07 21 10 4F       LD HL,DirAny
 	4E0A 18 59          JR TurnRandomly
-;; Random direction change, axially (like a rook).
-ObjFnRandR:
+ObjFnRandR:			;; Random direction change, axially (like a Chess Rook).
 	4E0C 21 F4 4E       LD HL,DirAxes
 	4E0F 18 54          JR TurnRandomly
-;; Random direction change, in diagonal (like a bishop).
-ObjFnRandB:		;; eg. Beacon room 516
+ObjFnRandB:			;; Random direction change, in diagonal (like a Chess Bishop). ; eg. Beacon room 516
 	4E11 21 01 4F       LD HL,DirDiag
 	4E14 18 4F          JR TurnRandomly
-;; Home in, like a robomouse (attracted by the player if close enough, but can also go in lines, like a rook).
-ObjFnHomeIn:
+ObjFnHomeIn:		;; Home in, like a robomouse (attracted by the player if close enough, but can also go in lines, like a rook).
 	4E16 21 55 4F       LD HL,HomeIn
 	4E19 18 36          JR GoThatWay
 
-;; if we saved the 4 worlds, it gives us the capability to frighten some ennemies?
-ObjFnCrowny:
+;; -----------------------------------------------------------------------------------------------------------
+;; if we saved the 4 worlds, it gives us the capability to frighten the Emperor Guard.
+;; (ie. the BALL+VAPE enemy, one room BEFORE the Emperor's Room (NOT the BEACON within the Emperor's room))
+;; When we arrive with less than 4 worlds saved, it "attacks" (MoveTowards). But if we saved 4 worlds
+;; the Emperor's guard moves out of our way (MoveAway).
+ObjFnRespectful:
 	4E1B 3A EA 3D       LD A,(saved_World_Mask)								;; get saved_World_Mask
 	4E1E F6 F0          OR #F0												;; look at the 4 first crowns only
 	4E20 3C             INC A												;; if #0F then become 0
 	4E21 21 6D 4F       LD HL,MoveAway
-	4E24 28 03          JR Z,crowny_1										;; if was #0F (we have 4 crowns) then make it MoveAway
-	4E26 21 74 4F       LD HL,MoveTowards									;; else make it move towards
-crowny_1:
+	4E24 28 03          JR Z,respect_1										;; if we have 4 crowns then make it MoveAway
+	4E26 21 74 4F       LD HL,MoveTowards									;; else make it MoveTowards
+respect_1:
 	4E29 18 26          JR GoThatWay										;; move it the selected way
 
+;; -----------------------------------------------------------------------------------------------------------
 ObjFnStuff2:
 	4E2B E5             PUSH HL
 	4E2C CD DF 4F       CALL FaceAndAnimate
 	4E2F 18 0B          JR ObjFnStuff5
 
+;; -----------------------------------------------------------------------------------------------------------
 .TurnOnCollision:
 	4E31 E5             PUSH HL
 .TurnOnColl2:
@@ -14812,9 +14835,9 @@ ObjFnStuff6:
 	4E42 E1             POP HL
 	4E43 3A E9 4B       LD A,(Collided)
 	4E46 3C             INC A
-	4E47 CA C7 4F       JP Z,ObjDraw
-	4E4A CD 50 4E       CALL DoTurn
-	4E4D C3 C7 4F       JP ObjDraw
+	4E47 CA C7 4F       JP Z,ObjDraw										;; not collided, just Draw
+	4E4A CD 50 4E       CALL DoTurn											;; else turn
+	4E4D C3 C7 4F       JP ObjDraw											;; and draw
 
 ;; Call the turning function provided earlier.
 .DoTurn:
@@ -14985,22 +15008,27 @@ DirAxes:
 	4F34 18 F3          JR 		Mod8MoveDir									;; move to new dir
 
 ;; -----------------------------------------------------------------------------------------------------------
-ObjFn33:
+;; Move towards the player but only if we enter a box centered around it.
+;; eg. used by the BEE in room #DB7 or #1A8 or by the Emperor in room #373!
+;; Stay far enough to remain undetected.
+RadarRadius:			EQU		#18
+
+ObjFnBoxRadar:
 	4F36 CD 29 50       CALL ObjAgain8
 	;; Check for collision
 	4F39 CD 79 4F       CALL CharDistAndDir
-	4F3C 3E 18          LD A,#18
+	4F3C 3E 18          LD A,RadarRadius
 	4F3E BA             CP D
-	4F3F 38 0E          JR C,NoColl33
+	4F3F 38 0E          JR c,rdr_undetected									;; if neither U nor V distance is below the "RadarRadius", we remain undetected
 	4F41 BB             CP E
-	4F42 DA 4F 4F       JP C,NoColl33
-	4F45 79             LD A,C
+	4F42 DA 4F 4F       JP c,rdr_undetected
+	4F45 79             LD A,C												;; else detected, moveTowards the player
 	4F46 CD 0F 44       CALL 	DirCode_from_LRDU							;; get dir code (0 to 7 or FF), from LRDU
 	4F49 FD 77 10       LD (IY+O_DIRECTION),A								;; dir code (0 to 7 or FF)
 	4F4C C3 59 4E       JP Collision33
 
-.NoColl33:
-	4F4F CD DF 4F       CALL FaceAndAnimate
+.rdr_undetected:
+	4F4F CD DF 4F       CALL FaceAndAnimate									;; undetected, don't move, but animate/draw
 	4F52 C3 C7 4F       JP ObjDraw
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -15168,6 +15196,14 @@ br_501F:
 ObjAgain7:
 	5024 3E 06          LD A,#06											;; Sound_ID 06
 	5026 C3 1C 2B       JP SetSound											;; will RET
+
+;; -----------------------------------------------------------------------------------------------------------
+;; check something and return Carry or NotCarry.
+;; also deals with object falling or goind up.
+;;
+;; For exemple, this will turn ObjFnVisor1 into ObjFnLinePatrol (or ObjFnMonocat into ObjFnSquarePatrol)
+;; when the result is NC (will reconvert DirCode_to_LRDU).
+;; Else the ObjFnVisor1 (or ObjFnMonocat) won't get the new dirCode.
 ObjAgain8:
 	5029 FD CB 0C 66    BIT 4,(IY+#0C)
 	502D 28 35          JR Z,ObjAgain10
@@ -15189,16 +15225,16 @@ OA9b:
 	504C C9             RET
 
 OA9c:
-	504D F5             PUSH AF
+	504D F5             PUSH AF												;; save Carry
 	504E CD B6 4F       CALL UpdateObjExtents
 	5051 FD CB 0B AE    RES 5,(IY+O_IMPACT)
-	5055 FD 34 07       INC (IY+O_Z)
-	5058 3E 03          LD A,Sound_ID_Didididip
+	5055 FD 34 07       INC (IY+O_Z)										;; increase Z coord (goes down)
+	5058 3E 03          LD A,Sound_ID_Didididip								;; falling
 	505A CD 1C 2B       CALL SetSound
-	505D F1             POP AF
-	505E D8             RET C
-	505F FD 34 07       INC (IY+O_Z)
-	5062 37             SCF
+	505D F1             POP AF												;; Restore Carry
+	505E D8             RET C												;; leave if Carry set
+	505F FD 34 07       INC (IY+O_Z)										;; else increase Z coord (down) again
+	5062 37             SCF													;; leave with Carry set
 	5063 C9             RET
 
 ObjAgain10:
@@ -15407,20 +15443,20 @@ Room_list1: ;; 230 rooms
 	536B DEFB 0D 4E 0F 21 00 25 B2 17 DA 17 E5 81 FF C0
 	5379 DEFB 08 81 0F 61 40 05 96 07 FF
 	5382 DEFB 10 82 01 E1 1F 8C 1F 38 24 9B 85 C4 F2 31 3F 1F E0
-	5393 DEFB 0D 84 03 E1 08 05 AF 0F D7 9B E5 81 FF C0
-	53A1 DEFB 0B 85 01 A1 08 05 B0 07 CB 0F FF 80
+	5393 DEFB 0D 84 03 E1 08 05 AF 0F D7 9B E5 81 FF C0												;; Room ID "840" Moon Base Teleporters to Penitentiary "B10"
+	53A1 DEFB 0B 85 01 A1 08 05 B0 07 CB 0F FF 80													;; Room ID "850" Moon Base Teleporters to Book World "EF2"
 	53AD DEFB 06 87 0F E1 48 05 FE
 	53B4 DEFB 08 88 0F A1 01 05 96 07 FF
 	53BD DEFB 06 92 07 61 48 25 FE
 	53C4 DEFB 08 93 0C 61 41 05 AF C7 FF
-	53CD DEFB 08 94 00 A1 49 25 9E 47 FF
-	53D6 DEFB 08 95 00 E1 49 25 9E 47 FF
+	53CD DEFB 08 94 00 A1 49 25 9E 47 FF															;; Room ID "940" first Moon Base "Arrow" room (access to rooms 840 and A40)
+	53D6 DEFB 08 95 00 E1 49 25 9E 47 FF															;; Room ID "950" 2nd Moon Base "Arrow" room (access to rooms 850 and A50)
 	53DF DEFB 0B 96 0D 21 41 04 1F 1A FA FC 7F F0
 	53EB DEFB 06 97 07 61 09 25 FE
 	53F2 DEFB 08 A1 0F 61 40 05 96 07 FF
 	53FB DEFB 0D A2 00 21 03 25 86 24 CC 9E 67 45 FF C0
-	5409 DEFB 0D A4 02 61 00 25 AC CF D6 7B E5 81 FF C0
-	5417 DEFB 0B A5 01 61 00 25 B0 07 CB 03 FF 80
+	5409 DEFB 0D A4 02 61 00 25 AC CF D6 7B E5 81 FF C0												;; Room ID "A40" Moon Base Teleporters to Safari "00F"
+	5417 DEFB 0B A5 01 61 00 25 B0 07 CB 03 FF 80													;; Room ID "A50" Moon Base Teleporters to Egyptus "88D"
 	5423 DEFB 0B A7 0E 21 C0 24 19 31 F9 C0 FF F0
 	542F DEFB 0B A8 00 61 01 05 B0 07 CB 03 FF 80
 	543B DEFB 08 B1 02 5B 08 07 96 07 FF
@@ -15428,11 +15464,11 @@ Room_list1: ;; 230 rooms
 	545E DEFB 1A C2 01 5B 81 8C 3F 08 E1 F8 FC 7F FC 08 6F F8 1F F0 49 BC EF F9 FC 1D 8F F8 FF
 	5479 DEFB 14 C3 0F 1B 01 06 43 A6 EF 7F C1 26 38 3C 4E 6B 5D 76 D7 F1 FE
 	548E DEFB 1E D1 0B DB 00 26 03 2A 01 F9 2E 8F B3 FE 08 F2 59 1D 65 B7 7E 09 35 46 85 4B BF D7 3F 1F E0
-	54AD DEFB 19 89 41 78 40 02 1D 38 E0 10 0F 82 47 C1 A3 83 68 3E 1E 8E C7 43 91 FF 1F E0		;; Heels' 1st room, id #8940
-	54C7 DEFB 10 8A 43 F8 01 02 01 3E E0 58 62 33 1A 8D FF 1F E0								;; Head's 1st room, id #8A40
-	54D8 DEFB 0B 61 59 38 14 0E 2D B3 FA 7F C7 F8												;; Head's 3rd room, id #6150
+	54AD DEFB 19 89 41 78 40 02 1D 38 E0 10 0F 82 47 C1 A3 83 68 3E 1E 8E C7 43 91 FF 1F E0			;; Heels' 1st room, id #8940
+	54C7 DEFB 10 8A 43 F8 01 02 01 3E E0 58 62 33 1A 8D FF 1F E0									;; Head's 1st room, id #8A40
+	54D8 DEFB 0B 61 59 38 14 0E 2D B3 FA 7F C7 F8													;; Head's 3rd room, id #6150
 	54E4 DEFB 0E 64 51 78 10 0E 2D 3B E2 F3 DE 09 3F FF E0
-	54F3 DEFB 09 71 53 40 00 22 01 3E FF E0														;; Head's 2nd room, id #7150
+	54F3 DEFB 09 71 53 40 00 22 01 3E FF E0															;; Head's 2nd room, id #7150
 	54FD DEFB 11 74 54 80 04 3C 03 A3 E9 FF C0 B6 CF F7 C3 FF 8F F0
 	550F DEFB 0F 84 54 80 80 1C 2F 13 E2 DA 5F 1F 0F FE 3F C0
 	551F DEFB 06 85 5E 00 09 03 FE
@@ -15475,7 +15511,7 @@ Room_list1: ;; 230 rooms
 	5746 DEFB 1A 14 70 80 80 0C 17 39 F8 79 7C 3C 7E 20 7C 4E 47 C5 21 D8 27 75 79 BC 5F C7 F8
 	5761 DEFB 0B 15 74 00 15 22 15 02 E2 B1 CF FE
 	576D DEFB 0B 25 72 40 00 22 19 31 E0 93 91 FE
-	5779 DEFB 15 98 70 C8 48 0A 1D 3F E2 FB FC 06 FC 0B 60 79 1F 7F F7 FC 7F 80
+	5779 DEFB 15 98 70 C8 48 0A 1D 3F E2 FB FC 06 FC 0B 60 79 1F 7F F7 FC 7F 80						;; Market Reunion room id #9870
 	578F DEFB 06 99 7E 48 01 0B FE
 	5796 DEFB 09 A8 7E 08 14 2A 17 09 FF E0
 	57A0 DEFB 14 B8 70 48 10 3C 27 38 F8 49 7C 2B 78 B6 F3 FB C2 E1 FF C7 F8
@@ -15525,7 +15561,7 @@ Room_list1: ;; 230 rooms
 	5A6D DEFB 12 20 BD DB 00 26 23 20 F9 9C BC C0 58 EE 69 44 BF 1F E0
 	5A80 DEFB 0C 2C B7 D3 80 0E 47 83 EE 79 3F E3 FC
 	5A8D DEFB 0B 2D B0 13 41 09 A0 07 CB 03 FF 80
-	5A99 DEFB 16 2E B1 93 01 08 49 1C 21 71 B9 A3 C4 D1 FF E8 F1 C4 77 7C 3F F8 FF
+	5A99 DEFB 16 2E B1 93 01 08 49 1C 21 71 B9 A3 C4 D1 FF E8 F1 C4 77 7C 3F F8 FF								;; Egyptus Crown room
 	5AB0 DEFB 17 DE B1 D3 00 0E 09 3D E0 59 FA F9 7D FE 05 B7 97 AC 38 3F F1 FF 1F E0
 	5AC8 DEFB 1D 03 C1 9B 00 3E 55 3E C1 53 FC 2F 09 FA 40 71 6C 7C 5E F0 79 7D 3E EF 73 B6 FD FC 7F 80
 	5AE6 DEFB 0B 0C CD 13 E0 0E 2D 9F 93 CF C7 F8
@@ -15614,9 +15650,9 @@ Room_list1: ;; 230 rooms
 	606F DEFB 08 34 04 A1 48 25 B4 37 FF
 	6078 DEFB 0D 14 09 61 19 05 B2 1F 11 98 7C E5 FF F8
 	6086 DEFB 0B 13 01 A1 41 05 B0 07 CB 03 FF 80
-	6092 DEFB 25 9A F1 B2 00 2A 37 17 DA 2E 4D 17 38 BC 87 E5 75 F3 37 F9 80 F1 5D C1 AF FE 02 B3 FB F0 2D A0 EF F5 BA FF F1 FE
+	6092 DEFB 25 9A F1 B2 00 2A 37 17 DA 2E 4D 17 38 BC 87 E5 75 F3 37 F9 80 F1 5D C1 AF FE 02 B3 FB F0 2D A0 EF F5 BA FF F1 FE		;; Safari Crown room
 	60B8 DEFB 12 8A F0 B2 FD 0A 5D 24 E2 B8 9F F8 16 CF D7 FB FB F1 FE
-	60CB DEFB 19 00 B1 9B 0C 07 A3 24 03 9C 42 88 FA D1 93 80 4B D9 26 23 F1 67 6F BF C7 F8
+	60CB DEFB 19 00 B1 9B 0C 07 A3 24 03 9C 42 88 FA D1 93 80 4B D9 26 23 F1 67 6F BF C7 F8							;; Penitentiary Crown room
 	60E5 DEFB 00
 
 Room_List2: ;; 71 more rooms
@@ -15663,7 +15699,7 @@ Room_List2: ;; 71 more rooms
 	6344 DEFB 13 FB 23 68 01 20 17 3E E2 B2 4E 0B B9 FC EE 6F 33 97 F8 FF
 	6358 DEFB 1A 97 31 E8 00 0E 0D 8F E3 FF C0 46 03 83 C2 E1 F1 38 BC 6F F8 00 CF F9 FF E3 FC
 	6373 DEFB 09 97 41 E8 08 00 09 00 FF E0
-	637D DEFB 1C A7 43 A8 00 20 05 24 E6 72 3F A8 06 11 D0 F9 7F E0 0F 03 F9 FF 80 5D 22 92 7E 3F C0
+	637D DEFB 1C A7 43 A8 00 20 05 24 E6 72 3F A8 06 11 D0 F9 7F E0 0F 03 F9 FF 80 5D 22 92 7E 3F C0			;; Book World Crown room
 	639A DEFB 06 3B 33 00 09 23 FE
 	63A1 DEFB 08 1B 3F 80 08 03 96 07 FF
 	63AA DEFB 08 39 3E 00 40 03 96 07 FF
@@ -15679,14 +15715,14 @@ Room_List2: ;; 71 more rooms
 	6484 DEFB 19 57 31 00 40 72 6D 38 C3 12 3A 17 A3 5C 7F C0 B6 11 86 E3 71 C8 F4 7F F1 FE
 	649E DEFB 09 47 34 40 08 22 7B 1B FF E0
 	64A8 DEFB 14 3A 31 80 DB 82 03 00 58 82 31 6D 3F 7F BF 9E F3 D9 F7 E3 FC
-	64BD DEFB 1D 8E 35 F9 00 86 76 8D E5 7A 5E 77 AD FE FF AE FC 1D 23 71 5C 97 1D CB 77 AD EF 3F 1F E0
+	64BD DEFB 1D 8E 35 F9 00 86 76 8D E5 7A 5E 77 AD FE FF AE FC 1D 23 71 5C 97 1D CB 77 AD EF 3F 1F E0			;; far corner of the victory room (can never go in!, but is counted in the 301 anyway since we see it)
 	64DB DEFB 19 5A 38 40 0B 22 17 30 E2 32 2E 2D A0 8C 4F C0 76 CB D5 E3 ED F4 B9 5F F1 FE
-	64F5 DEFB 2B 8D 31 F9 20 06 2B 10 E7 55 8C 77 58 F9 8F FD B0 FE D8 FC 5B 1F D7 EB E7 FF FF EF F8 3C C8 E4 72 39 1C 8E 47 7E 09 32 19 1D F8 FF
+	64F5 DEFB 2B 8D 31 F9 20 06 2B 10 E7 55 8C 77 58 F9 8F FD B0 FE D8 FC 5B 1F D7 EB E7 FF FF EF F8 3C C8 E4 72 39 1C 8E 47 7E 09 32 19 1D F8 FF	;; Victory Room!
 	6521 DEFB 1B 59 3B 80 41 02 35 14 82 B1 BF 80 44 C1 E3 85 EA FA 87 F0 05 94 4E 25 1B 93 F1 FE
 	653D DEFB 10 79 34 00 08 22 6F 64 F9 00 70 ED 57 B7 FE 3F C0
 	654E DEFB 0D 69 21 80 00 0E 2D 07 E2 F0 6F 88 2F FF
 	655C DEFB 12 6A 38 80 C1 62 23 AF F8 7F C0 B6 7E CF 6F DB FF C7 F8
-	656F DEFB 1A 37 31 80 0C 02 23 1B E7 D1 EC 1D 8F E7 7B FD DD EF 36 9F 2D 97 CF D7 F7 E3 FC
+	656F DEFB 1A 37 31 80 0C 02 23 1B E7 D1 EC 1D 8F E7 7B FD DD EF 36 9F 2D 97 CF D7 F7 E3 FC					;; Emperor Crown room
 	658A DEFB 22 6B 39 00 83 0D 98 8F 1E C8 54 74 9D 4E 97 FC 07 6D E6 D7 5B F8 16 D8 F6 24 11 FF 3F CE E6 F3 DF 8F F0
 	65AD DEFB 08 CC 2C 28 C1 01 9C 17 FF
 	65B6 DEFB 19 89 31 C0 E0 22 23 3E C2 73 88 57 3E E2 D3 8B 88 1F 14 C8 FA 7D 9D 4F F8 FF
