@@ -26,7 +26,7 @@ Note : The files are intended to be view with a Tabs size of 4 defined in your "
 -------------------------------------------------------
 Other files:
 * DSK/HEADOVER.dsk : The WinApe compatible DSK file (Amstrad CPC disk image)
-* scripts/hoh_rooms.py : Python3 script that decompacts the Rooms data to visualize the data we get. Result log file scripts/hoh_rooms.out.txt
+* scripts/hoh_rooms.py : Python3 script that decompacts the Rooms data to visualize the data we get. It'll print a map for every room. Result log file scripts/hoh_rooms.out.txt
 * scripts/sounds.py : Python3 script that decompacts the Music/Sounds data. Result log file scripts/sounds.out.txt
 * scripts/txt2asm.py : Python3 script that converts the text file "fileinfo_II.txt" into a compilable z80 asm file (Maxam/WinApe compatible).
 
