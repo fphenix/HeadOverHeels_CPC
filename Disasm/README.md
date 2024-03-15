@@ -9,7 +9,7 @@ The loader is described in fileinfo.txt (TODO: must be re-written.)
 
 fileinfo_II.txt (main repo file!!)
 ===============
-THe main game is described in fileinfo_II.txt (TODO: work in progress). 
+The main game is described in fileinfo_II.txt (TODO: work in progress). 
 This is the main file for this repo!
 
 Note: SHould be seen with Tabs-size = 4.
