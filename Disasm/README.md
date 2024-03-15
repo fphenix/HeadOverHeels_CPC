@@ -12,4 +12,4 @@ fileinfo_II.txt (main repo file!!)
 The main game is described in fileinfo_II.txt (TODO: work in progress). 
 This is the main file for this repo!
 
-Note: SHould be seen with Tabs-size = 4.
+Note: Should be seen with Tabs-size = 4.
