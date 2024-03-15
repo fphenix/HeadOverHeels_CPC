@@ -14,7 +14,8 @@
 ;; which is very similar). I inserted in here most of his findings to mines.
 ;; -----------------------------------------------------------------------------------------------------------
 
-						org 	&0100
+org 	&0100
+run	Entry
 
 Stack:
 Entry:
