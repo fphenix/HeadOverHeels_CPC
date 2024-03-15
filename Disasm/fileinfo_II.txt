@@ -14,8 +14,8 @@
 ;; which is very similar). I inserted in here most of his findings to mines.
 ;; -----------------------------------------------------------------------------------------------------------
 
-org 	&0100
-run	Entry
+						org		&0100
+						run		Entry
 
 Stack:
 Entry:
@@ -537,7 +537,7 @@ sscf_sk2
 ;; Output: Z is set if they are in the same room
 .Do_We_Share_Room:															;; Z set if a shared room
 	035F 2A 0E 01       LD 		HL,(current_Room_ID)						;; get current_Room_ID
-	0362 ED 5B 10 BB    LD 		DE,(Other_Character_state)					;; at this point, the first word is room ID
+	0362 ED 5B 10 BB    LD 		DE,(Other_Character_state + MOVE_OFFSET)	;; at this point, the first word is room ID
 	0366 A7             AND 	A											;; reset flags, especially the Carry
 	0367 ED 52          SBC 	HL,DE										;; compare room IDs,
 	0369 C9             RET													;; Z set if in same room
@@ -599,7 +599,7 @@ sscf_sk2
 	0393 CD E7 03       CALL 	Get_other_character_var_HL					;; HL = pointer on NOT selected character's variables
 	0396 22 C3 03       LD 		(arg_copy_character_variables),HL			;; self modifying code : Heels_variables or Head_variables
 	0399 A7             AND 	A											;; test A
-	039A 21 10 BB       LD 		HL,Other_Character_state
+	039A 21 10 BB       LD 		HL,Other_Character_state + MOVE_OFFSET
 	039D 20 01          JR 		NZ,copy_array_direction						;; exchange DE and HL (A=0) ot not (A=-1)
 	039F EB             EX 		DE,HL										;; if A=0 ("Save Mode") : DE<-->HL
 copy_array_direction:
@@ -615,15 +615,18 @@ copy_array_direction:
 	03B4 92 24			DEFW 	&2492										;; Argument 2: ???? (2492)
 	03B6 CD F4 03       CALL 	Copy_Data
 	03B9 F0 03			DEFW 	&03F0										;; Argument 1: length ObjectsLen (&03F0)
-	03BB 40 6A			DEFW 	&6A40										;; Argument 2: Objects (6A40)
+	03BB 40 6A			DEFW 	Objects										;; Argument 2: Objects (6A40)
 	03BD C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Runs Copy_Data on a character object.
 .Sub_Copy_Character_data:
 	03BE CD F4 03       CALL 	Copy_Data									;; call Copy_Data
+
+OBJECT_LENGTH			EQU		&0012
+
 arg_copy_character_size:
-	03C1 12 00 			DEFW 	&0012										;; Argument 1: length of the array &12 (18) bytes
+	03C1 12 00 			DEFW 	OBJECT_LENGTH								;; Argument 1: length of the array &12 (18) bytes
 arg_copy_character_variables:
 	03C3 B0 24			DEFW 	Heels_variables								;; Argument 2: self modifying code, word at &03C3 is updated at line &0396, can be &24B0 (Heels_variables) or 24C2 (Head_variables)
 	03C5 C9             RET
@@ -638,7 +641,7 @@ arg_copy_character_variables:
 	03C6 D5             PUSH 	DE
 	03C7 CD 3B 2B       CALL 	Get_curr_Char_variables						;; HL = pointer on current selected character's variables
 	03CA EB             EX 		DE,HL										;; swap DE (now dest variables array) and HL (now source)
-	03CB 01 12 00       LD 		BC,&0012									;; length of the array &12 = 18 bytes
+	03CB 01 12 00       LD 		BC,OBJECT_LENGTH							;; length of the array &12 = 18 bytes
 	03CE C5             PUSH 	BC
 	03CF ED B0          LDIR												;; repeat LD (DE),(HL); DE++, HL++, BC-- until BC=0
 	03D1 CD E7 03       CALL 	Get_other_character_var_HL					;; HL = pointer on NOT selected character's variables
@@ -700,7 +703,7 @@ smc_copy_func:
 	0421 2B             DEC 	HL											;; note "DEC ss" (ss being a double reg) does NOT impact flags
 	0422 77             LD 		(HL),A										;; (HL) = temp
 	0423 23             INC 	HL											;; note "INC ss" (ss being a double reg) does NOT impact flags
-	0424 EA 1E 04       JP 		PO,Swap_DE_and_HL_cont_xBC					;; loop until BC reaches 0 (the OVerflow flag bit comes from LDI, because the DEC ss, LD and INC ss did not change the flags)
+	0424 EA 1E 04       JP 		PE,Swap_DE_and_HL_cont_xBC					;; loop until BC reaches 0 (the OVerflow flag bit comes from LDI, because the DEC ss, LD and INC ss did not change the flags)
 	0427 C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -766,6 +769,8 @@ Sub_Do_Objects_entry:
 	0460 3D             DEC 	A											;; else return A-1 (note only "3" is the other case, so it returns 2)
 	0461 C9             RET
 
+MOVE_OFFSET				EQU		&B897 - &ADBF								;; #0AD8 is the offset between the pre-init block from 6600 that is moved at 70D8 (see move_loaded_data_section)
+
 ;; -----------------------------------------------------------------------------------------------------------CPC
 ;; This will 1) Move a big block of loaded data 2) initialize some
 ;; Tables 3) set the interrupts/RST and 4) initialize the CRT (mode, colors, etc.).
@@ -773,7 +778,7 @@ Sub_Do_Objects_entry:
 	0462 F3             DI													;; Disable Interrupts
 move_loaded_data_section:
 	0463 11 97 B8       LD 		DE,&B897									;; destination of the last byte of the destination array
-	0466 21 BF AD       LD 		HL,&ADBF									;; Move block from 6600-ADBF to 70D8-B897
+	0466 21 BF AD       LD 		HL,&ADBF									;; Move block from 6600-ADBF to 70D8-B897 (offset: MOVE_OFFSET = #0AD8)
 	0469 01 C0 47       LD 		BC,&47C0									;; length &47C0 bytes
 	046C ED B8          LDDR												;; repeats LD (DE), (HL); DE--, HL--, BC-- until BC==0
 erase_buffer_6800:
@@ -1049,7 +1054,7 @@ cc2a_0:
 	058E 6F             LD 		L,A
 	058F 26 00          LD 		H,&00
 	0591 29             ADD 	HL,HL										;; *2, char addr offset in HL
-	0592 11 30 B6       LD 		DE,Char_symbol_data							;; base addr for char data : Char_symbol_data
+	0592 11 30 B6       LD 		DE,Char_symbol_data	+ MOVE_OFFSET			;; base addr for char data : Char_symbol_data; the MOVE_OFFSET is to get the addr after the 6600 block move at init
 	0595 19             ADD		HL,DE										;; base+offset
 	0596 EB             EX 		DE,HL                						;; put the addr of the character symbol in DE
 	0597 C9             RET
@@ -1130,12 +1135,12 @@ smc_BlitYOffset_value:
 ;; THis table will return the pointer address for the blit routine to
 ;; be used, with index = N-1; N being the byte width of the sprite.
 .Sub_routines_table:
-	05D9 E5 05 			DEFW 	&05E5      			;; address of blit_sub_subroutine_1 (05E5)
-	05DB 1E 06 			DEFW 	&061E      			;; address of blit_sub_subroutine_2 (061E)
-	05DD 69 06 			DEFW 	&0669 				;; address of blit_sub_subroutine_3 (0669)
-	05DF C6 06 			DEFW 	&06C6 				;; address of blit_sub_subroutine_4 (06C6)
-	05E1 35 07 			DEFW 	&0735 				;; address of blit_sub_subroutine_5 (0735)
-	05E3 B6 07 			DEFW 	&07B6 				;; address of blit_sub_subroutine_6 (07B6)
+	05D9 E5 05 			DEFW 	blit_sub_subroutine_1      			;; address of blit_sub_subroutine_1 (05E5)
+	05DB 1E 06 			DEFW 	blit_sub_subroutine_2      			;; address of blit_sub_subroutine_2 (061E)
+	05DD 69 06 			DEFW 	blit_sub_subroutine_3 				;; address of blit_sub_subroutine_3 (0669)
+	05DF C6 06 			DEFW 	blit_sub_subroutine_4 				;; address of blit_sub_subroutine_4 (06C6)
+	05E1 35 07 			DEFW 	blit_sub_subroutine_5 				;; address of blit_sub_subroutine_5 (0735)
+	05E3 B6 07 			DEFW 	blit_sub_subroutine_6 				;; address of blit_sub_subroutine_6 (07B6)
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; All these (6 functions) provide Sprite Bliting functions.
@@ -1980,7 +1985,7 @@ Print_StringID_Wipe_Salute		EQU		&CA
 	097A				DEFB 	&38, &37, &55, &59, &48, &4A, &4E, &EE		;; (line 5) "8", "7", "U", "Y", "H", "J", "N", "SPACE"
 	0982				DEFB 	&36, &35, &52, &54, &47, &46, &42, &56		;; (line 6) "6", "5", "R", "T", "G", "F", "B", "V"
 	098A				DEFB 	&34, &33, &45, &57, &53, &44, &43, &58		;; (line 7) "4", "3", "E", "W", "S", "D", "C", "X"
-	0992				DEFB 	&31, &32, &E2, &51, &E2, &41, &E1, &5A		;; (line 8) "1", "2", ESC, "Q", TAB, "A", LOCK, "Z"
+	0992				DEFB 	&31, &32, &E2, &51, &E3, &41, &E1, &5A		;; (line 8) "1", "2", ESC, "Q", TAB, "A", LOCK, "Z"
 	099A				DEFB 	&EA, &EB, &ED, &EC, &E9, &E9, &58, &E4		;; (line 9) JOYU, JOYD, JOYL, JOYR, JOYF, JOYF, (unused), DEL
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -3449,14 +3454,14 @@ Sound_ID_Teleport_Down		EQU 	&C8 		;; Teleport down
 ;; This array return the pointers on the 3 channels data per HQ Sound ID Cx
 .Sound_High_table:																;; Sound_group_3 ID 0xCx
 	1111 4A 13 4A 13 4A 13 	DEFW 	Voice_data_Silence, Voice_data_Silence, Voice_data_Silence		;; Sound ID&C0 Silence		 134A 134A 134A
-	1117 BE 13 D2 13 E7 13 	DEFW 	Voice_data_C1_V0, Voice_data_C1_V1, Voice_data_C1_V2			;; Sound ID&C1 "Tada!"		 13BE 13D2 13E7
-	111D FC 13 18 14 34 14 	DEFW 	Voice_data_C2_V0, Voice_data_C2_V1, Voice_data_C2_V2			;; Sound ID&C2 Hornpipe	     13FC 1418 1434
-	1123 91 11 F4 11 28 12 	DEFW 	Voice_data_C3_V0, Voice_data_C3_V1, Voice_data_C3_V2			;; Sound ID&C3 HoH theme	 1191 11F4 1228
-	1129 34 12 3C 12 44 12 	DEFW 	Voice_data_C4_V0, Voice_data_C4_V1, Voice_data_C4_V2			;; Sound ID&C4 "Nope!"	     1234 123C 1244
-	112F 42 14 55 14 66 14 	DEFW 	Voice_data_C5_V0, Voice_data_C5_V1, Voice_data_C5_V2			;; Sound ID&C5 Dum-diddy-dum 1442 1455 1466
-	1135 88 11 7B 11 69 11 	DEFW 	Voice_data_C6_V0, Voice_data_C6_V1, Voice_data_C6_V2			;; Sound ID&C6 Death	     1188 117B 1169
-	113B 47 11 51 11 5E 11 	DEFW 	Voice_data_C7_V0, Voice_data_C7_V1, Voice_data_C7_V2			;; Sound ID&C7 Teleport up	 1147 1151 115E
-	1141 77 14 81 14 8E 14 	DEFW 	Voice_data_C8_V0, Voice_data_C8_V1, Voice_data_C8_V2			;; Sound ID&C8 Teleport down 1477 1481 148E
+	1117 BE 13 D2 13 E7 13 	DEFW 	Voice_data_C1_V0,	Voice_data_C1_V1, 	Voice_data_C1_V2		;; Sound ID&C1 "Tada!"		 13BE 13D2 13E7
+	111D FC 13 18 14 34 14 	DEFW 	Voice_data_C2_V0,	Voice_data_C2_V1, 	Voice_data_C2_V2		;; Sound ID&C2 Hornpipe	     13FC 1418 1434
+	1123 91 11 F4 11 28 12 	DEFW 	Voice_data_C3_V0,	Voice_data_C3_V1, 	Voice_data_C3_V2		;; Sound ID&C3 HoH theme	 1191 11F4 1228
+	1129 34 12 3C 12 44 12 	DEFW 	Voice_data_C4_V0,	Voice_data_C4_V1, 	Voice_data_C4_V2		;; Sound ID&C4 "Nope!"	     1234 123C 1244
+	112F 42 14 55 14 66 14 	DEFW 	Voice_data_C5_V0,	Voice_data_C5_V1, 	Voice_data_C5_V2		;; Sound ID&C5 Dum-diddy-dum 1442 1455 1466
+	1135 88 11 7B 11 69 11 	DEFW 	Voice_data_C6_V0,	Voice_data_C6_V1, 	Voice_data_C6_V2		;; Sound ID&C6 Death	     1188 117B 1169
+	113B 47 11 51 11 5E 11 	DEFW 	Voice_data_C7_V0,	Voice_data_C7_V1, 	Voice_data_C7_V2		;; Sound ID&C7 Teleport up	 1147 1151 115E
+	1141 77 14 81 14 8E 14 	DEFW 	Voice_data_C8_V0,	Voice_data_C8_V1, 	Voice_data_C8_V2		;; Sound ID&C8 Teleport down 1477 1481 148E
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Sound/Music Data for HQ music ID (C7, C6, C3, C4, 3 voices V0 to V2).
@@ -4262,7 +4267,7 @@ Sound_ID_Teleport_Down		EQU 	&C8 		;; Teleport down
 	16FB 32 ED 16       LD 		(PillarHeight),A							;; PillarHeight
 .DrawPillarBuf:
 	16FE F5             PUSH 	AF											;; preserve A
-	16FF 21 98 B8       LD 		HL,PillarBuf
+	16FF 21 98 B8       LD 		HL,PillarBuf + MOVE_OFFSET
 	1702 01 28 01       LD 		BC,&0128									;; Erase from &B898 length &0128 (296) bytes
 	1705 CD 67 24       CALL 	Erase_forward_Block_RAM
 	1708 AF             XOR 	A
@@ -4273,19 +4278,19 @@ Sound_ID_Teleport_Down		EQU 	&C8 		;; Teleport down
 	1711 A7             AND 	A											;; test
 	1712 C8             RET 	Z											;; if 0 (height of 0) RET Z set, else:
 	;; Otherwise, draw in reverse from end of buffer PillarBuf...
-	1713 11 BF B9       LD 		DE,PillarBuf+296-1							;; PillarBuf + PillarBufLen - 1 (B9A0 to B9BF)
-	1716 21 97 B8       LD 		HL,image_pillar_btm+32-1					;; image_pillar_btm + 4 * 4 - 1 (last byte of image_pillar_btm) (B878 to B897)
+	1713 11 BF B9       LD 		DE,PillarBuf+296 - 1 + MOVE_OFFSET			;; PillarBuf + PillarBufLen - 1 (B9A0 to B9BF)
+	1716 21 97 B8       LD 		HL,image_pillar_btm+32 - 1 + MOVE_OFFSET	;; image_pillar_btm + 4 * 4 - 1 (last byte of image_pillar_btm) (B878 to B897)
 	1719 01 20 00       LD 		BC,&0020									;; length in bytes : 32 = 4 * 4 * 2
 	171C ED B8          LDDR												;; Copy Pillar Bottom in pillar buffer
 drawPillarLoop:
 	171E D6 06          SUB 	6											;; add as many 6-row tall mid pillars as needed
 	1720 28 0A          JR 		Z,drawPillarTop
-	1722 21 77 B8       LD 		HL,img_pillar_mid+48-1						;; img_pillar_mid + 4 * 6 - 1 (last byte of img_pillar_mid) (B848 to B877)
+	1722 21 77 B8       LD 		HL,img_pillar_mid+48 - 1 + MOVE_OFFSET		;; img_pillar_mid + 4 * 6 - 1 (last byte of img_pillar_mid) (B848 to B877)
 	1725 01 30 00       LD 		BC,&0030									;; length in bytes : 48 = 4 * 6 * 2
 	1728 ED B8          LDDR												;; Copy Pillar Mid in pillar buffer
 	172A 18 F2          JR 		drawPillarLoop								;; until desired height is reached
 drawPillarTop:
-	172C 21 47 B8       LD 		HL,img_pillar_top+72-1						;; img_pillar_top + 4 * 9 - 1 (last byte of img_pillar_top) (B800 to B847)
+	172C 21 47 B8       LD 		HL,img_pillar_top+72 - 1 + MOVE_OFFSET		;; img_pillar_top + 4 * 9 - 1 (last byte of img_pillar_top) (B800 to B847)
 	172F 01 48 00       LD 		BC,&0048									;; length in bytes : 72 = 4 * 9 * 2
 	1732 ED B8          LDDR												;; Copy Pillar Top in pillar buffer
 	1734 C9             RET
@@ -4743,7 +4748,7 @@ hasPillarUnderDoor:
 .GetEmptyPillarBuf:
 	1942 3A 41 19       LD 		A,(hasPillarUnderDoor)						;; do we have pillar under the door?
 	1945 A7             AND 	A											;; test
-	1946 21 98 B8       LD 		HL,PillarBuf								;; HL = &B898 = PillarBuf
+	1946 21 98 B8       LD 		HL,PillarBuf + MOVE_OFFSET					;; HL = &B898 = PillarBuf
 	1949 C8             RET 	Z											;; leave if pillar buffer empty, else:
 	194A E5             PUSH 	HL
 	194B C5             PUSH 	BC
@@ -4770,7 +4775,7 @@ hasPillarUnderDoor:
 	1967 3A C0 1A       LD 		A,(IsPillarBufFlipped)						;; needs to be flipped? in bit7
 	196A AD             XOR 	L											;; match with pillar id bit7 (result bit7 = 0 means pillar id bit7 and IsPillarBufFlipped bit7 identical, result bit7 = 1, different)
 	196B 17             RLA													;; get result bit7 in Carry
-	196C 21 98 B8       LD 		HL,PillarBuf								;; HL = B898 PillarBuf
+	196C 21 98 B8       LD 		HL,PillarBuf + MOVE_OFFSET					;; HL = B898 PillarBuf
 	196F D0             RET 	NC						 					;; Return PillarBuf if no flip required...
 	1970 3A C0 1A       LD 		A,(IsPillarBufFlipped)						;; Otherwise...
 	1973 EE 80          XOR 	%10000000									;; flip IsPillarBufFlipped bit7.
@@ -4888,7 +4893,7 @@ clr2_1:
 	19DC 6F             LD 		L,A
 	19DD 26 00          LD 		H,0											;; HL=index*24
 	19DF 29             ADD 	HL,HL										;; *48 = &30 (floor tile size in bytes)
-	19E0 11 B0 B4       LD 		DE,floor_tile_pattern0						;; IMG_2x24 ; The floor tile images. Base addr for floor tile patterns is floor_tile_pattern0
+	19E0 11 B0 B4       LD 		DE,floor_tile_pattern0 + MOVE_OFFSET		;; IMG_2x24 ; The floor tile images. Base addr for floor tile patterns is floor_tile_pattern0; the move offset is to get the addr after the init 6600 block move
 	19E3 19             ADD 	HL,DE										;; base+tile_data_offset ; Add to floor tile base to get the pointer on the tile data we want.
 	19E4 22 E8 19       LD 		(FloorAddr),HL								;; store the addr in FloorAddr
 	19E7 C9             RET
@@ -4897,7 +4902,7 @@ clr2_1:
 ;; Address of the sprite data used to draw the floor.
 ;; This is updated by SetFloorAddr.
 .FloorAddr:     															;; IMG_2x24 + 2 * &30
-	19E8 E0 B4 			DEFW 	&B4E0             							;; default = floor_tile_pattern1
+	19E8 E0 B4 			DEFW 	floor_tile_pattern1 + MOVE_OFFSET			;; default = floor_tile_pattern1 + MOVE_OFFSET
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; HL' points to the floor sprite id.
@@ -4925,7 +4930,7 @@ clr2_1:
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Use the empty floor tile (no floor)
 .Blank_Tile:
-	19FF 01 00 B6       LD 		BC,floor_tile_pattern7						;; IMG_2x24 + 7 * &30
+	19FF 01 00 B6       LD 		BC,floor_tile_pattern7 + MOVE_OFFSET		;; IMG_2x24 + 7 * &30
 	1A02 F1             POP 	AF
 	1A03 C9             RET													;; Return the blank tile
 
@@ -5153,7 +5158,7 @@ smc_dest_addr2:
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Top bit is set if the column image buffer is flipped
 IsPillarBufFlipped:
-	1AC0 DEFB &00
+	1AC0 00				DEFB 	&00
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Return the wall panel address in HL, given panel index in A.
@@ -5240,13 +5245,13 @@ smc_btrot_2:
 ;; -----------------------------------------------------------------------------------------------------------
 ;; pointers on the BlitRot* function to use
 BlitRot3s:
-	1B1C 2A 1B			DEFW 	&1B2A 						;; BlitRot2on3 1B2A
-	1B1E E0 1B 			DEFW 	&1BE0 						;; BlitRot4on3 1BE0
-	1B20 85 1B 			DEFW 	&1B85 						;; BlitRot6on3 1B85
+	1B1C 2A 1B			DEFW 	BlitRot2on3					;; BlitRot2on3 1B2A
+	1B1E E0 1B 			DEFW 	BlitRot4on3					;; BlitRot4on3 1BE0
+	1B20 85 1B 			DEFW 	BlitRot6on3					;; BlitRot6on3 1B85
 BlitRot4s:
-	1B22 03 1C 			DEFW 	&1C03 						;; BlitRot2on4 1C03
-	1B24 71 1C 			DEFW 	&1C71 						;; BlitRot4on4 1C71
-	1B26 3A 1C 			DEFW 	&1C3A 						;; BlitRot6on4 1C3A
+	1B22 03 1C 			DEFW 	BlitRot2on4					;; BlitRot2on4 1C03
+	1B24 71 1C 			DEFW 	BlitRot4on4					;; BlitRot4on4 1C71
+	1B26 3A 1C 			DEFW 	BlitRot6on4					;; BlitRot6on4 1C3A
 
 ;; -----------------------------------------------------------------------------------------------------------
 Save_Stack_ptr:
@@ -5855,24 +5860,24 @@ btobj_1:
 
 ;; -----------------------------------------------------------------------------------------------------------
 .BlitMaskFns:
-	1DE5 EB 1D			DEFW 	&1DEB					;; BlitMasksOf1 1DEB
-	1DE7 F1 1D			DEFW 	&1DF1					;; BlitMasksOf2 1DF1
-	1DE9 F9 1D			DEFW 	&1DF9					;; BlitMasksOf3 1DF9
+	1DE5 EB 1D			DEFW 	BlitMasksOf1				;; BlitMasksOf1 1DEB
+	1DE7 F1 1D			DEFW 	BlitMasksOf2				;; BlitMasksOf2 1DF1
+	1DE9 F9 1D			DEFW 	BlitMasksOf3				;; BlitMasksOf3 1DF9
 .BlitMasksOf1:
-	1DEB 9A 14			DEFW 	&149A					;; BlitMask1of3 149A
-	1DED B5 14			DEFW 	&14B5					;; BlitMask2of3 14B5
-	1DEF DD 14			DEFW 	&14DD					;; BlitMask3of3 14DD
+	1DEB 9A 14			DEFW 	BlitMask1of3				;; BlitMask1of3 149A
+	1DED B5 14			DEFW 	BlitMask2of3				;; BlitMask2of3 14B5
+	1DEF DD 14			DEFW 	BlitMask3of3				;; BlitMask3of3 14DD
 .BlitMasksOf2:
-	1DF1 12	15			DEFW 	&1512					;; BlitMask1of4 1512
-	1DF3 2F	15			DEFW 	&152F					;; BlitMask2of4 152F
-	1DF5 59	15			DEFW 	&1559					;; BlitMask3of4 1559
-	1DF7 90	15			DEFW 	&1590					;; BlitMask4of4 1590
+	1DF1 12	15			DEFW 	BlitMask1of4				;; BlitMask1of4 1512
+	1DF3 2F	15			DEFW 	BlitMask2of4				;; BlitMask2of4 152F
+	1DF5 59	15			DEFW 	BlitMask3of4				;; BlitMask3of4 1559
+	1DF7 90	15			DEFW 	BlitMask4of4				;; BlitMask4of4 1590
 .BlitMasksOf3:
-	1DF9 D3 15  		DEFW 	&15D3					;; BlitMask1of5 15D3
-	1DFB F2 15  		DEFW 	&15F2					;; BlitMask2of5 15F2
-	1DFD 1E 16  		DEFW 	&161E					;; BlitMask3of5 161E
-	1DFF 57 16  		DEFW 	&1657					;; BlitMask4of5 1657
-	1E01 9C 16  		DEFW 	&169C					;; BlitMask5of5 169C
+	1DF9 D3 15  		DEFW 	BlitMask1of5				;; BlitMask1of5 15D3
+	1DFB F2 15  		DEFW 	BlitMask2of5				;; BlitMask2of5 15F2
+	1DFD 1E 16  		DEFW 	BlitMask3of5				;; BlitMask3of5 161E
+	1DFF 57 16  		DEFW 	BlitMask4of5				;; BlitMask4of5 1657
+	1E01 9C 16  		DEFW 	BlitMask5of5				;; BlitMask5of5 169C
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Given an object, calculate the intersections with
@@ -6033,7 +6038,7 @@ gsobjext_2:
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Pointer into stack for current origin coordinates
 .DecodeOrgPtr:
-	1E88 8A 1E 			DEFW 	&1E8A 							;; DecodeOrgStack pointer (1E8A)
+	1E88 8A 1E 			DEFW 	DecodeOrgStack	 							;; DecodeOrgStack pointer (1E8A)
 
 ;; Each stack entry contains UVZ coordinates
 .DecodeOrgStack:
@@ -6042,7 +6047,7 @@ gsobjext_2:
 	1E90 00 00 00		DEFB 	&00, &00, &00
 	1E93 00 00 00		DEFB 	&00, &00, &00
 
-BaseFlags:														;; object flags when builing a room
+BaseFlags:																	;; object flags when builing a room
 	1E96 00 			DEFB 	&00
 	1E97 00				DEFB 	&00
 
@@ -6242,7 +6247,7 @@ GROUND_LEVEL			EQU 	&C0
 	1F09 22 9A 1C       LD 		(ViewYExtent),HL
 	1F0C 21 C0 C0       LD 		HL,GROUND_LEVEL * 256 + GROUND_LEVEL		;; reset values for doors height; &C0 is GROUND_LEVEL
 	1F0F 22 F2 1E       LD 		(DoorHeightsTmp),HL							;; nw ne doors; init value
-	1F12 22 F4 1E       LD 		(DoorHeightsTmp+1),HL						;; se sw doors; init value
+	1F12 22 F4 1E       LD 		(DoorHeightsTmp+2),HL						;; se sw doors; init value
 	1F15 21 00 00       LD 		HL,&0000									;; UV origin (0,0) for ReadRoom
 	1F18 ED 4B 0E 01    LD 		BC,(current_Room_ID)						;; get current_Room_ID in BC
 	1F1C CD B8 1F       CALL 	ReadRoom									;; read room data
@@ -6515,7 +6520,7 @@ pent_one_obj:
 ;; If SkipObj is zero, do an "AddObject"; else skip AddObject
 .AddObjOpt:
 	20CC 21 98 1E       LD 		HL,TmpObj_variables							;; point on tmp Object array
-	20CF 01 12 00       LD 		BC,&0012									;; length &12 bytes
+	20CF 01 12 00       LD 		BC,OBJECT_LENGTH							;; length &12 bytes
 	20D2 FD E5          PUSH 	IY
 	20D4 3A BD 1E       LD 		A,(SkipObj)									;; if SkipObj...
 	20D7 A7             AND 	A											;; ...test SkipObj...
@@ -7036,7 +7041,7 @@ dcwll_2:
 .InitOtherChar:
 	2322 32 84 24       LD 		(selected_characters),A						;; update selected_characters with value in A
 	2325 F5             PUSH 	AF
-	2326 32 10 BB       LD 		(Other_Character_state),A
+	2326 32 10 BB       LD 		(Other_Character_state + MOVE_OFFSET),A
 	2329 CD 9E 23       CALL 	EnterRoom									;; enter first room
 	232C AF             XOR 	A											;; A=0
 	232D 32 87 24       LD 		(Teleport_down_anim_length),A				;; Init Teleport anim
@@ -7115,7 +7120,7 @@ br_238C
 	23A8 3A 84 24       LD 		A,(selected_characters)						;; get selected_characters
 	23AB FE 03          CP 		&03
 	23AD 20 0C          JR 		NZ,br_23BB
-	23AF 21 10 BB       LD 		HL,Other_Character_state
+	23AF 21 10 BB       LD 		HL,Other_Character_state + MOVE_OFFSET
 	23B2 CB C6          SET 	0,(HL)
 	23B4 CD FC 1E       CALL 	BuildRoom
 	23B7 3E 01          LD 		A,&01
@@ -7211,7 +7216,7 @@ br_240F
 	2434 D8             RET c
 ;; Scan from the right for the first drawn column
 NukeColR:
-	2435 21 3E 6A       LD HL,BackgrdBuff + 31*2							;; BackgrdBuff + 31*2
+	2435 21 3E 6A       LD HL,BackgrdBuff + 62								;; BackgrdBuff + 31*2
 .ScanR:
 	2438 7E             LD A,(HL)
 	2439 A7             AND A
@@ -7415,7 +7420,7 @@ Sound_ID:
 Movement:
 	24AF FF				DEFB 	&FF
 
-Head_offset 			EQU 	&12
+Head_offset 			EQU 	OBJECT_LENGTH
 
 Heels_variables:											;; &12 = 18
 	24B0 00 00 			DEFW 	&0000						;;	0&1 :
@@ -7833,7 +7838,7 @@ HD_6:
 	2702 21 00 00       LD HL,&0000
 	2705 22 59 46       LD (DyingAnimFrameIndex),HL							;; reset DyingAnimFrameIndex and Dying
 HD_7:
-	2708 21 10 BB       LD HL,Other_Character_state
+	2708 21 10 BB       LD HL,Other_Character_state + MOVE_OFFSET
 	270B CB C6          SET 0,(HL)
 	270D C9             RET
 
@@ -9641,7 +9646,7 @@ br_3123
 	3242 				DEFB 	Print_Wipe_DblSize_pos, &08, &00			;; Macro ID &B0 Text_col Text_row
 	3245 				DEFB 	Print_Color_Attr_1							;; Macro ID &81
 	3246 				DEFB 	&9B             							;; Pointer on the ID &8C string ("SELECT THE KEYS")
-	3247 				DEFB 	&A3             							;; Pointer on the ID &A3
+	3247 				DEFB 	&A7             							;; Pointer on the ID &A7
 	3248 				DEFB 	Delimiter       							;; Delimiter (ID &A7)
 	3249 				DEFB 	&A3             							;; Pointer on the ID &A3
 	324A 				DEFB 	Print_SetPosition, &05, &03					;; Set_Text_Position Text_col Text_row
@@ -9843,7 +9848,7 @@ br_3123
 ;; Swap RoomId with the room at the other end of the teleport.
 .Teleport_swap_room:
 	346A ED 4B 0E 01    LD 		BC,(current_Room_ID)  						;; get current_Room_ID in BC
-	346E 21 90 34       LD 		HL,Sprite4x28								;; HL points on Teleport_data
+	346E 21 90 34       LD 		HL,Teleport_data							;; HL points on Teleport_data
 	3471 CD 79 34       CALL 	Scan_teleport_pairs							;; Scan_teleport_pairs, DE will have the destination room ID
 	3474 ED 53 0E 01    LD 		(current_Room_ID),DE						;; update current_Room_ID with teleport destination room ID
 	3478 C9             RET
@@ -9922,7 +9927,7 @@ Teleport_data:
 	34EC 32 38 35       LD (Sprite_Code),A									;; update sprite code
 	34EF CD FA 35       CALL Sprite3x56
 	34F2 EB             EX DE,HL
-	34F3 11 C0 B9       LD DE,DoorwayBuf
+	34F3 11 C0 B9       LD DE,DoorwayBuf + MOVE_OFFSET
 	34F6 D5             PUSH DE
 	34F7 01 50 01       LD BC,&0150											;; 56 * 3 * 2
 	34FA ED B0          LDIR												;; repeat LD (DE),(HL); DE++, HL++, BC-- until BC=0
@@ -10151,8 +10156,8 @@ br_35E4
 	35E6 3A ED 36       LD A,(DoorwayFlipped)
 	35E9 A9             XOR C
 	35EA 17             RLA
-	35EB 11 C0 B9       LD DE,DoorwayBuf									;; DoorwayBuf
-	35EE 21 68 BA       LD HL,DoorwayMaskBuf								;; DoorwayMaskBuf : DoorwayBuf + 56 * 3
+	35EB 11 C0 B9       LD DE,DoorwayImgBuf + MOVE_OFFSET
+	35EE 21 68 BA       LD HL,DoorwayMaskBuf + MOVE_OFFSET					;; DoorwayMaskBuf : DoorwayBuf + 56 * 3
 	35F1 D0             RET NC
 	;; And flip it if necessary.
 	35F2 79             LD A,C
@@ -10359,7 +10364,7 @@ ndflp_1:
 	36D0 E6 0F          AND &0F
 	36D2 5F             LD E,A
 	36D3 16 00          LD D,0
-	36D5 21 E0 70       LD HL,SpriteFlips_buffer							;; buffer 16 bytes to flip sprite
+	36D5 21 E0 70       LD HL,SpriteFlips_buffer + MOVE_OFFSET				;; buffer 16 bytes to flip sprite
 	36D8 19             ADD HL,DE
 	36D9 78             LD A,B
 	36DA A6             AND (HL)											;; Perform bit-mask look-up
@@ -10520,7 +10525,7 @@ initobj_2:
 	3792 CD AB 37       CALL 	Animate										;; Need to Move and Animate both stacked sprites (double height)
 	3795 08             EX 		AF,AF'										;; save flags (carry)
 	3796 FD 4E 10       LD 		C,(IY+O_DIRECTION)							;; C=facing direction (0 to 7 or FF)
-	3799 11 12 00       LD 		DE,&0012									;; points on ...
+	3799 11 12 00       LD 		DE,OBJECT_LENGTH							;; points on ...
 	379C FD E5          PUSH 	IY
 	379E FD 19          ADD 	IY,DE										;; ...next object (the 2nd object in the double stacked/height)
 	37A0 CD 9D 50       CALL 	SetFacingDir
@@ -10796,9 +10801,9 @@ ObjVars:
 	3986 1B 			DEFB 	&1B								;; length : 27 bytes
 ObjVars_reset_data:
 	3987 00 			DEFB 	&00								;; reset for idx Objects
-	3988 40 6A 			DEFW 	&6A40            				;; reset for dest Objects 6A40
-	398A A9 39 			DEFW 	&39A9             				;; reset for ALstPtr ObjectLists + 0	39A9
-	398C AB 39 			DEFW 	&39AB            				;; reset for BLstPtr ObjectLists + 2  	39AB
+	3988 40 6A 			DEFW 	Objects         				;; reset for dest Objects 6A40
+	398A A9 39 			DEFW 	ObjectLists      				;; reset for ALstPtr ObjectLists + 0	39A9
+	398C AB 39 			DEFW 	ObjectLists + 2 				;; reset for BLstPtr ObjectLists + 2  	39AB
 	398E 00 00 			DEFW 	&0000							;; reset for AList
 	3990 00 00 00 00 	DEFW 	&0000							;; reset for BList
 	3992 00 00 00 00 	DEFW 	&0000, &0000					;; reset for Next V room
@@ -10811,11 +10816,11 @@ ObjVars_reset_data:
 ObjListIdx:
 	39A2 00 			DEFB 	&00								;; list index
 Object_Destination:												;; Current pointer for where we write objects into (6A40 buffer)
-	39A3 40 6A 			DEFW 	&6A40
+	39A3 40 6A 			DEFW 	Objects
 .ObjListAPtr:													;; 'A' list item pointers are offset +2 from 'B' list pointers.
-	39A5 A9 39 			DEFW 	&39A9 							;; ObjectLists + 0 : 39A9
+	39A5 A9 39 			DEFW 	ObjectLists 					;; ObjectLists + 0 : 39A9
 .ObjListBPtr:
-	39A7 AB 39 			DEFW 	&39AB 							;; ObjectLists + 2 : 39AB
+	39A7 AB 39 			DEFW 	ObjectLists + 2					;; ObjectLists + 2 : 39AB
 ;; Each list consists of a pair of pointers to linked lists of
 ;; objects (ListA and ListB). They're opposite directions in a
 ;; doubly-linked list, and each side has a head node, it seems.
@@ -10828,7 +10833,7 @@ ObjectLists:
 	39B9 00 00 00 00 	DEFW 	&0000, &0000            		;; ObjectLists + 4*4 ; Near
 
 Saved_Object_Destination:
-	39BD 40 6A 			DEFW 	&6A40 							;; Objects : 6A40
+	39BD 40 6A 			DEFW 	Objects							;; Objects : 6A40
 
 ;; -----------------------------------------------------------------------------------------------------------
 .SortObj:
@@ -10857,7 +10862,7 @@ Saved_Object_Destination:
 .SyncDoubleObject:
     ;; Copy 5 bytes, from the pointer location onwards:
     ;; Next pointer, flags, U & V coordinates.
-	39D6 21 12 00       LD HL,&0012
+	39D6 21 12 00       LD HL,OBJECT_LENGTH
 	39D9 19             ADD HL,DE
 	39DA E5             PUSH HL
 	39DB EB             EX DE,HL
@@ -10929,7 +10934,7 @@ snkdblob_1:
 	3A25 FD CB 09 6E    BIT 5,(IY+O_SPRFLAGS)								;; single/double spitre object
 	3A29 28 0F          JR Z,addob_1
 	3A2B FD E5          PUSH IY
-	3A2D 11 12 00       LD DE,&0012											;; array size
+	3A2D 11 12 00       LD DE,OBJECT_LENGTH									;; array size
 	3A30 FD 19          ADD IY,DE
 	3A32 3A F1 36       LD A,(BottomSprite)
 	3A35 CD 4E 37       CALL SetObjSprite
@@ -11110,7 +11115,7 @@ br_3ADF
 	3AF7 E5             PUSH HL
 	3AF8 CD 00 3B       CALL UnlinkObj
 	3AFB D1             POP DE
-	3AFC 21 12 00       LD HL,&0012
+	3AFC 21 12 00       LD HL,OBJECT_LENGTH
 	3AFF 19             ADD HL,DE
 ;; Takes a 'B' pointer in HL, and removes the pointed object
 ;; from the list.
@@ -11593,9 +11598,10 @@ Walls_DoorZ:
 	3CB1 08             EX 		AF,AF'
 	3CB2 3A BF 1E       LD 		A,(WorldId)									;; which world? (for panels selection)
 	3CB5 47             LD 		B,A
-	3CB6 C6 D8          ADD 	A,PanelFlips and &00FF						;; &D8 = (PanelFlips & &FF)
+PanelFlips_after_move	EQU		PanelFlips + MOVE_OFFSET
+	3CB6 C6 D8          ADD 	A,PanelFlips_after_move and &00FF			;; &D8 = (PanelFlips & &FF)
 	3CB8 6F             LD 		L,A
-	3CB9 CE 70          ADC 	A,PanelFlips / 256							;; &70 = (PanelFlips >> 8)	; &70D8+offset
+	3CB9 CE 70          ADC 	A,PanelFlips_after_move / 256				;; &70 = (PanelFlips >> 8)	; &70D8+offset
 	3CBB 95             SUB 	L
 	3CBC 67             LD 		H,A											;; HL = PanelFlips + WorldId
 	3CBD 22 44 3C       LD 		(Walls_PanelFlipsPtr),HL					;; in Walls_PanelFlipsPtr
@@ -11774,14 +11780,14 @@ br_3D71
 ;; world. From that base value, the Panel_WorldData will add an offset
 ;; to pick the wall panel we want for each part of the wall.
 .PanelsBaseAddr:								;; panel images base addr
-	3D9A F0	70			DEFW 	&70F0 							;; img_wall_deco + &70 * 0   ; 70F0 Blacktooth	; worldID 0
-	3D9C 90	73			DEFW 	&7390 							;; img_wall_deco + &70 * 3   ; 7390 Market		; worldID 1
-	3D9E 30	76			DEFW 	&7630 							;; img_wall_deco + &70 * 6   ; 7630 Egyptus		; worldID 2
-	3DA0 F0	77			DEFW 	&77F0 							;; img_wall_deco + &70 * 8   ; 77F0 Penitentiary; worldID 3
-	3DA2 B0	79			DEFW 	&79B0 							;; img_wall_deco + &70 * 10  ; 79B0 Moon base	; worldID 4
-	3DA4 30	7D			DEFW 	&7D30 							;; img_wall_deco + &70 * 14  ; 7D30 Book world	; worldID 5
-	3DA6 F0	7E			DEFW 	&7EF0 							;; img_wall_deco + &70 * 16  ; 7EF0 Safari		; worldID 6
-	3DA8 90	81			DEFW 	&8190 							;; img_wall_deco + &70 * 19  ; 8190 Prison		; worldID 7
+	3D9A F0	70			DEFW 	img_blacktooth_walls + MOVE_OFFSET			;; img_wall_deco + &70 * 0  + MOVE_OFFSET ; 70F0 Blacktooth		; worldID 0
+	3D9C 90	73			DEFW 	img_market_walls + MOVE_OFFSET				;; img_wall_deco + &70 * 3  + MOVE_OFFSET ; 7390 Market			; worldID 1
+	3D9E 30	76			DEFW 	img_egyptus_walls + MOVE_OFFSET				;; img_wall_deco + &70 * 6  + MOVE_OFFSET ; 7630 Egyptus		; worldID 2
+	3DA0 F0	77			DEFW 	img_penitentiary_walls + MOVE_OFFSET		;; img_wall_deco + &70 * 8  + MOVE_OFFSET ; 77F0 Penitentiary	; worldID 3
+	3DA2 B0	79			DEFW 	img_moonbase_walls + MOVE_OFFSET			;; img_wall_deco + &70 * 10 + MOVE_OFFSET ; 79B0 Moon base		; worldID 4
+	3DA4 30	7D			DEFW 	img_bookworld_walls	+ MOVE_OFFSET			;; img_wall_deco + &70 * 14 + MOVE_OFFSET ; 7D30 Book world		; worldID 5
+	3DA6 F0	7E			DEFW 	img_safari_walls + MOVE_OFFSET				;; img_wall_deco + &70 * 16 + MOVE_OFFSET ; 7EF0 Safari			; worldID 6
+	3DA8 90	81			DEFW 	img_prison_walls + MOVE_OFFSET				;; img_wall_deco + &70 * 19 + MOVE_OFFSET ; 8190 Prison			; worldID 7
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Used when Wall building.
@@ -12056,20 +12062,20 @@ special_found_end_1:
 ;; For exemple when picking up the special item 'Donuts', we will
 ;; run the function at address "3FB4" : BoostDonuts.
 .SpecialFns:
-	3F89 A5 3F			DEFW 	&3FA5					;; 0 : Purse PickUp2	3FA5
-	3F8B A5 3F			DEFW 	&3FA5					;; 1 : Hooter PickUp2	3FA5
-	3F8D B4 3F			DEFW 	&3FB4					;; 2 : Donuts BoostDonuts 3FB4
-	3F8F C3 3F			DEFW 	&3FC3					;; 3 : Bunny BoostSpeed 3FC3
-	3F91 CC 3F			DEFW 	&3FCC					;; 4 : Bunny BoostSpring 3FCC
-	3F93 D8 3F			DEFW 	&3FD8					;; 5 : Bunny BoostInvuln 3FD8
-	3F95 DC 3F			DEFW 	&3FDC					;; 6 : Bunny BoostLives 3FDC
+	3F89 A5 3F			DEFW 	PickUp2					;; 0 : Purse PickUp2	3FA5
+	3F8B A5 3F			DEFW 	PickUp2					;; 1 : Hooter PickUp2	3FA5
+	3F8D B4 3F			DEFW 	BoostDonuts				;; 2 : Donuts BoostDonuts 3FB4
+	3F8F C3 3F			DEFW 	BoostSpeed				;; 3 : Bunny BoostSpeed 3FC3
+	3F91 CC 3F			DEFW 	BoostSpring				;; 4 : Bunny BoostSpring 3FCC
+	3F93 D8 3F			DEFW 	BoostInvuln				;; 5 : Bunny BoostInvuln 3FD8
+	3F95 DC 3F			DEFW 	BoostLives				;; 6 : Bunny BoostLives 3FDC
 	3F97 00 00			DEFW 	&0000					;; 7 :
-	3F99 25 40			DEFW 	&4025					;; 8 : Fish SaveContinue 4025
-	3F9B 14 40			DEFW 	&4014					;; 9 : Crown GetCrown 4014
-	3F9D 14 40			DEFW 	&4014					;; &A : Crown GetCrown 4014
-	3F9F 14 40			DEFW 	&4014					;; &B : Crown GetCrown 4014
-	3FA1 14 40			DEFW 	&4014					;; &C : Crown GetCrown 4014
-	3FA3 14 40			DEFW 	&4014					;; &D : Crown GetCrown 4014 (Emperor)
+	3F99 25 40			DEFW 	SaveContinue			;; 8 : Fish SaveContinue 4025
+	3F9B 14 40			DEFW 	GetCrown				;; 9 : Crown GetCrown 4014
+	3F9D 14 40			DEFW 	GetCrown				;; &A : Crown GetCrown 4014
+	3F9F 14 40			DEFW 	GetCrown				;; &B : Crown GetCrown 4014
+	3FA1 14 40			DEFW 	GetCrown				;; &C : Crown GetCrown 4014
+	3FA3 14 40			DEFW 	GetCrown				;; &D : Crown GetCrown 4014 (Emperor)
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Pickup Purse or Hooter, update Inventory and update HUD
@@ -12214,7 +12220,7 @@ savecont_2:
 	4061 21 31 BB       LD HL,&BB31											;; save 4 bytes in buffer
 	4064 01 04 00       LD BC,&0004
 	4067 ED B0          LDIR												;; repeat LD (DE),(HL); DE++, HL++, BC-- until BC=0
-	4069 21 10 BB       LD HL,Other_Character_state
+	4069 21 10 BB       LD HL,Other_Character_state + MOVE_OFFSET
 	406C 18 0B          JR SaveContinue_4
 .SaveContinue_3
 	406E 21 92 24       LD HL,&2492
@@ -12291,7 +12297,7 @@ br_40DD
 	40F5 0D             DEC C
 	40F6 FA 03 41       JP M,dconti_1
 	40F9 EE 03          XOR &03
-	40FB 32 10 BB       LD (Other_Character_state),A
+	40FB 32 10 BB       LD (Other_Character_state + MOVE_OFFSET),A
 	40FE E5             PUSH HL
 	40FF CD 22 23       CALL InitOtherChar
 	4102 E1             POP HL
@@ -12319,8 +12325,8 @@ dconti_1:
 	412A 3A 94 41       LD 		A,(Save_point_value)						;; Continues Save point value
 	412D 47             LD 		B,A
 	412E 04             INC 	B											;; get which save point we need to restore
-	412F 21 83 41       LD 		HL,Continue_Data - &12						;; Continue_Data (4195) - &12 (because it'll get added &12 just next)
-	4132 11 12 00       LD 		DE,&0012									;; Character obj size
+	412F 21 83 41       LD 		HL,Continue_Data - OBJECT_LENGTH			;; Continue_Data (4195) - &12 (because it'll get added &12 just next)
+	4132 11 12 00       LD 		DE,OBJECT_LENGTH							;; Character obj size
 gcdta_loop:
 	4135 19             ADD 	HL,DE										;; (Continue_Data + &12) B times
 	4136 10 FD          DJNZ 	gcdta_loop									;; loop until HL points on the data
@@ -15349,7 +15355,7 @@ sfd_1:
 	;; 50CE CD B6 ??		; call &<??0c??>b6 (UpdateObjExtents)
 
 
-org &50D0
+						org		&50D0
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; These macros are used when processing the Room_list1 and 2 data to build a room
@@ -15358,7 +15364,7 @@ Room_Macro_data: 														;; MacroID &C0 to &DB
 	;; <Length> <macroID> <Macro data N bytes>
 	;; note: the length includes the MacroID byte but not the length byte
 	50D0 DEFB &0C, &C0, &02, &CE, &77, &33, &96, &4F, &26, &92, &FE, &3F, &C0					;; Macro C0: 2*3 Gratings
-	50DD DEFB &07, &C1, &C0, &43, &E0, &01, &FF, &C0									;; Macro C1: 4*3 Gratings
+	50DD DEFB &07, &C1, &C0, &43, &E0, &01, &FF, &C0											;; Macro C1: 4*3 Gratings
 	50E5 DEFB &12, &C2, &16, &D2, &FB, &3C, &7D, &CF, &27, &FC, &0A, &69, &75, &9A, &3C, &E6, &FC, &7F, &80	;; etc.
 	50F8 DEFB &08, &C3, &16, &CA, &77, &3C, &9F, &F1, &FE
 	5101 DEFB &0B, &C4, &C3, &23, &E1, &E1, &C5, &B6, &9F, &CF, &F8, &FF
@@ -15467,8 +15473,8 @@ Room_list1: ;; 230 rooms
 	536B DEFB &0D, &4E, &0F, &21, &00, &25, &B2, &17, &DA, &17, &E5, &81, &FF, &C0
 	5379 DEFB &08, &81, &0F, &61, &40, &05, &96, &07, &FF
 	5382 DEFB &10, &82, &01, &E1, &1F, &8C, &1F, &38, &24, &9B, &85, &C4, &F2, &31, &3F, &1F, &E0
-	5393 DEFB &0D, &84, &03, &E1, &08, &05, &AF, &0F, &D7, &9B, &E5, &81, &FF, &C0												;; Room ID "840" Moon Base Teleporters to Penitentiary "B10"
-	53A1 DEFB &0B, &85, &01, &A1, &08, &05, &B0, &07, &CB, &0F, &FF, &80													;; Room ID "850" Moon Base Teleporters to Book World "EF2"
+	5393 DEFB &0D, &84, &03, &E1, &08, &05, &AF, &0F, &D7, &9B, &E5, &81, &FF, &C0									;; Room ID "840" Moon Base Teleporters to Penitentiary "B10"
+	53A1 DEFB &0B, &85, &01, &A1, &08, &05, &B0, &07, &CB, &0F, &FF, &80											;; Room ID "850" Moon Base Teleporters to Book World "EF2"
 	53AD DEFB &06, &87, &0F, &E1, &48, &05, &FE
 	53B4 DEFB &08, &88, &0F, &A1, &01, &05, &96, &07, &FF
 	53BD DEFB &06, &92, &07, &61, &48, &25, &FE
@@ -15479,8 +15485,8 @@ Room_list1: ;; 230 rooms
 	53EB DEFB &06, &97, &07, &61, &09, &25, &FE
 	53F2 DEFB &08, &A1, &0F, &61, &40, &05, &96, &07, &FF
 	53FB DEFB &0D, &A2, &00, &21, &03, &25, &86, &24, &CC, &9E, &67, &45, &FF, &C0
-	5409 DEFB &0D, &A4, &02, &61, &00, &25, &AC, &CF, &D6, &7B, &E5, &81, &FF, &C0												;; Room ID "A40" Moon Base Teleporters to Safari "00F"
-	5417 DEFB &0B, &A5, &01, &61, &00, &25, &B0, &07, &CB, &03, &FF, &80													;; Room ID "A50" Moon Base Teleporters to Egyptus "88D"
+	5409 DEFB &0D, &A4, &02, &61, &00, &25, &AC, &CF, &D6, &7B, &E5, &81, &FF, &C0									;; Room ID "A40" Moon Base Teleporters to Safari "00F"
+	5417 DEFB &0B, &A5, &01, &61, &00, &25, &B0, &07, &CB, &03, &FF, &80											;; Room ID "A50" Moon Base Teleporters to Egyptus "88D"
 	5423 DEFB &0B, &A7, &0E, &21, &C0, &24, &19, &31, &F9, &C0, &FF, &F0
 	542F DEFB &0B, &A8, &00, &61, &01, &05, &B0, &07, &CB, &03, &FF, &80
 	543B DEFB &08, &B1, &02, &5B, &08, &07, &96, &07, &FF
@@ -15489,10 +15495,10 @@ Room_list1: ;; 230 rooms
 	5479 DEFB &14, &C3, &0F, &1B, &01, &06, &43, &A6, &EF, &7F, &C1, &26, &38, &3C, &4E, &6B, &5D, &76, &D7, &F1, &FE
 	548E DEFB &1E, &D1, &0B, &DB, &00, &26, &03, &2A, &01, &F9, &2E, &8F, &B3, &FE, &08, &F2, &59, &1D, &65, &B7, &7E, &09, &35, &46, &85, &4B, &BF, &D7, &3F, &1F, &E0
 	54AD DEFB &19, &89, &41, &78, &40, &02, &1D, &38, &E0, &10, &0F, &82, &47, &C1, &A3, &83, &68, &3E, &1E, &8E, &C7, &43, &91, &FF, &1F, &E0			;; Heels' 1st room, id &8940
-	54C7 DEFB &10, &8A, &43, &F8, &01, &02, &01, &3E, &E0, &58, &62, &33, &1A, &8D, &FF, &1F, &E0									;; Head's 1st room, id &8A40
+	54C7 DEFB &10, &8A, &43, &F8, &01, &02, &01, &3E, &E0, &58, &62, &33, &1A, &8D, &FF, &1F, &E0							;; Head's 1st room, id &8A40
 	54D8 DEFB &0B, &61, &59, &38, &14, &0E, &2D, &B3, &FA, &7F, &C7, &F8													;; Head's 3rd room, id &6150
 	54E4 DEFB &0E, &64, &51, &78, &10, &0E, &2D, &3B, &E2, &F3, &DE, &09, &3F, &FF, &E0
-	54F3 DEFB &09, &71, &53, &40, &00, &22, &01, &3E, &FF, &E0															;; Head's 2nd room, id &7150
+	54F3 DEFB &09, &71, &53, &40, &00, &22, &01, &3E, &FF, &E0																;; Head's 2nd room, id &7150
 	54FD DEFB &11, &74, &54, &80, &04, &3C, &03, &A3, &E9, &FF, &C0, &B6, &CF, &F7, &C3, &FF, &8F, &F0
 	550F DEFB &0F, &84, &54, &80, &80, &1C, &2F, &13, &E2, &DA, &5F, &1F, &0F, &FE, &3F, &C0
 	551F DEFB &06, &85, &5E, &00, &09, &03, &FE
@@ -15535,7 +15541,7 @@ Room_list1: ;; 230 rooms
 	5746 DEFB &1A, &14, &70, &80, &80, &0C, &17, &39, &F8, &79, &7C, &3C, &7E, &20, &7C, &4E, &47, &C5, &21, &D8, &27, &75, &79, &BC, &5F, &C7, &F8
 	5761 DEFB &0B, &15, &74, &00, &15, &22, &15, &02, &E2, &B1, &CF, &FE
 	576D DEFB &0B, &25, &72, &40, &00, &22, &19, &31, &E0, &93, &91, &FE
-	5779 DEFB &15, &98, &70, &C8, &48, &0A, &1D, &3F, &E2, &FB, &FC, &06, &FC, &0B, &60, &79, &1F, &7F, &F7, &FC, &7F, &80						;; Market Reunion room id &9870
+	5779 DEFB &15, &98, &70, &C8, &48, &0A, &1D, &3F, &E2, &FB, &FC, &06, &FC, &0B, &60, &79, &1F, &7F, &F7, &FC, &7F, &80		;; Market Reunion room id &9870
 	578F DEFB &06, &99, &7E, &48, &01, &0B, &FE
 	5796 DEFB &09, &A8, &7E, &08, &14, &2A, &17, &09, &FF, &E0
 	57A0 DEFB &14, &B8, &70, &48, &10, &3C, &27, &38, &F8, &49, &7C, &2B, &78, &B6, &F3, &FB, &C2, &E1, &FF, &C7, &F8
@@ -15585,7 +15591,7 @@ Room_list1: ;; 230 rooms
 	5A6D DEFB &12, &20, &BD, &DB, &00, &26, &23, &20, &F9, &9C, &BC, &C0, &58, &EE, &69, &44, &BF, &1F, &E0
 	5A80 DEFB &0C, &2C, &B7, &D3, &80, &0E, &47, &83, &EE, &79, &3F, &E3, &FC
 	5A8D DEFB &0B, &2D, &B0, &13, &41, &09, &A0, &07, &CB, &03, &FF, &80
-	5A99 DEFB &16, &2E, &B1, &93, &01, &08, &49, &1C, &21, &71, &B9, &A3, &C4, &D1, &FF, &E8, &F1, &C4, &77, &7C, &3F, &F8, &FF								;; Egyptus Crown room
+	5A99 DEFB &16, &2E, &B1, &93, &01, &08, &49, &1C, &21, &71, &B9, &A3, &C4, &D1, &FF, &E8, &F1, &C4, &77, &7C, &3F, &F8, &FF		;; Egyptus Crown room
 	5AB0 DEFB &17, &DE, &B1, &D3, &00, &0E, &09, &3D, &E0, &59, &FA, &F9, &7D, &FE, &05, &B7, &97, &AC, &38, &3F, &F1, &FF, &1F, &E0
 	5AC8 DEFB &1D, &03, &C1, &9B, &00, &3E, &55, &3E, &C1, &53, &FC, &2F, &09, &FA, &40, &71, &6C, &7C, &5E, &F0, &79, &7D, &3E, &EF, &73, &B6, &FD, &FC, &7F, &80
 	5AE6 DEFB &0B, &0C, &CD, &13, &E0, &0E, &2D, &9F, &93, &CF, &C7, &F8
@@ -15762,29 +15768,34 @@ Room_List2:   ;; 71 more rooms
 ;; -----------------------------------------------------------------------------------------------------------
 
 ;; -----------------------------------------------------------------------------------------------------------
+;; This block is not generated by DEFS, but instead by moving data 6600-AD8F to 70D8-B897 at init
+;; hence leaving this memory area available for buffering:
 BlitBuff:
-	6600		DEFS 256			;; Table of values used by the blit routines
+	6600		DEFS 	256				;; Table of values used by the blit routines
 ViewBuff:
-	6700		DEFS 256			;; buffer
+	6700		DEFS 	256				;; buffer
 DestBuff:
-	6800		DEFS 256			;; buffer
+	6800		DEFS 	256				;; buffer
 RevTable:
-	6900		DEFS 256			;; Table of values used by
+	6900		DEFS 	256				;; Table of values used by
 BackgrdBuff:
-	6A00		DEFS 64				;; data???
+	6A00		DEFS 	64				;; data???
 Objects:
-	6A40		DEFS &3F0			;; Objects buffer
-	6E30		DEFS &190 			;; ???
+	6A40		DEFS 	&3F0			;; Objects buffer
+	6E30		DEFS 	&190 			;; ???
 KeyScanningBuffer:
-	6FC0		DEFS 10				;; Buffer (key scanning)
-	6FCA		DEFS &10E
+	6FC0		DEFS 	10				;; Buffer (key scanning)
+	6FCA		DEFS 	&10E
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Again, everything below this point has been moved by &0AD8 at init (70D8 was placed at 6600 before Entry).
+
+				org 	&6600		;; but moved at 70D8 at init
+
 .PanelFlips:
-	70D8 		DEFS 8, &00
+	70D8 		DEFS	8, &00
 .SpriteFlips_buffer:														;; flipped sprite
-	70E0 		DEFS 16, &00
+	70E0 		DEFS 	16, &00
 
 ;; -----------------------------------------------------------------------------------------------------------
 img_wall_deco:
@@ -23360,6 +23371,8 @@ floor_tile_pattern7: 				;; Empty tile
 
 ;; & new end position B887 from old ADAF (addr before it was moved) & fin de HEADOVER.III
 ;; end of "This block was moved from 6600-ADBF to 70D8-B897  (+0AD8)"
+
+.end_moved_block:
 
 ;; -----------------------------------------------------------------------------------------------------------
 PillarBuf:								;; &0128 (296) bytes
