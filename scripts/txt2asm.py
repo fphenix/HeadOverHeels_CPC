@@ -1,5 +1,5 @@
-# This converts the "fileinfo_II.txt" file into a compilable z80 asm file
-# change location of "infile" appropriatly
+# This converts the "fileinfo_II.txt" file into a compilable z80 asm (Maxam compatible) file.
+# Change location of "infile" appropriatly
 
 import re
 
@@ -24,8 +24,5 @@ with open(outfile, 'w') as fw:
                 fw.write(line)
             else:
                 fw.write(asmln_pattern.sub("\t", line))
-
-
-
 
 raise SystemExit
