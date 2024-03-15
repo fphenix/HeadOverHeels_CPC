@@ -15,7 +15,7 @@ A big thanks and credit must be given to **Simon Frankau**:
     https://github.com/simon-frankau/head-over-heels .
 Simon Frankau did a similar work for the ZX-Spectrum version (from which the CPC version has been ported hence which is very similar), if was therefore natural to merge his work with my own findings.
 
-Thanks Mr. **Ritman** and Mr **Drummond** for one of the best 8-bit game, and Mr **Sugar** for the Amstrad CPC!
+Thanks Mr. **Ritman** and Mr **Drummond** for one of the best 8-bit games ever, and Mr **Sugar** for the Amstrad CPC!
 
 Files:
 ======
