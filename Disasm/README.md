@@ -4,8 +4,8 @@ fileinfo.txt
 ============
 The loader is described in fileinfo.txt (TODO: must be re-written.)
   HEADOVER.BIN is the loader:
-    * Loads HEADOVER.I (Title image ; Mode 0).
-    * Loads HEADOVER.II and .III and jump #0100 to starts the execution of the game.
+* Loads HEADOVER.I (Title image ; Mode 0).
+* Loads HEADOVER.II and .III and jump #0100 to starts the execution of the game.
 
 fileinfo_II.txt (main repo file!!)
 ===============
