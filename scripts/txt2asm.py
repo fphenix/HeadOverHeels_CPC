@@ -9,7 +9,7 @@ cwd = dirname(realpath(__file__))
 
 #---------------------------------------------------------------------------------------------------
 infile = join(cwd, "..", "dsk", "Headover_DSK", "fileinfo_II.txt")
-outfile = join(cwd, "fileinfo_II_________.z80")
+outfile = join(cwd, "fileinfo_II.z80.asm")
 
 emptyln_pattern = re.compile(r"^\s*$")
 copyln_pattern = re.compile(r"(^\s*((;;)|(\.)|(org)|([^\s]+:))).*$")
