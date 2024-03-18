@@ -1,5 +1,6 @@
-# This converts the "fileinfo_II.txt" file into a compilable z80 asm (Maxam compatible) file.
-# Change location of "infile" appropriatly
+# This converts the "fileinfo_II.txt" file into a compilable z80 asm file (Maxam compatible,
+# openable in WinApe).
+# Change input file location in "infile" appropriatly
 
 import re
 
