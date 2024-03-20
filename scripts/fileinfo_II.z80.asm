@@ -777,6 +777,8 @@ Sub_Do_Objects_entry:
 ;; in Init_table_and_crtc (see move_loaded_data_section)
 MOVE_OFFSET				EQU		&B897 - &ADBF			;; &0AD8
 JUMP_OPCODE				EQU		&C3						;; JP addr, used to generate RST7 (int handler) and 0 (reset to Entry)
+RST0_ADDR				EQU		&0000
+RST7_ADDR				EQU		&0038
 
 ;; -----------------------------------------------------------------------------------------------------------CPC
 ;; This will 1) Move a big block of loaded data 2) initialize some
@@ -787,7 +789,7 @@ move_loaded_data_section:
 	LD		DE,&B897									;; destination of the last byte of the destination array
 	LD		HL,&ADBF									;; Move block from 6600-ADBF to 70D8-B897 (offset: MOVE_OFFSET = #0AD8)
 	LD		BC,&47C0									;; length &47C0 bytes
-	LDDR												;; repeats LD (DE), (HL); DE--, HL--, BC-- until BC==0
+	LDDR												;; Copy: repeats LD (DE), (HL); DE--, HL--, BC-- until BC==0
 erase_buffer_6800:
 	LD		HL,DestBuff									;; array from &6800
 	LD		BC,&0100									;; length 256 bytes
@@ -795,11 +797,11 @@ erase_buffer_6800:
 inth_and_rst:
 	LD		A,JUMP_OPCODE								;; A = &C3 (will be a JP instruction)
 	LD		HL,Interrupt_Handler						;; Interrupt jump addr = &04BC
-	LD		(&0038),A									;; override the RST7 interrupt handler...
-	LD		(&0039),HL									;; ...with the routine Interrupt_Handler
+	LD		(RST7_ADDR),A								;; override the RST7 interrupt handler...
+	LD		(RST7_ADDR+1),HL							;; ...with the routine Interrupt_Handler
 	LD		HL,Entry									;; override the RST0 Reset with...
-	LD		(&0000),A									;; ...with a....
-	LD		(&0001),HL									;; ...Jump at Entry
+	LD		(RST0_ADDR),A								;; ...with a....
+	LD		(RST0_ADDR+1),HL							;; ...Jump at Entry
 	IM 		1											;; Interrupt Mode 1 = exec a RST7 (RST &38) when an Interrupt occurs
 	CALL 	Init_6600_table
 init_CTRC_and_screen:
@@ -1866,6 +1868,7 @@ drwspr_4:
 	RET
 
 ;; -----------------------------------------------------------------------------------------------------------
+;; String attributes
 Delimiter 						EQU		&FF
 Print_WipeScreen				EQU		&00
 Print_NewLine					EQU		&01
@@ -1886,6 +1889,7 @@ Print_Icon_Speed				EQU		&25
 Print_Icon_Spring				EQU		&26
 Print_Icon_Sheild				EQU		&27
 Print_StrID_Title_Instr			EQU		&99
+Print_StrID_Old_Game			EQU		&A0
 Print_StrID_Enter2Finish		EQU		&A5
 Print_StrID_SelectKeys			EQU		&A6
 Print_StrID_ShiftToFinish		EQU		&A7
@@ -2274,7 +2278,7 @@ gui_1:
 	EX		AF,AF'										;; save A
 	INC 	C											;; next line
 	LD		A,C
-	CP		&4A											;; until last line (&40 (scan line 0) + &0A (lastline+1))
+	CP		&40+10										;; until last line (&40 (scan line 0) + &0A (lastline+1))
 	JR		c,gui_0										;; loop next line
 	EX		AF,AF'										;; restore A : from MSb to LSb : Left, Right, Down, Up, Jump, Carry, Fire, Swop
 	RRCA                    							;; bits are not in the order we want (they are in key scan order)
@@ -2986,7 +2990,7 @@ f0eab_4:
 	SBC 	HL,BC										;; get the difference between the current_note period and its following one in the scale
 	SRL 	L
 	SRL 	L											;; divide it by 4
-	LD		A,(IY+&10)									;; array [&10]
+	LD		A,(IY+SND_TODO)								;; array [&10]
 	AND 	A											;; test it (Z set if 0, S bit set if bit7=1, Neg and Carry reset)
 	JR		Z,f0eab_6									;; if 0, then jump f0eab_6, else:
 	LD		H,A											;; H=array[&10] L=notegap/4
@@ -3095,104 +3099,104 @@ rnsplt_loop:																;; need to shift right so that the lsb bit od D is a
 ;; IX : points on Data: Voice_data_C?_V?
 ;; IY : points on channel sound object : Voice_channel_?_data
 .Slice_VolumeEnvp_Effects:
-	LD BC,&040F											;; B = 4 right shifts; C = &0F mask which means split in two 4-bit nibbles
-	CALL Read_IX_data_and_split							;; Read (IX) and split : D = high nibble, E = low nibble
-	LD A,&02
-	AND (IY+SND_FLAGS)									;; turn off bit7 (enable?) and keep bit1 from...
-	LD (IY+SND_FLAGS),A									;; ... the status/flag byte in the Voice_channel<n>_data array
-	BIT 2,D												;; test bit 2 of high nibble in D (Sound=0 or Noise=1 ????)
-	JR Z,f0fa9_1										;; and effectively copy that bit (0 or 1)...
-	SET 6,(IY+SND_FLAGS)								;; ...in the status/flags bit6, because b6 was reset before.
+	LD		BC,&040F									;; B = 4 right shifts; C = &0F mask which means split in two 4-bit nibbles
+	CALL	Read_IX_data_and_split						;; Read (IX) and split : D = high nibble, E = low nibble
+	LD		A,&02
+	AND		(IY+SND_FLAGS)								;; turn off bit7 (enable?) and keep bit1 from...
+	LD		(IY+SND_FLAGS),A							;; ... the status/flag byte in the Voice_channel<n>_data array
+	BIT		2,D											;; test bit 2 of high nibble in D (Sound=0 or Noise=1 ????)
+	JR		Z,f0fa9_1									;; and effectively copy that bit (0 or 1)...
+	SET		6,(IY+SND_FLAGS)							;; ...in the status/flags bit6, because b6 was reset before.
 f0fa9_1:
 	;; this will check if the 2nd byte bits [5:4] are 0, then skip all this;
 	;; else if 1, 2 and 3, calc in A :
 	;; max(x;y) / min(x;y) and A bit7 = '0' if x>=y else '1' if x<y with
 	;; x and y from the Voice_data_10AD, index being [5:4]-1
-	LD A,&03											;; this is to look at the (IX) data bits [5:4] or high nibble in D [1:0]
-	AND D												;; keep D[1:0] (data high nibble) only and test if value = 0
-	JR Z,f0fdc_1										;; if 0 then jump f0fdc_1, else D[1:0] is 1, 2 or 3
-	PUSH DE												;; save DE (splited (IX) data byte (2nd byte of sound data))
-	DEC A												;; D[1:0] value-1 (new value can be 0, 1 or 2)
-	LD HL,Voice_data_10AD								;; points on ???? array
-	LD E,A
-	LD D,&00											;; DE = A is the index in the Voice_data_10AD array
-	ADD HL,DE											;; add offset
-	LD D,(HL)											;; get data from this 3byte array
-	CALL Get_nibbles_from_D_to_D_and_E					;; split in 2 nibbles (eg.&81 gets D=&08 and E=&01)
-	LD (IY+SND_EFFECT_TARGET),E							;; store low nibble value in Voice_channel<n>_data array byte &C (12)
-	LD A,D												;; high nibble
-	CP E												;; compare high nibble to low nibble
-	LD A,0												;; A = 0
-	JR Z,f0fd4_1										;; if high byte was = low byte, then jump f0fd4_1
-	JR NC,f0fa9_2										;; if high > low then jump f0fa9_2 (A=0, Carry=0), else:
-	LD A,D
-	LD D,E												;; swap D and E
-	LD E,A
-	LD A,&80											;; and set A to &80, Carry = 1
+	LD		A,&03										;; this is to look at the (IX) data bits [5:4] or high nibble in D [1:0]
+	AND		D											;; keep D[1:0] (data high nibble) only and test if value = 0
+	JR		Z,f0fdc_1									;; if 0 then jump f0fdc_1, else D[1:0] is 1, 2 or 3
+	PUSH	DE											;; save DE (splited (IX) data byte (2nd byte of sound data))
+	DEC		A											;; D[1:0] value-1 (new value can be 0, 1 or 2)
+	LD		HL,Voice_data_10AD							;; points on ???? array
+	LD		E,A
+	LD		D,&00										;; DE = A is the index in the Voice_data_10AD array
+	ADD		HL,DE										;; add offset
+	LD		D,(HL)										;; get data from this 3byte array
+	CALL	Get_nibbles_from_D_to_D_and_E				;; split in 2 nibbles (eg.&81 gets D=&08 and E=&01)
+	LD		(IY+SND_EFFECT_TARGET),E					;; store low nibble value in Voice_channel<n>_data array byte &C (12)
+	LD		A,D											;; high nibble
+	CP		E											;; compare high nibble to low nibble
+	LD		A,0											;; A = 0
+	JR		Z,f0fd4_1									;; if high byte was = low byte, then jump f0fd4_1
+	JR		NC,f0fa9_2									;; if high > low then jump f0fa9_2 (A=0, Carry=0), else:
+	LD		A,D
+	LD		D,E											;; swap D and E
+	LD		E,A
+	LD		A,&80										;; and set A to &80, Carry = 1
 f0fa9_2:
-	RR E												;; put E parity in Carry and E/2, the previous Carry goes in E[7] (1 if we swapped high;low above)
-	JR c,f0fa9_3										;; if E was Odd then jump f0fa9_3, else if Even:
-	RRC D												;; divide high by 2
-	JR f0fa9_2											;; and loop
+	RR		E											;; put E parity in Carry and E/2, the previous Carry goes in E[7] (1 if we swapped high;low above)
+	JR		c,f0fa9_3									;; if E was Odd then jump f0fa9_3, else if Even:
+	RRC		 D											;; divide high by 2
+	JR		f0fa9_2										;; and loop
 
 f0fa9_3:
-	OR D
+	OR		D
 	;; at this point: A = max(D;E) / min(D;E) and A bit7 = '0' if D>=E else '1' if D<E
 	;; (can also be 0 if all this was skipped)
 	;; 8|1 : D=8; E=0; A=8 		(8/1 = 8 and A bit7 = 0 : D>=E)
 	;; 4|2 : D=2; E=0; A=2 		(4/2 = 2 and A bit7 = 0 : D>=E)
 	;; 4|8 : D=2; E=&20; A=&82 	(8/4 = 2 and A bit7 = 1 : D<E)
 f0fd4_1:
-	LD (IY+&10),A										;; store that computed A value in array[&10]
-	SET 7,(IY+SND_FLAGS)								;; and set bit7 of the status/flags
-	POP DE												;; restore DE (splited 2nd data byte)
+	LD		(IY+SND_TODO),A								;; store that computed A value in array[&10]
+	SET		7,(IY+SND_FLAGS)							;; and set bit7 of the status/flags
+	POP		DE											;; restore DE (splited 2nd data byte)
 f0fdc_1:
-	LD HL,Volume_Envp_Speed_n_Select_arr				;; points on Volume_Envp_Speed_n_Select_arr array
-	LD D,0
-	ADD HL,DE											;; add 2nd byte low nibble as an offset
-	LD D,(HL)											;; and get corresponding data (eg. E=&05 get D=&12)
-	CALL Get_nibbles_from_D_to_D_and_E					;; and split in 2 (eg; D=&12 gives D=&01; E=&02)
-	LD (IY+SND_NB_FX_SLICES),D							;; Store D (is a value from 1 to 4) in both array[5] (TODO: init/max number of volume effect parts)
-	LD (IY+SND_CURR_FX_SLICE),D							;; ... and array[4] (TODO: Current index volume effect)
-	CALL Choose_Volume_envp								;; choose volume array (E offset from low byte of data from Volume_Envp_Speed_n_Select_arr, can be from 0 to 9)
-	LD A,(Current_sound_voice_number)					;; get Current sound voice number
-	AND A
-	JR NZ,f0ff9_1										;; if not 0 skip to f0ff9_1, else
-	RES 3,(IY+SND_FLAGS)								;; if channel 0 : reset status/flag bit3
+	LD		HL,Volume_Envp_Speed_n_Select_arr			;; points on Volume_Envp_Speed_n_Select_arr array
+	LD		D,0
+	ADD		HL,DE										;; add 2nd byte low nibble as an offset
+	LD		D,(HL)										;; and get corresponding data (eg. E=&05 get D=&12)
+	CALL	Get_nibbles_from_D_to_D_and_E				;; and split in 2 (eg; D=&12 gives D=&01; E=&02)
+	LD		(IY+SND_NB_FX_SLICES),D						;; Store D (is a value from 1 to 4) in both array[5] (TODO: init/max number of volume effect parts)
+	LD		(IY+SND_CURR_FX_SLICE),D					;; ... and array[4] (TODO: Current index volume effect)
+	CALL	Choose_Volume_envp							;; choose volume array (E offset from low byte of data from Volume_Envp_Speed_n_Select_arr, can be from 0 to 9)
+	LD		A,(Current_sound_voice_number)				;; get Current sound voice number
+	AND		A
+	JR		NZ,f0ff9_1									;; if not 0 skip to f0ff9_1, else
+	RES		3,(IY+SND_FLAGS)							;; if channel 0 : reset status/flag bit3
 f0ff9_1:
-	BIT 7,(IX+0)										;; test 2nd byte of sound data bit7
-	RET Z												;; if 0 (no noise), leave, else:
-	INC IX												;; do noise: point on next data
-	AND A												;; test Current sound voice number
-	RET NZ												;; if voice not 0, leave; else:
-	SET 3,(IY+SND_FLAGS)								;; set bit3 of status/flags
-	PUSH IY												;; save pointer on Sound "object"
-	LD IY,Voice_Noise_data								;; temporarily points on Noise array
-	LD E,(IX+0)											;; read data byte
-	LD A,&C0
-	AND E												;; keep bits[7:6]
+	BIT		7,(IX+0)									;; test 2nd byte of sound data bit7
+	RET		Z											;; if 0 (no noise), leave, else:
+	INC		IX											;; do noise: point on next data
+	AND		A											;; test Current sound voice number
+	RET		NZ											;; if voice not 0, leave; else:
+	SET		3,(IY+SND_FLAGS)							;; set bit3 of status/flags
+	PUSH	IY											;; save pointer on Sound "object"
+	LD		IY,Voice_Noise_data							;; temporarily points on Noise array
+	LD		E,(IX+0)									;; read data byte
+	LD		A,&C0
+	AND		E											;; keep bits[7:6]
 	RLCA												;; bit7 goes in Carry and bit0, bit6 goes in bit7
-	LD (IY+NOISE_FLAGS),A								;; put that in Noise flags
-	LD A,&0F											;; keep bit0 (previous bit7)
-	AND E
-	LD E,A
-	LD HL,Noise_data_10B8								;; Noise enveloppe???
-	RLC E
-	LD D,0
-	ADD HL,DE
-	LD D,(HL)											;; get selected value from Noise_data_10B8 table
-	CALL Get_nibbles_from_D_to_D_and_E
-	LD (IY+NOISE_CURR_FX_SLICE),D
-	LD (IY+NOISE_NB_FX_SLICES),D
-	INC HL
-	LD A,(HL)
-	LD (IY+NOISE_FINE),A
-	CALL Choose_Volume_envp
-	ADD A,(HL)
-	LD (IY+NOISE_COARSE),A
-	XOR A
-	LD (IY+NOISE_VOL_INDEX),A
-	POP IY												;; get back pointer on Sound "object"
+	LD		(IY+NOISE_FLAGS),A							;; put that in Noise flags
+	LD		A,&0F										;; keep bit0 (previous bit7)
+	AND		E
+	LD		E,A
+	LD		HL,Noise_data_10B8							;; Noise enveloppe???
+	RLC		E
+	LD		D,0
+	ADD		HL,DE
+	LD		D,(HL)										;; get selected value from Noise_data_10B8 table
+	CALL	Get_nibbles_from_D_to_D_and_E
+	LD		(IY+NOISE_CURR_FX_SLICE),D
+	LD		(IY+NOISE_NB_FX_SLICES),D
+	INC		HL
+	LD		A,(HL)
+	LD		(IY+NOISE_FINE),A
+	CALL	Choose_Volume_envp
+	ADD		A,(HL)
+	LD		(IY+NOISE_COARSE),A
+	XOR		A
+	LD		(IY+NOISE_VOL_INDEX),A
+	POP		IY											;; get back pointer on Sound "object"
 	RET
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -6089,7 +6093,7 @@ BaseFlags:																	;; object flags when builing a room
 ;; Offset 8: O_SPRITE : Sprite code
 ;; Offset 9: O_SPRFLAGS : Sprite flags:
 ;;           	Bit 0 - is it a playable character or an object/enemy?
-;;           	Bit 1 - same thant bit0 but for 2ndpart double height? TODO????
+;;           	Bit 1 - 1 if the 2nd part of a double height/sprite object
 ;;           	Bit 2 = we're Head.
 ;;           	Bit 4 = TODO: 0:deadly, 1: harmless
 ;;           	Bit 5 = 0 single height (one sprite) ; 1 double size (i.e. 2 sprites, need to Animate and move both sprites together as a single object);
@@ -6102,11 +6106,11 @@ BaseFlags:																	;; object flags when builing a room
 ;; Offset B: O_IMPACT
 ;;				Bottom 4 bits are roller direction... last move dir for updated things.
 ;; Offset C: O_????
-;;				Some form of direction bitmask?
-;;           	how we're being pushed.
-;;				I think bit 5 means 'being stood on'.
-;; Offset D&E: O_????
-;;				Object we're resting on. zeroed on the floor. Forms a pointer?
+;;				bits3:0 : LRDU direction bitmask? how we're being pushed?
+;;				bit4 :
+;;				bit5 : 'being stood on'?
+;; Offset D&E: O_OBJUNDER
+;;				Object we're resting on. zeroed on the floor. Has the object pointer (if an object is under, else 0).
 ;; Offset F: O_ANIM : Animation code
 ;;				top 5 bits [7:3] are the animation code ([7:0] = ((index in AnimTable * 2) + 2) << 2)
 ;;				bottom 3 bits [2:0] are the frame number.
@@ -6124,6 +6128,8 @@ O_SPRITE				EQU 	&08
 O_SPRFLAGS				EQU 	&09
 O_FUNC					EQU 	&0A
 O_IMPACT				EQU		&0B
+;; ????					EQU		&0C
+O_OBJUNDER				EQU		&0D				;; D and E = object under pointer
 O_ANIM					EQU 	&0F
 O_DIRECTION				EQU 	&10
 O_SPECIAL				EQU 	&11
@@ -6139,10 +6145,10 @@ O_SPECIAL				EQU 	&11
 	DEFB 	&00				;;	8 : O_SPRITE
 	DEFB 	&00				;;	9 : O_SPRFLAGS
 	DEFB 	&00				;;	A : O_FUNC
-	DEFB 	&FF				;;	B :
+	DEFB 	&FF				;;	B : O_IMPACT
 	DEFB 	&FF				;;	C :
-	DEFB 	&00				;;	D :
-	DEFB 	&00				;;	E :
+	DEFB 	&00				;;	D : O_OBJUNDER
+	DEFB 	&00				;;	E : O_OBJUNDER+1
 	DEFB 	&00				;;	F : O_ANIM
 	DEFB 	&00				;;	10 : O_DIRECTION (dir code (0 to 7 or FF))
 	DEFB 	&00				;;	11 : O_SPECIAL
@@ -7170,7 +7176,7 @@ br_23DF
 	CP		B
 	JR		c,br_23EB
 	LD		A,&FF
-	LD		(&236E),A
+	LD		(TODO_236e),A
 br_23EB
 	LD		A,&01
 	JR		br_23F3
@@ -7184,90 +7190,90 @@ br_23F3
 
 ;; -----------------------------------------------------------------------------------------------------------
 .GetScreenEdges:
-	LD HL,(Max_min_UV_Table)							;; MinU; MinU in L, MinV in H.
-	LD A,(Has_Door)										;; Has_Door
-	PUSH AF
-	BIT 1,A
-	JR Z,br_2408
+	LD		HL,(Max_min_UV_Table)						;; MinU; MinU in L, MinV in H.
+	LD		A,(Has_Door)								;; Has_Door
+	PUSH	AF
+	BIT		1,A
+	JR		Z,br_2408
 	;; If there's a door, bump up MinV.
-	DEC H
-	DEC H
-	DEC H
-	DEC H
+	DEC		H
+	DEC		H
+	DEC		H
+	DEC		H
 br_2408
 	RRA
-	LD A,L												;; MinU
-	JR NC,br_240F
+	LD		A,L											;; MinU
+	JR		NC,br_240F
 	;; If there's the other door, reduce MinU.
-	SUB 4
-	LD L,A
+	SUB		4
+	LD		L,A
 	;; Find MinU - MinV
 br_240F
-	SUB H
+	SUB		H
 	;; And use this to set the X coordinate of the corner.
-	ADD A,&80
-	LD (smc_CornerPos+1),A								;; self_mod code &1803 (value of CP ...)
-	LD C,A												;; Save in C for TweakEdges
+	ADD		A,&80
+	LD		(smc_CornerPos+1),A							;; self_mod code &1803 (value of CP ...)
+	LD		C,A											;; Save in C for TweakEdges
 	;; Then set the Y coordinate of the corner, taking into
     ;; account various fudge factors.
-	LD A,&FC											;; Y_START + &C0 - EDGE_HEIGHT - 1
-	SUB H
-	SUB L
+	LD		A,&FC										;; Y_START + &C0 - EDGE_HEIGHT - 1
+	SUB		H
+	SUB		L
 	;; Save Y coordinate of the corner in B for TweakEdges
-	LD B,A
+	LD		B,A
 	;; Then generate offsets to convert from screen X coordinates to
     ;; associated Y coordinates.
 	NEG
-	LD E,A												;; E = MinU + MinV - &FC
-	ADD A,C
-	LD (smc_LeftAdj+1),A								;; 1817 ; E + CornerPos, value of ADD A,??? ; self mod
-	LD A,C
+	LD		E,A											;; E = MinU + MinV - &FC
+	ADD		A,C
+	LD		(smc_LeftAdj+1),A							;; 1817 ; E + CornerPos, value of ADD A,??? ; self mod
+	LD		A,C
 	NEG
-	ADD A,E
-	LD (smc_RightAdj+1),A								;; 180F:  E - CornerPos, value of ADD A,??? ; self mod
-	CALL TweakEdges
+	ADD		A,E
+	LD		(smc_RightAdj+1),A							;; 180F:  E - CornerPos, value of ADD A,??? ; self mod
+	CALL	TweakEdges
 	;; Then, inspect Has_Doors to see if we need to remove
 	;; a column panel or two.
-	POP AF
+	POP		AF
 	RRA
-	PUSH AF
-	CALL NC,NukeColL
-	POP AF
+	PUSH	AF
+	CALL	NC,NukeColL
+	POP		AF
 	RRA
-	RET c
+	RET		c
 ;; Scan from the right for the first drawn column
 NukeColR:
-	LD HL,BackgrdBuff + 62								;; BackgrdBuff + 31*2
+	LD		HL,BackgrdBuff + 62							;; BackgrdBuff + 31*2
 .ScanR:
-	LD A,(HL)
-	AND A
-	JR NZ,NukeCol
-	DEC HL
-	DEC HL
-	JR ScanR
+	LD		A,(HL)
+	AND		A
+	JR		NZ,NukeCol
+	DEC		HL
+	DEC		HL
+	JR		ScanR
 
 ;; If the current screen column sprite is a blank, delete it.
 .NukeCol:
-	INC HL
-	LD A,(HL)
-	OR &FA												;; ~5
-	INC A
-	RET NZ
-	LD (HL),A
-	DEC HL
-	LD (HL),A
+	INC		HL
+	LD		A,(HL)
+	OR		&FA											;; ~5
+	INC		A
+	RET		NZ
+	LD		(HL),A
+	DEC		HL
+	LD		(HL),A
 	RET
 
 ;; Scan from the left for the first drawn column
 .NukeColL:
-	LD HL,BackgrdBuff									;; BackgrdBuff buffer
+	LD		HL,BackgrdBuff								;; BackgrdBuff buffer
 ScanL:
-	LD A,(HL)
-	AND A
-	JR NZ,NukeCol
-	INC HL
-	INC HL
-	JR ScanL
+	LD		A,(HL)
+	AND		A
+	JR		NZ,NukeCol
+	INC		HL
+	INC		HL
+	JR		ScanL
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; This copies a block of data to another block in order to reset the
@@ -7323,14 +7329,14 @@ StatusReinit:
 	DEFB 	9             			;; Number of bytes (length) to reinit with
 StatusReinit_reset_data:
 	DEFB 	&00						;; Inventory reset value; Indicates what objects we have; a &FF here gives us all the objects!
-	DEFB 	0             			;; Speed reset value
-	DEFB 	0             			;; Springs reset value
-	DEFB 	0             			;; Heels invulnerable reset value
-	DEFB 	0             			;; Head invulnerable reset value
-	DEFB 	8             			;; Heels lives reset value
-	DEFB 	8             			;; Head lives reset value
-	DEFB 	0             			;; Donuts reset value
-	DEFB 	0             			;; TODO : jump force reset value
+	DEFB 	0             			;; CNT_SPEED : Speed reset value
+	DEFB 	0             			;; CNT_SPRING : Springs reset value
+	DEFB 	0             			;; CNT_HEELS_INVULN : Heels invulnerable reset value
+	DEFB 	0             			;; CNT_HEAD_INVULN : Head invulnerable reset value
+	DEFB 	8             			;; CNT_HEELS_LIVES : Heels lives reset value
+	DEFB 	8             			;; CNT_HEAD_LIVES : Head lives reset value
+	DEFB 	0             			;; CNT_DONUTS : Donuts reset value
+	DEFB 	0             			;; Heels Gravity
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; This will indicate the available character inventory.
@@ -7345,21 +7351,20 @@ StatusReinit_reset_data:
 ;; These are the main counters (Lives, Invuln, Speed, Spring, Donuts)
 .Counters:
 .Speed:
-	DEFB 	0							;; speed
+	DEFB 	0							;; CNT_SPEED : speed
 .Spring:
-	DEFB 	0							;; number of extra jumps
+	DEFB 	0							;; CNT_SPRING : number of extra jumps
 .Heels_invulnerability:
-	DEFB 	0							;; Head's invulnerable
+	DEFB 	0							;; CNT_HEELS_INVULN : Heels' invulnerable
 .Head_s_invulnerability:
-	DEFB 	0							;; Heels' invulnerable
+	DEFB 	0							;; CNT_HEAD_INVULN : Head's invulnerable
 Characters_lives:
-	DEFB 	4							;; Heels' lives
-	DEFB 	4                     		;; Head's lives
+	DEFB 	4							;; CNT_HEELS_LIVES : Heels' lives
+	DEFB 	4                     		;; CNT_HEAD_LIVES : Head's lives
 nb_donuts:
-	DEFB 	0							;; Number of Donuts available
-
+	DEFB 	0							;; CNT_DONUTS : Number of Donuts available
 Heels_Gravity:
-	DEFB 	0             				;; Value (0 or 7), only applied to Heels (without Head) after a jump when falling back down; it'll fall straight below (saw-tooth shape), whereas Head can gently fly to the ground (triangle shaped).
+	DEFB 	0             				;; Heels' Gravity : Value (0 or 7), only applied to Heels (without Head) after a jump when falling back down; it'll fall straight below (saw-tooth shape), whereas Head can gently fly to the ground (triangle shaped).
 
 ;; -----------------------------------------------------------------------------------------------------------
 selected_characters:
@@ -7425,11 +7430,11 @@ FiredObj_variables:  										;; &12 = 18
 	DEFB	&12							;;	A : O_FUNC
 	DEFB	&FF							;;	B : O_IMPACT
 	DEFB	&FF							;;	C :
-	DEFB	&00							;;	D :
-	DEFB	&00							;;	E :
+	DEFB	&00							;;	D : O_OBJUNDER
+	DEFB	&00							;;	E : O_OBJUNDER+1
 	DEFB	&08							;;	F : O_ANIM
 	DEFB	&00							;;	10 : O_DIRECTION (dir code 0 to 7 or FF)
-	DEFB	&00							;;	11 :
+	DEFB	&00							;;	11 : O_SPECIAL
 .SaveRestore_Block3_end
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -7458,11 +7463,11 @@ Heels_variables:											;; &12 = 18
 	DEFB 	&00							;;	A : O_FUNC
 	DEFB 	&FF							;;	B : O_IMPACT
 	DEFB 	&FF							;;	C :
-	DEFB 	&00							;;	D :
-	DEFB 	&00							;;	E :
+	DEFB 	&00							;;	D : O_OBJUNDER
+	DEFB 	&00							;;	E : O_OBJUNDER+1
 	DEFB 	&00							;;	F : O_ANIM
 	DEFB 	&00							;;	10 : O_DIRECTION (dir code 0 to 7 or FF)
-	DEFB 	&00							;;	11 :
+	DEFB 	&00							;;	11 : O_SPECIAL
 
 ;; Head_variables addr = Heels_variables + Head_offset
 Head_variables:												;; &12 = 18
@@ -7477,11 +7482,11 @@ Head_variables:												;; &12 = 18
 	DEFB	&00							;;	A : O_FUNC
 	DEFB	&FF							;;	B : O_IMPACT
 	DEFB	&FF							;;	C : (displacement when trying to merge (when swop to both))
-	DEFB	&00							;;	D :
-	DEFB	&00							;;	E :
+	DEFB	&00							;;	D : O_OBJUNDER
+	DEFB	&00							;;	E : O_OBJUNDER+1
 	DEFB	&00							;;	F : O_ANIM
 	DEFB	&00							;;	10 : O_DIRECTION (dir code 0 to 7 or FF)
-	DEFB	&00							;;	11 :
+	DEFB	&00							;;	11 : O_SPECIAL
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; This defines the sprites list that compose an animation for
@@ -7515,6 +7520,8 @@ Head_variables:												;; &12 = 18
 .BlinkEyesCounter:															;; (for BlinkEyes)
 	DEFB 	&40
 
+Eyes_Offset				EQU		&0D											;; Head's eyes offset in the sprite
+
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Blinks Head eyes if facing us
 .BlinkEyes:
@@ -7524,7 +7531,7 @@ Head_variables:												;; &12 = 18
 	LD		(HL),A										;; ...update BlinkEyesState
 	LD		A,(SpriteFlips_buffer + 3 + MOVE_OFFSET) 	;; check if the sprite is flipped or not
 	BIT 	0,A											;; test bit0 (Zero set (bit0=0) = facing right, Zero reset (bit0=1) = facing left)
-	LD		HL,img_head_1f + &0D + MOVE_OFFSET			;; SPR_HEAD2 addr + &0D offset (&8FCD start of the eyes in Head's image)
+	LD		HL,img_head_1f+Eyes_Offset + MOVE_OFFSET	;; SPR_HEAD2 addr + &0D offset (&8FCD start of the eyes in Head's image)
 	LD		DE,Blink_XOR_facing_right					;; load Xor Right
 	JR		Z,weybw_doit								;; if bit0 was previously Zero then jump weybw_doit with Xor2
 	DEC 	HL											;; else HL points on &8FCC
@@ -7725,7 +7732,7 @@ br_25B9:
 	LD (IY+O_FLAGS),0									;; Init fire obj flags ;
 	LD A,(character_direction)							;; get LRDU character_direction
 	LD (FiredObj_variables+O_IMPACT),A
-	LD (IY+&0C),&FF										;; ??? displacement if merges ???
+	LD (IY+&0C),&FF										;; fire obj ????
 	LD (IY+O_ANIM),&20									;; anim code in [7:3] = &04 (index3 in AminTable = ANIM_VAPE2) and frame = 0
 	CALL EnlistAux
 	;; Use up a donut
@@ -7756,174 +7763,175 @@ br_25B9:
 
 ;; -----------------------------------------------------------------------------------------------------------
 FinishedDying:
-	LD A,(both_in_same_room)							;; get both_in_same_room
-	AND A												;; test
-	JR Z,nfc_end										;; no? then jump nfc_end, else:
-	CALL Get_curr_Char_variables						;; HL = pointer on current selected character's variables
-	PUSH HL
-	POP IY
-	CALL Unlink
-	LD A,(selected_characters)							;; get selected_characters
-	CP &03
-	JR Z,nfc_end
-	LD HL,TODO_2496										;; TODO???
-	CP (HL)
-	JR Z,br_2672
-	XOR &03
-	LD (HL),A
-	JR br_267D
+	LD		A,(both_in_same_room)						;; get both_in_same_room
+	AND		A											;; test
+	JR		Z,nfc_end									;; no? then jump nfc_end, else:
+	CALL	Get_curr_Char_variables						;; HL = pointer on current selected character's variables
+	PUSH	HL
+	POP		IY											;; IY = current character
+	CALL	Unlink
+	LD		A,(selected_characters)						;; get selected_characters (
+	CP		&03
+	JR		Z,nfc_end
+	LD		HL,TODO_2496								;; TODO???
+	CP		(HL)
+	JR		Z,br_2672
+	XOR		&03
+	LD		(HL),A
+	JR		br_267D
 
 br_2672
-	LD HL,&BB31											;; copy the 5 bytes in the buffer in the 3 variables from 2492
-	LD DE,&2492
-	LD BC,&0005
+	LD		HL,&BB31									;; copy the 5 bytes in the buffer in the 3 variables from 2492
+	LD		DE,&2492
+	LD		BC,&0005
 	LDIR												;; Copy: repeat LD (DE),(HL); DE++, HL++, BC-- until BC=0
 
 br_267D
-	LD HL,&0000
-	LD (Heels_variables+&0D),HL							;; reset Heels item &D and &E
-	LD (Head_variables+&0D),HL							;; reset Head item &D and &E
-	CALL Save_array										;; SaveStuff
+	LD		HL,&0000
+	LD		(Heels_variables+O_OBJUNDER),HL				;; reset Heels (not standing on an abject)
+	LD		(Head_variables+O_OBJUNDER),HL				;; reset Head (not standing on an object)
+	CALL	Save_array									;; SaveStuff
 nfc_end:
-	LD HL,&0000											;; reset Carrying
-	LD (Carrying),HL
-	JP Go_to_room										;; Change room
+	LD		HL,&0000									;; reset Carrying pointer
+	LD		(Carrying),HL
+	JP		Go_to_room									;; Change room
 
 teleport_down_playing:
-	DEC (HL)
-	LD HL,(selected_characters)							;; get selected_characters and both_in_same_room
-	JP CharThing18
+	DEC		(HL)
+	LD		HL,(selected_characters)					;; get selected_characters and both_in_same_room
+	JP		CharThing18
 
 teleport_up_playing:
-	DEC (HL)
-	LD HL,(selected_characters)							;; get selected_characters and both_in_same_room
-	JP NZ,CharThing19
-	LD A,&07											;; code 7 = Teleport Code
-	LD (access_new_room_code),A							;; update access_new_room_code (0=Stay,1=Down,2=Right,3=Up,4=Left,5=Below,6=Above,7=Teleport)
-	JP br_25B9
+	DEC		(HL)
+	LD		HL,(selected_characters)					;; get selected_characters and both_in_same_room
+	JP		NZ,CharThing19
+	LD		A,&07										;; code 7 = Teleport Code
+	LD		(access_new_room_code),A					;; update access_new_room_code (0=Stay,1=Down,2=Right,3=Up,4=Left,5=Below,6=Above,7=Teleport)
+	JP		br_25B9
 
 ;; -----------------------------------------------------------------------------------------------------------
 .HandleDeath:
-	DEC (HL)											;; decrease DyingAnimFrameIndex
-	JP NZ,CharThing20									;; in the process of dying go CharThing20, else dead:
+	DEC		(HL)										;; decrease DyingAnimFrameIndex
+	JP		NZ,CharThing20								;; in the process of dying go CharThing20, else dead:
 end_of_death:
-	LD HL,&0000
-	LD (Carrying),HL
-	LD HL,Characters_lives								;; point on Characters_lives
-	LD BC,(Dying)
-	LD B,&02
-	LD D,&FF
+	LD		HL,&0000
+	LD		(Carrying),HL								;; reset Carrying pointer
+	LD		HL,Characters_lives							;; point on Characters_lives
+	LD		BC,(Dying)
+	LD		B,&02
+	LD		D,&FF
 hded_loop:
-	RR C
-	JR NC,br_26CA
-	LD A,(HL)											;; Sub 1 to a base10 value in HL (1st time : Characters_lives = Heels lives; 2nd time : Characters_lives + 1)
-	SUB 1
-	DAA													;; This subroutine is used to decrease Head's or Heels' lives
-	LD (HL),A											;; a 00 (NOP) here, gives infinite lives
-	JR NZ,br_26CA
-	LD D,0												;; D updated to &00 if any lives reduced.
+	RR		C
+	JR		NC,br_26CA
+lose_a_life:
+	LD		A,(HL)										;; Sub 1 to a base10 value in HL (1st time : Characters_lives = Heels lives; 2nd time : Characters_lives + 1)
+	SUB		1
+	DAA													;; This subroutine is used to decrease Head's or Heels' lives (BCD corrected)
+	LD		(HL),A										;; a 00 (NOP) here, gives infinite lives!
+	JR		NZ,br_26CA
+	LD		D,0											;; D updated to &00 if any lives reduced.
 br_26CA
-	INC HL												;; points on Head's lives
-	DJNZ hded_loop
+	INC		HL											;; points on Head's lives
+	DJNZ	hded_loop
 	;; If no lives left, game over.
-	DEC HL
-	LD A,(HL)
-	DEC HL
-	OR (HL)
-	JP Z,Game_over										;; if Z set then Game_over
+	DEC		HL
+	LD		A,(HL)
+	DEC		HL
+	OR		(HL)
+	JP		Z,Game_over									;; if Z set then Game_over
 	;; No lives lost, then skip to the end.
-	LD A,D
-	AND A
-	JR NZ,HD_8
-	LD HL,Characters_lives								;; point on Characters_lives
-	LD A,(both_in_same_room)							;; get both_in_same_room
-	AND A												;; test A
-	JR Z,HD_6											;; if 0 (not in same room) jump HD_6, else (same room):
-	LD A,(TODO_2496)
-	CP &03												;; TODO is this to share a life when one has 0, borrow 1 life to the other char.
-	JR NZ,hddth_1
-	LD A,(HL)
-	AND A
-	LD A,&01
-	JR NZ,br_26EF
-	INC A
+	LD		A,D
+	AND		A
+	JR		NZ,HD_8
+	LD		HL,Characters_lives							;; point on Characters_lives
+	LD		A,(both_in_same_room)						;; get both_in_same_room
+	AND		A											;; test A
+	JR		Z,HD_6										;; if 0 (not in same room) jump HD_6, else (same room):
+	LD		A,(TODO_2496)
+	CP		&03											;; TODO is this to share a life when one has 0, borrow 1 life to the other char.
+	JR		NZ,hddth_1
+	LD		A,(HL)
+	AND		A
+	LD		A,&01
+	JR		NZ,br_26EF
+	INC		A
 br_26EF
-	LD (TODO_2496),A
-	JR HD_8
+	LD		(TODO_2496),A
+	JR		HD_8
 
 hddth_1:
 	RRA
 	JR		c,hddth_skip_inc
-	INC HL
+	INC		HL
 hddth_skip_inc:
-	LD A,(HL)
-	AND A
-	JR NZ,br_270E
-	LD (both_in_same_room),A							;; update both_in_same_room; InSameRoom
+	LD		A,(HL)
+	AND		A
+	JR		NZ,br_270E
+	LD		(both_in_same_room),A						;; update both_in_same_room; InSameRoom
 
 HD_6:
 	;; Current character has no more lives, switch to other character"
-	CALL Switch_Character
-	LD HL,&0000
-	LD (DyingAnimFrameIndex),HL							;; reset DyingAnimFrameIndex and Dying
+	CALL	Switch_Character
+	LD		HL,&0000
+	LD		(DyingAnimFrameIndex),HL					;; reset DyingAnimFrameIndex and Dying
 HD_7:
-	LD HL,Other_Character_state + MOVE_OFFSET
-	SET 0,(HL)
+	LD		HL,Other_Character_state + MOVE_OFFSET
+	SET		0,(HL)
 	RET
 
 br_270E
-	CALL HD_7
+	CALL	HD_7
 HD_8
-	LD A,(TODO_2496)
-	LD (selected_characters),A							;; update selected_characters
-	CALL CharThing3
-	CALL Get_curr_Char_variables						;; HL = pointer on current selected character's variables
-	LD DE,&0005											;; object link list is 5 bytes per element
-	ADD HL,DE											;; update pointer
-	EX DE,HL
-	LD HL,EntryPosn
-	LD BC,&0003
+	LD		A,(TODO_2496)
+	LD		(selected_characters),A						;; update selected_characters
+	CALL	CharThing3
+	CALL	Get_curr_Char_variables						;; HL = pointer on current selected character's variables
+	LD		DE,&0005									;; object link list is 5 bytes per element
+	ADD		HL,DE										;; update pointer
+	EX		DE,HL
+	LD		HL,EntryPosn
+	LD		BC,&0003
 	LDIR												;; repeat LD (DE),(HL); DE++, HL++, BC-- until BC=0
-	LD A,(TODO_2492)
-	LD (access_new_room_code),A							;; update access_new_room_code (0=Stay,1=Down,2=Right,3=Up,4=Left,5=Below,6=Above,7=Teleport)
-	JP Long_move_to_new_room
+	LD		A,(TODO_2492)
+	LD		(access_new_room_code),A					;; update access_new_room_code (0=Stay,1=Down,2=Right,3=Up,4=Left,5=Below,6=Above,7=Teleport)
+	JP		Long_move_to_new_room
 
 CharThing18:
-	PUSH HL
-	LD HL,VapeLoop2										;; VapeLoop2 anim
-	JR CharThing21
+	PUSH	HL
+	LD		HL,VapeLoop2								;; VapeLoop2 anim
+	JR		CharThing21
 
 CharThing20:
-	LD HL,(Dying)
+	LD		HL,(Dying)
 CharThing19:
-	PUSH HL
-	LD HL,Vapeloop1										;; Vapeloop1 anim index
+	PUSH	HL
+	LD		HL,Vapeloop1								;; Vapeloop1 anim index
 CharThing21:
-	LD IY,Heels_variables
-	CALL Read_Loop_byte
-	POP HL
-	PUSH HL
-	BIT 1,L
-	JR Z,br_2762
-	PUSH AF
-	LD (Head_variables+O_SPRITE),A
-	RES 3,(IY+Head_offset+O_FLAGS)						;; &16 = &12 + &04
-	LD HL,Head_variables
-	CALL StoreObjExtents
-	LD HL,Head_variables
-	CALL UnionAndDraw
-	POP AF
+	LD		IY,Heels_variables
+	CALL	Read_Loop_byte
+	POP		HL
+	PUSH	HL
+	BIT		1,L
+	JR		Z,br_2762
+	PUSH	AF
+	LD		(Head_variables+O_SPRITE),A
+	RES		3,(IY+Head_offset+O_FLAGS)					;; &16 = &12 + &04
+	LD		HL,Head_variables
+	CALL	StoreObjExtents
+	LD		HL,Head_variables
+	CALL	UnionAndDraw
+	POP		AF
 br_2762
-	POP HL
-	RR L
-	RET NC
-	XOR %10000000
-	LD (Heels_variables+O_SPRITE),A
-	RES 3,(IY+O_FLAGS)
-	LD HL,Heels_variables
-	CALL StoreObjExtents
-	LD HL,Heels_variables
-	JP UnionAndDraw
+	POP		HL
+	RR		L
+	RET		NC
+	XOR		%10000000
+	LD		(Heels_variables+O_SPRITE),A
+	RES		3,(IY+O_FLAGS)
+	LD		HL,Heels_variables
+	CALL	StoreObjExtents
+	LD		HL,Heels_variables
+	JP		UnionAndDraw
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Put bit 0 of A into bit 2 (next char to swop to) of SwopPressed
@@ -7940,54 +7948,54 @@ CharThing3:
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Looks like more movement stuff
 CharThing4:
-	CALL Get_curr_Char_variables						;; HL = pointer on current selected character's variables
-	PUSH HL
-	POP IY
-	LD A,&3F											;; Stop 0x0X noise
-	LD (Other_sound_ID),A								;; update Other_sound_ID &3F+&80 = &BF
-	LD A,(Saved_Objects_List_index)						;; get Saved_Objects_List_index
-	CALL SetObjList
-	CALL Get_curr_Char_variables						;; HL = pointer on current selected character's variables
-	CALL StoreObjExtents
-	LD HL,Jump_Height
-	LD A,(HL)
-	AND A
-	JR Z,br_27F8
-	LD A,(Saved_Objects_List_index)						;; get Saved_Objects_List_index
-	AND A
-	JR Z,br_27AF
-	LD (HL),&00
-	JR br_27F8
+	CALL	Get_curr_Char_variables						;; HL = pointer on current selected character's variables
+	PUSH	HL
+	POP		IY
+	LD		A,&3F										;; Stop 0x0X noise
+	LD		(Other_sound_ID),A							;; update Other_sound_ID &3F+&80 = &BF
+	LD		A,(Saved_Objects_List_index)				;; get Saved_Objects_List_index
+	CALL	SetObjList
+	CALL	Get_curr_Char_variables						;; HL = pointer on current selected character's variables
+	CALL	StoreObjExtents
+	LD		HL,Jump_Height
+	LD		A,(HL)
+	AND		A
+	JR		Z,br_27F8
+	LD		A,(Saved_Objects_List_index)				;; get Saved_Objects_List_index
+	AND		A
+	JR		Z,br_27AF
+	LD		(HL),&00
+	JR		br_27F8
 
 br_27AF
-	DEC (HL)
-	CALL Get_curr_Char_variables						;; HL = pointer on current selected character's variables
-	CALL ChkSatOn
+	DEC		(HL)
+	CALL	Get_curr_Char_variables						;; HL = pointer on current selected character's variables
+	CALL	ChkSatOn
 	JR		c,br_27C2
-	DEC (IY+O_Z)
-	LD A,Sound_ID_Rise_seq								;; TODO: Repeated rising sequence
-	CALL SetOtherSound
-	JR br_27D3
+	DEC		(IY+O_Z)
+	LD		A,Sound_ID_Rise_seq							;; TODO: Repeated rising sequence
+	CALL	SetOtherSound
+	JR		br_27D3
 
 br_27C2
-	EX AF,AF'
-	LD A,Sound_ID_Menu_Blip								;; TODO: Menu blip
-	BIT 4,(IY+O_IMPACT)
-	SET 4,(IY+O_IMPACT)
-	CALL Z,SetOtherSound
-	EX AF,AF'
-	JR Z,br_27DE
+	EX		AF,AF'
+	LD		A,Sound_ID_Menu_Blip						;; TODO: Menu blip
+	BIT		4,(IY+O_IMPACT)
+	SET		4,(IY+O_IMPACT)
+	CALL	Z,SetOtherSound
+	EX		AF,AF'
+	JR		Z,br_27DE
 br_27D3
-	RES 4,(IY+O_IMPACT)
-	SET 5,(IY+O_IMPACT)
-	DEC (IY+O_Z)
+	RES		4,(IY+O_IMPACT)
+	SET		5,(IY+O_IMPACT)
+	DEC		(IY+O_Z)
 br_27DE
-	LD A,(selected_characters)							;; get selected_characters
-	AND &02
-	JR NZ,br_27EB
+	LD		A,(selected_characters)						;; get selected_characters
+	AND		&02
+	JR		NZ,br_27EB
 br_27E5
-	LD A,(character_direction)							;; get LRDU character_direction
-	JP HandleMove
+	LD		A,(character_direction)						;; get LRDU character_direction
+	JP		HandleMove
 
 br_27EB
 	LD		A,(Current_User_Inputs)						;; get Current_User_Inputs CFWLRDUJ
@@ -7998,132 +8006,132 @@ br_27EB
 	JR		br_27E5										;; else not moving goto br_27E5
 
 br_27F8
-	SET 4,(IY+O_IMPACT)
-	SET 5,(IY+&0C)
-	CALL Get_curr_Char_variables						;; HL = pointer on current selected character's variables
-	LD A,(access_new_room_code)							;; get access_new_room_code (0=Stay,1=Down,2=Right,3=Up,4=Left,5=Below,6=Above,7=Teleport)
-	AND A												;; test
-	JR NZ,br_2812
-	CALL DoorContact
-	JP NC,CharThing23
-	JP NZ,CharThing22
+	SET		4,(IY+O_IMPACT)
+	SET		5,(IY+&0C)
+	CALL	Get_curr_Char_variables						;; HL = pointer on current selected character's variables
+	LD		A,(access_new_room_code)					;; get access_new_room_code (0=Stay,1=Down,2=Right,3=Up,4=Left,5=Below,6=Above,7=Teleport)
+	AND		A											;; test
+	JR		NZ,br_2812
+	CALL	DoorContact
+	JP		NC,CharThing23
+	JP		NZ,CharThing22
 br_2812
-	LD A,(access_new_room_code)							;; get access_new_room_code (0=Stay,1=Down,2=Right,3=Up,4=Left,5=Below,6=Above,7=Teleport)
-	RLA
-	JR NC,br_281C
-	LD (IY+&0C),&FF
+	LD		A,(access_new_room_code)					;; get access_new_room_code (0=Stay,1=Down,2=Right,3=Up,4=Left,5=Below,6=Above,7=Teleport)
+	RLA													;; bit7 in Carry (FF or not?)
+	JR		NC,br_281C									;; not FF then skip br_281C, else
+	LD		(IY+&0C),&FF								;; else if access_new_room_code=FF, set &0C offset to FF
 br_281C
-	LD A,Sound_ID_High_Blip
-	BIT 5,(IY+O_IMPACT)
-	SET 5,(IY+O_IMPACT)
-	CALL Z,SetOtherSound
-	BIT 4,(IY+&0C)
-	SET 4,(IY+&0C)
-	JR NZ,br_284B
-	CALL Get_curr_Char_variables						;; HL = pointer on current selected character's variables
-	CALL ChkSatOn
-	JR NC,EPIC_40
-	JR NZ,EPIC_40
-	LD A,Sound_ID_Menu_Blip								;; TODO Menu blip
-	CALL SetOtherSound
-	JR br_284B
+	LD		A,Sound_ID_High_Blip
+	BIT		5,(IY+O_IMPACT)
+	SET		5,(IY+O_IMPACT)
+	CALL	Z,SetOtherSound
+	BIT		4,(IY+&0C)
+	SET		4,(IY+&0C)
+	JR		NZ,br_284B
+	CALL	Get_curr_Char_variables						;; HL = pointer on current selected character's variables
+	CALL	ChkSatOn
+	JR		NC,EPIC_40
+	JR		NZ,EPIC_40
+	LD		A,Sound_ID_Menu_Blip						;; TODO Menu blip
+	CALL	SetOtherSound
+	JR		br_284B
 
 EPIC_40:
-	DEC (IY+O_Z)
-	RES 4,(IY+O_IMPACT)
+	DEC		(IY+O_Z)
+	RES		4,(IY+O_IMPACT)
 br_284B
-	XOR A
-	LD (TODO_248e),A									;; reset TODO_248e value
-	CALL DoCarry
-	CALL DoJump
+	XOR		A
+	LD		(TODO_248e),A								;; reset TODO_248e value
+	CALL	DoCarry
+	CALL	DoJump
 br_2855
-	LD A,(Current_User_Inputs)							;; get Current_User_Inputs CFSLRDUJ
+	LD		A,(Current_User_Inputs)						;; get Current_User_Inputs CFSLRDUJ
 	RRA													;; get LRDU in bits [3:0] = LRDU dir
 .HandleMove:																;; Do the movement with LRDU direction in A.
-	CALL MoveChar
-	CALL Orient
-	EX AF,AF'
-	LD A,(IsStill)
-	INC A
-	JR NZ,br_288C
+	CALL	MoveChar
+	CALL	Orient
+	EX		AF,AF'
+	LD		A,(IsStill)
+	INC		A
+	JR		NZ,br_288C
 	;; Character-is-still case.
     ;; Reset the animation loops for whichever Character is running now.
-	XOR A
-	LD HL,selected_characters							;; points on selected_characters
-	BIT 0,(HL)
-	JR Z,br_2874
-	LD (HeelsLoop),A									;; HeelsLoop anim index
-	LD (HeelsBLoop),A									;; HeelsBLoop anim index
+	XOR		A
+	LD		HL,selected_characters						;; points on selected_characters
+	BIT		0,(HL)
+	JR		Z,br_2874
+	LD		(HeelsLoop),A								;; HeelsLoop anim index
+	LD		(HeelsBLoop),A								;; HeelsBLoop anim index
 br_2874
-	BIT 1,(HL)
-	JR Z,br_287E
-	LD (HeadLoop),A										;; HeadLoop anim index
-	LD (HeadBLoop),A									;; HeadBLoop anim index
+	BIT		1,(HL)
+	JR		Z,br_287E
+	LD		(HeadLoop),A								;; HeadLoop anim index
+	LD		(HeadBLoop),A								;; HeadBLoop anim index
 br_287E
 	;; If Head is facing towards us, do blink. Set BC appropriately.
-	EX AF,AF'
-	LD BC,SPR_HEELSB1 * 256 + SPR_HEADB1				;; BC,SPR_HEELSB1 << 8 | SPR_HEADB1
-	JR c,br_28BC
-	CALL DoBlinkHeadEyes
-	LD BC,SPR_HEELS1 * 256 + SPR_HEAD2					;; BC,SPR_HEELS1 << 8 | SPR_HEAD2
-	JR br_28BC
+	EX		AF,AF'
+	LD		BC,SPR_HEELSB1 * 256 + SPR_HEADB1			;; BC,SPR_HEELSB1 << 8 | SPR_HEADB1
+	JR		c,br_28BC
+	CALL	DoBlinkHeadEyes
+	LD		BC,SPR_HEELS1 * 256 + SPR_HEAD2				;; BC,SPR_HEELS1 << 8 | SPR_HEAD2
+	JR		br_28BC
 
 br_288C
 	;; Choose animation frame for movement.
     ;; A' carry -> facing away.
-	EX AF,AF'
-	LD HL,HeelsLoop										;; HeelsLoop anim index
-	LD DE,HeadLoop										;; HeadLoop anim index
-	JR NC,br_289B
-	LD HL,HeelsBLoop									;; HeelsBLoop anim index
-	LD DE,HeadBLoop										;; HeadBLoop anim index
+	EX		AF,AF'
+	LD		HL,HeelsLoop								;; HeelsLoop anim index
+	LD		DE,HeadLoop									;; HeadLoop anim index
+	JR		NC,br_289B
+	LD		HL,HeelsBLoop								;; HeelsBLoop anim index
+	LD		DE,HeadBLoop								;; HeadBLoop anim index
 br_289B
-	PUSH DE
-	LD A,(selected_characters)							;; get selected_characters
+	PUSH	DE
+	LD		A,(selected_characters)						;; get selected_characters
 	RRA
-	JR NC,br_28A8
-	CALL Read_Loop_byte
-	LD (Heels_variables+O_SPRITE),A
+	JR		NC,br_28A8
+	CALL	Read_Loop_byte
+	LD		(Heels_variables+O_SPRITE),A
 br_28A8
-	POP HL
+	POP		HL
 	;; Update Head sprite (Head_variables+O_SPRITE) if Character contains Head.
-	LD A,(selected_characters)							;; get selected_characters
-	AND &02
-	JR Z,br_28B6
-	CALL Read_Loop_byte
-	LD (Head_variables+O_SPRITE),A
+	LD		A,(selected_characters)						;; get selected_characters
+	AND		&02
+	JR		Z,br_28B6
+	CALL	Read_Loop_byte
+	LD		(Head_variables+O_SPRITE),A
 br_28B6
-	SET 5,(IY+O_IMPACT)
-	JR UpdateChar
+	SET		5,(IY+O_IMPACT)
+	JR		UpdateChar
 br_28BC
-	SET 5,(IY+O_IMPACT)
+	SET		5,(IY+O_IMPACT)
 	;; Update the character animation frames to values in BC, and then
 	;; call UpdateChar.
 .UpdateCharFrame:
-	LD A,(selected_characters)							;; get selected_characters
+	LD		A,(selected_characters)						;; get selected_characters
 	RRA
-	JR NC,br_28C9
+	JR		NC,br_28C9
 	;; Heels case.
-	LD (IY+&08),B
+	LD		(IY+O_SPRITE),B
 br_28C9
-	LD A,(selected_characters)							;; get selected_characters
-	AND &02
-	JR Z,UpdateChar
+	LD		A,(selected_characters)						;; get selected_characters
+	AND		&02
+	JR		Z,UpdateChar
 	;; Head case.
-	LD A,C
-	LD (Head_variables+O_SPRITE),A
+	LD		A,C
+	LD		(Head_variables+O_SPRITE),A
 ;; Actually resort and redraw the character in IY.
 .UpdateChar:
-	LD A,(Movement)
-	LD (IY+&0C),A
-	CALL Get_curr_Char_variables						;; HL = pointer on current selected character's variables
-	CALL Relink
-	CALL SaveObjListIdx
-	XOR A
-	CALL SetObjList 									;; Switch to default object list
-	CALL Get_curr_Char_variables						;; HL = pointer on current selected character's variables
-	CALL UnionAndDraw
-	JP Also_Play_Movement_sound
+	LD		A,(Movement)
+	LD		(IY+&0C),A
+	CALL	Get_curr_Char_variables						;; HL = pointer on current selected character's variables
+	CALL	Relink
+	CALL	SaveObjListIdx
+	XOR		A
+	CALL	SetObjList 									;; Switch to default object list
+	CALL	Get_curr_Char_variables						;; HL = pointer on current selected character's variables
+	CALL	UnionAndDraw
+	JP		Also_Play_Movement_sound
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Update the blink counter, checks it, and blink or unblink Head's eyes.
@@ -8218,42 +8226,42 @@ br_2976
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Move the character.
 .MoveChar:
-	OR &F0
-	CP &FF
-	LD (IsStill),A
-	JR Z,br_2993
-	EX AF,AF'
-	XOR A
-	LD (IsStill),A
-	LD A,Sound_ID_Walking								;; Slower walking sound
-	CALL SetOtherSound
-	EX AF,AF'
-	LD HL,character_direction							;; points on LRDU character_direction
-	CP (HL)
-	LD (HL),A
-	JR Z,br_2998
+	OR		&F0
+	CP		&FF
+	LD		(IsStill),A
+	JR		Z,br_2993
+	EX		AF,AF'
+	XOR		A
+	LD		(IsStill),A
+	LD		A,Sound_ID_Walking							;; Slower walking sound
+	CALL	SetOtherSound
+	EX		AF,AF'
+	LD		HL,character_direction						;; points on LRDU character_direction
+	CP		(HL)
+	LD		(HL),A
+	JR		Z,br_2998
 br_2993
-	CALL ResetTickTock
-	LD A,&FF
+	CALL	ResetTickTock
+	LD		A,&FF
 br_2998
-	PUSH AF
-	AND (IY+&0C)
+	PUSH	AF
+	AND		(IY+&0C)
 	CALL 	DirCode_from_LRDU							;; get dir code (0 to 7 or FF), from LRDU
-	CP &FF
-	JR Z,br_29B6
-	CALL Get_curr_Char_variables						;; HL = pointer on current selected character's variables
-	CALL Move
-	JR NC,Sub_Move_Char
-	LD A,(IY+O_IMPACT)
-	OR &F0
-	INC A
-	LD A,Sound_ID_Menu_Blip								;; TODO: Menu blip
-	CALL NZ,SetOtherSound
+	CP		&FF
+	JR		Z,br_29B6
+	CALL	Get_curr_Char_variables						;; HL = pointer on current selected character's variables
+	CALL	Move
+	JR		NC,Sub_Move_Char
+	LD		A,(IY+O_IMPACT)
+	OR		&F0
+	INC		A
+	LD		A,Sound_ID_Menu_Blip						;; TODO: Menu blip
+	CALL	NZ,SetOtherSound
 br_29B6
-	POP AF
-	LD A,(IY+O_IMPACT)
-	OR &0F
-	LD (IY+O_IMPACT),A
+	POP		AF
+	LD		A,(IY+O_IMPACT)
+	OR		&0F
+	LD		(IY+O_IMPACT),A
 	RET
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -8331,34 +8339,34 @@ djmp_skip:
 	RET		NZ
 	LD		A,(Current_User_Inputs)						;; get Current_User_Inputs CFSLRDUJ
 	RRA													;; move LRDU in bits [3:0] = LRDU dir (active low)
-	RET		c											;; Jump in Carry (active low, Carry set = No jump, then leave
-	;; Jump button handling case
-	LD		C,0
-	LD		L,(IY+&0D)
-	LD		H,(IY+&0E)
-	LD		A,H
-	OR		L
-	JR		Z,br_2A53
+	RET		c											;; Jump key in Carry (active low), Carry set = No jump, then leave
+djmp_jumpkey:
+	LD		C,0											;; else Jump button is pressed
+	LD		L,(IY+O_OBJUNDER)
+	LD		H,(IY+O_OBJUNDER+1)
+	LD		A,H											;; HL= abject pointer if on top of an object
+	OR		L											;; test if offsets &0D and &0E are 0
+	JR		Z,br_testheelsjpbonus						;; if 0, jump br_testheelsjpbonus, else (had an object pointer)
 	PUSH	HL
-	POP		IX
-	BIT		0,(IX+O_SPRFLAGS)
-	JR		Z,br_2A41
+	POP		IX											;; else get HL into IX
+	BIT		0,(IX+O_SPRFLAGS)							;; test bit0 of IX object O_SPRFLAGS
+	JR		Z,br_teststandingon							;; if 0, jump br_teststandingon, else (is 1)
 	LD		A,(IX+O_IMPACT)
-	OR		&CF
-	INC		A
-	RET		NZ
-br_2A41
-	LD		A,(IX+O_SPRITE)
+	OR		&CF											;; test bits 5:4 of O_IMPACT
+	INC		A											;; if the bits were 2b'11, the A is now 0
+	RET		NZ											;; RET with NZ if the bits 5:4 were not 2b'11, else (they were):
+br_teststandingon
+	LD		A,(IX+O_SPRITE)								;; get sprite
 	AND		&7F											;; ignore anim bit
-	CP		SPR_TELEPORT								;; &57 SPR_TELEPORT + jump will Teleport
-	JR		Z,OnTeleport								;; ???jumping while on a teleporter: teleport????
-	CP		SPR_SPRING
-	JR		Z,onSpringStool
-	CP		SPR_SPRUNG
-	JR		NZ,br_2A53
-onSpringStool
-	INC 	C											;; if on a SPRING stool, incr C
-br_2A53
+	CP		SPR_TELEPORT								;; &57=SPR_TELEPORT + "Jump" will Teleport
+	JR		Z,OnTeleport								;; Jumping while on a teleporter: teleport!
+	CP		SPR_SPRING									;; if not a Teleporter, test if a SPRING stool
+	JR		Z,onSpringStool								;; Jumping while on a Spring stool, jump with extra force
+	CP		SPR_SPRUNG									;; else test if on a Srpung Spring stool
+	JR		NZ,br_testheelsjpbonus						;; if not, don't add extra jump (normal jump)
+onSpringStool																;; on a Spring stool, add extra force
+	INC 	C											;; if on a SPRING stool (sprung or not), incr C
+br_testheelsjpbonus
 	LD		A,(selected_characters)						;; get selected_characters
 	AND		%00000010									;; test if Head
 	JR		NZ,br_bigjump								;; if Head (or Head over Heels) skip, else (Heels only)
@@ -8374,9 +8382,9 @@ calculate_jump
 	ADD		A,A
 	ADD 	A,A											;; A*4
 	ADD		A,4											;; +4, now A can be 4, 8  or 12
-	CP		&0C											;; if result is 12 then clamp to 10 (else will be either 8 or 4)
+	CP		12											;; if result is 12 then clamp to 10 (else will be either 8 or 4)
 	JR		NZ,br_gotjumpheight
-	LD		A,&0A										;; clamped max value
+	LD		A,10										;; clamped max value
 	;; at this point A can be :
 	;; 10 : max clamped value if Head on a Spring stool or Heels on a Spring stool plus a Bunny Jump Bonus
 	;; 8 : normal Head (and Head over Heels) jump height or Heels with a Spring Bunny Bonus or Heels on a Spring stool
@@ -8399,6 +8407,7 @@ OnTeleport:
 	JP		Play_Sound	 								;; will RET
 
 ;; -----------------------------------------------------------------------------------------------------------
+;; This will handle the pick-up (by Heels with the Purse) of an object in the room
 .DoCarry:
 	LD		A,(CarryObject_Pressed)						;; get CarryObject_Pressed
 	RRA													;; Carry key pressed?
@@ -8413,24 +8422,25 @@ purseNope:
 purseYop:																	;; else do have the Purse
 	LD		A,Sound_ID_Sweep_Tri						;; else: Sound ID Sweep down and up
 	CALL	SetOtherSound
-	LD		A,(Carrying+1)
+	LD		A,(Carrying+1)								;; carried object pointer high byte
 	AND		A											;; test (if 0, Purse empty)
 	JR		NZ,DropCarried								;; If holding something, drop it
 pursePickup:
 	CALL	Get_curr_Char_variables						;; else pick up; HL = pointer on current selected character's variables
 	CALL	CheckStoodUponNPickable						;; NC : nothing to pick up, else HL/IX object can be picked up
 	JR		NC,purseNope								;; nothing below, can't pick up
-	LD		A,(IX+O_SPRITE)								;; Load sprite of thing carried
+	LD		A,(IX+O_SPRITE)								;; else, Load sprite of thing carried
 	PUSH	HL
-	LD		(Carrying),HL
+	LD		(Carrying),HL								;; store carried object pointer
 	LD		BC,&D8B0									;; CARRY_POSN = 216 << 8 | 176; carried object sprite y,x coord on HUD????
 	PUSH	AF
 	CALL	Draw_sprite_3x24							;; Draw the item now carried
 	POP		AF
 	POP		HL
-	JP		RemoveObject
+	JP		RemoveObject								;; remove the object from the room
 
 ;; -----------------------------------------------------------------------------------------------------------
+;; This is to drop the object carried in the Purse by Heels.
 .DropCarried:
 	LD		A,(Saved_Objects_List_index)				;; get Saved_Objects_List_index
 	AND		A
@@ -8462,9 +8472,9 @@ carryLoop:
 	LDD
 	LDD
 	POP		HL
-	CALL	InsertObject
+	CALL	InsertObject								;; add object to the room
 	LD		HL,&0000
-	LD		(Carrying),HL
+	LD		(Carrying),HL								;; reset the "Carrying" var
 	LD		BC,&D8B0									;; ARRY_POSN = 216 << 8 | 176
 	CALL	Clear_3x24									;; Clear out the what's-carried display
 	CALL	Get_curr_Char_variables						;; HL = pointer on current selected character's variables
@@ -8515,64 +8525,64 @@ carryLoop:
 
 ;; -----------------------------------------------------------------------------------------------------------
 CharThing15:
-	XOR A												;; A=0
-	LD (Vapeloop1),A									;; set anim index of "Vapeloop1" to 0
-	LD (Teleport_up_anim_length),A						;; set Teleport_up_anim_length to 0
-	LD (VapeLoop2),A									;; set anim index of "Vapeloop2" to 0
-	LD A,&08
-	LD (&24A8),A										;; set ??? to 8 Fired_Obj+&0F
-	CALL Set_Character_Flags
-	LD A,(selected_characters)							;; get selected_characters
-	LD (TODO_2496),A										;; update
-	CALL Get_curr_Char_variables						;; HL = pointer on current selected character's variables
-	PUSH HL
-	PUSH HL
-	PUSH HL
-	POP IY
-	LD A,(access_new_room_code)							;; get access_new_room_code (0=Stay,1=Down,2=Right,3=Up,4=Left,5=Below,6=Above,7=Teleport)
-	LD (TODO_2492),A										;; store ???
-	PUSH AF
-	SUB 1												;; at this point the value in A is (0=Down,1=Right,2=Up,3=Left,4=Below,5=Above,6=Teleport)
-	PUSH AF
-	CP &04												;; if access_new_room_code-1 >=4 (Below,Above,Teleport)
-	JR NC,EPIC_86										;; ...then jump EPIC_86, else (A 0 to 3 correspond to access_new_room_code 1 to 4):
-	XOR %00000001										;; flip bit0 (invert ???)
-	LD E,A
-	LD D,0												;; DE=A
-	LD HL,DoorHeights
-	ADD HL,DE											;; HL = DoorHeights+offset, with offset=A
-	LD C,(HL)
-	LD HL,WallSideBitmap								;; point on WallSideBitmap
-	ADD HL,DE											;; HL = WallSideBitmap+offset, with offset=A
-	LD A,(Has_no_wall)									;; get walls status
-	AND (HL)											;; apply bitmask
-	JR NZ,EPIC_86										;; NZ jump EPIC_86
-	LD (IY+O_Z),C
+	XOR		A											;; A=0
+	LD		(Vapeloop1),A								;; set anim index of "Vapeloop1" to 0
+	LD		(Teleport_up_anim_length),A					;; set Teleport_up_anim_length to 0
+	LD		(VapeLoop2),A								;; set anim index of "Vapeloop2" to 0
+	LD		A,&08
+	LD		(FiredObj_variables+O_ANIM),A				;; reset Fired_Obj anim
+	CALL	Set_Character_Flags
+	LD		A,(selected_characters)						;; get selected_characters
+	LD		(TODO_2496),A								;; update
+	CALL	Get_curr_Char_variables						;; HL = pointer on current selected character's variables
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	POP		IY
+	LD		A,(access_new_room_code)					;; get access_new_room_code (0=Stay,1=Down,2=Right,3=Up,4=Left,5=Below,6=Above,7=Teleport)
+	LD		(TODO_2492),A								;; store ???
+	PUSH	AF
+	SUB		1											;; at this point the value in A is (0=Down,1=Right,2=Up,3=Left,4=Below,5=Above,6=Teleport)
+	PUSH	AF
+	CP		&04											;; if access_new_room_code-1 >=4 (Below,Above,Teleport)
+	JR		NC,EPIC_86									;; ...then jump EPIC_86, else (A 0 to 3 correspond to access_new_room_code 1 to 4):
+	XOR		%00000001									;; flip bit0 (invert ???)
+	LD		E,A
+	LD		D,0											;; DE=A
+	LD		HL,DoorHeights
+	ADD		HL,DE										;; HL = DoorHeights+offset, with offset=A
+	LD		C,(HL)
+	LD		HL,WallSideBitmap							;; point on WallSideBitmap
+	ADD		HL,DE										;; HL = WallSideBitmap+offset, with offset=A
+	LD		A,(Has_no_wall)								;; get walls status
+	AND		(HL)										;; apply bitmask
+	JR		NZ,EPIC_86									;; NZ jump EPIC_86
+	LD		(IY+O_Z),C
 EPIC_86:
-	CALL Get_curr_Char_variables						;; HL = pointer on current selected character's variables
-	LD DE,&0005
-	ADD HL,DE											;; Curr Char Variable+5 (U coord)
-	EX DE,HL											;; in DE
-	POP AF
-	JR c,EPIC_93
-	CP &06
-	JR Z,EPIC_90
-	JR NC,EPIC_92
-	CP &04
-	JR NC,EPIC_88
-	LD HL,Max_min_UV_Table								;; pointer on MinU
-	LD C,&FD
+	CALL	Get_curr_Char_variables						;; HL = pointer on current selected character's variables
+	LD		DE,&0005
+	ADD		HL,DE										;; Curr Char Variable+5 (U coord)
+	EX		DE,HL										;; in DE
+	POP		AF
+	JR		c,EPIC_93
+	CP		&06
+	JR		Z,EPIC_90
+	JR		NC,EPIC_92
+	CP		&04
+	JR		NC,EPIC_88
+	LD		HL,Max_min_UV_Table							;; pointer on MinU
+	LD		C,&FD
 	RRA
-	JR NC,EPIC_87
-	INC DE
-	INC HL
+	JR		NC,EPIC_87
+	INC		DE
+	INC		HL
 EPIC_87:
 	RRA
 	JR		c,EPIC_95
-	LD C,&03
-	INC HL
-	INC HL
-	JR EPIC_95
+	LD		C,&03
+	INC		HL
+	INC		HL
+	JR		EPIC_95
 
 EPIC_88:
 	INC DE
@@ -8580,7 +8590,7 @@ EPIC_88:
 	RRA
 	LD A,&84
 	JR NC,EPIC_89
-	LD A,(&236E)
+	LD A,(TODO_236e)
 	AND A
 	LD A,&BA
 	JR Z,EPIC_89
@@ -8593,7 +8603,7 @@ EPIC_89:
 EPIC_90:
 	INC DE
 	INC DE
-	LD A,(&236E)
+	LD A,(TODO_236e)
 	AND A
 	JR Z,EPIC_91
 	LD A,(DE)
@@ -8609,7 +8619,7 @@ EPIC_92:
 	JR EPIC_94
 
 EPIC_93:
-	LD HL,&2C54											;; TODO_2c54 ; DE points on the curr Char U (*_variables+5)
+	LD HL,TODO_2c54_uvz_reset_values					;; TODO_2c54 ; uvz
 EPIC_94:
 	LDI													;; copy U ; do : LD (DE),(HL); DE++, HL++, BC--
 	LDI													;; copy V
@@ -8638,8 +8648,8 @@ EPIC_97:
 	LD DE,EntryPosn
 	LD BC,&0003
 	LDIR												;; repeat LD (DE),(HL); DE++, HL++, BC-- until BC=0
-	LD (IY+&0D),&00
-	LD (IY+&0E),&00
+	LD (IY+O_OBJUNDER),&00
+	LD (IY+O_OBJUNDER+1),&00							;; reset O_OBJUNDER pointer
 	LD (IY+O_IMPACT),&FF
 	LD (IY+&0C),&FF
 	POP HL
@@ -8648,7 +8658,7 @@ EPIC_97:
 	XOR A												;; A=0
 	LD (DyingAnimFrameIndex),A							;; reset DyingAnimFrameIndex
 	LD (Dying),A										;; reset Dying
-	LD (&236E),A										;; reset 236E ???
+	LD (TODO_236e),A									;; reset 236E ???
 	JP SetObjList										;; Switch to default object list
 
 .SaveObjListIdx:
@@ -8677,7 +8687,7 @@ EPIC_97:
 	JP		Draw_sprite_3x24							;; Draw object sprite on HUD above the Purse
 
 ;; -----------------------------------------------------------------------------------------------------------
-TODO_2c54:											;; UVZ for ???
+TODO_2c54_uvz_reset_values:											;; UVZ for ???
 	DEFB 	&28, &28, GROUND_LEVEL
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -8731,13 +8741,16 @@ WallSideBitmap: 									;; index 0 = 8 = bit3, index 1 = 4 = bit2 etc.
 	RET
 
 ;; -----------------------------------------------------------------------------------------------------------
+;; This handles the "on ground level" state. It'll check if the Floor is deadly
+;; or if the room has no floor hence falling in room below.
+;; We are one the ground (HitFloor) or one above (NearHitFloor) : Input A = 0
 .NearHitFloor:
 	CP		&FF											;; This way, only get the start.
 	;; A is zero. We've hit, or nearly hit, the floor.
 .HitFloor:
 	SCF
-	LD		(IY+&0D),A
-	LD		(IY+&0E),A
+	LD		(IY+O_OBJUNDER),A
+	LD		(IY+O_OBJUNDER+1),A							;; A=0, so reset O_OBJUNDER pointer
 	RET		NZ
 	;; Called HitFloor, not NearHitFloor.
 	BIT		0,(IY+O_SPRFLAGS)							;; sprite flag bit0
@@ -8771,6 +8784,7 @@ HF_1:
 	RET
 
 ;; -----------------------------------------------------------------------------------------------------------
+;; If the floor is deadly
 .DeadlyFloorCase:
 	LD		C,(IY+O_SPRFLAGS)
 	LD		B,(IY+O_FLAGS)
@@ -8793,20 +8807,17 @@ HF_1:
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Object (character?) in IY.
 .DoContact2:
-	LD A,(IY+O_Z)
-	SUB GROUND_LEVEL
-	;; A contains height difference
+	LD A,(IY+O_Z)										;; Z - ground level
+	SUB GROUND_LEVEL									;; A has the difference between the height and the ground level
 .DoContact:
 	;; Clear what's on character so far.
 	LD BC,&0000
 	LD (ObjContact),BC
-	;; If we've hit the floor, go to that case
-	JR Z,HitFloor
-	;; Just above floor? Still call through
-	INC A
-	JR Z,NearHitFloor
+	JR Z,HitFloor										;; if A = 0 it means we hit the floor
+	INC A												;; if we were 1 above, we still considere we are on the ground
+	JR Z,NearHitFloor									;; inc A will have A=0 if nearly on the ground
 	;; Set C to high-Z plus one (i.e. what we're resting on)
-	CALL GetUVZExtents_AdjustLowZ
+	CALL GetUVZExtents_AdjustLowZ						;; else not on the ground
 	LD C,B
 	INC C
 	;; Looks like we use what we were on previously as our current
@@ -8815,19 +8826,19 @@ HF_1:
     ;;
     ;; Load the object character's on into IX. Go to ChkSitOn if null.
 	EXX
-	LD A,(IY+&0E)
-	AND A
-	JR Z,ChkSitOn
-	LD H,A
-	LD L,(IY+&0D)
+	LD A,(IY+O_OBJUNDER+1)
+	AND A												;; test O_OBJUNDER high byte
+	JR Z,ChkSitOn										;; if 0 check if we are just on contact with something
+	LD H,A												;; else not 0 so already have an object pointer for O_OBJUNDER
+	LD L,(IY+O_OBJUNDER)
 	PUSH HL
-	POP IX
+	POP IX												;; ... and put the pointer in IX
 	;; Various other tests where we switch over to ChkSitOn.
-	BIT 7,(IX+O_FLAGS)
+	BIT 7,(IX+O_FLAGS)									;; test if object should be ignored
 	JR NZ,ChkSitOn
 	;; Check we're still on it.
-	LD A,(IX+O_Z)
-	SUB 6
+	LD A,(IX+O_Z)										;; get its Z
+	SUB 6												;; now has the value for one character height unit above (sub = going up in Z)
 	EXX
 	CP B
 	EXX
@@ -8838,19 +8849,16 @@ HF_1:
 ;; Deal with contact between a character and a thing.
 ;; IY is the character, IX is what it's resting on.
 .DoObjContact:
-    ;; If it's the second part of a double-height...
-	BIT 1,(IX+O_SPRFLAGS)
-	JR Z,DOC_1
-	;; Reset bit 5 of Offset C
-	RES 5,(IX-6)										;; (IX-06)
-	;; Load Offset B
-	LD A,(IX-7)											;; (IX-07)
+	BIT 1,(IX+O_SPRFLAGS)								;; check if tis is the 2nd part of a double sprite object
+	JR Z,DOC_1											;; single or main part, jump DOC_1
+	RES 5,(IX-OBJECT_LENGTH+&0C)						;; else double sprite, 2nd one : reset bit5 of the main object (IX-06 = IX-&12+&0C)
+	LD A,(IX-OBJECT_LENGTH+O_IMPACT)					;; read main object impact (IX-07 = IX-&12+&0B)
 	JR DOC_2
 
-;; Otherwise, do the same, but single-height.
-DOC_1:
-	RES 5,(IX+&0C)
-	LD A,(IX+O_IMPACT)
+
+DOC_1:																		;; Otherwise, do the same, but directly on the main object
+	RES 5,(IX+&0C)										;; reset bit5 of &0C
+	LD A,(IX+O_IMPACT)									;; read main object impact
 ;; Mask Offset C of IY with top 3 bits of Offset C of stood-on object.
 DOC_2:
 	OR &E0
@@ -8893,8 +8901,8 @@ CSIT_nextobject:
 	POP		HL
 	JR		NC,CSIT_nextobject								;; no overlap, look at next object in the list
 CSIT_2:																			;; else
-	LD		(IY+&0D),L										;; Record what we're sitting on in the (character) in IY.
-	LD		(IY+&0E),H
+	LD		(IY+O_OBJUNDER),L								;; Record pointer of what we're sitting on in the character IY+O_OBJUNDER
+	LD		(IY+O_OBJUNDER+1),H
 	JR		DoObjContact 									;; Hit!
 
 CSIT_3:
@@ -8949,14 +8957,14 @@ CSIT_6:
 	CALL	GetCharObjIX
 	CALL	CheckWeOverlap
 	JR		NC,CSIT_7
-	LD		(IY+&0D),0
-	LD		(IY+&0E),0
+	LD		(IY+O_OBJUNDER),0								;; reset object under pointer
+	LD		(IY+O_OBJUNDER+1),0
 	JR		CSIT_11
 
 CSIT_7:
 	LD		HL,(ObjContact)
-	LD		(IY+&0D),0
-	LD		(IY+&0E),0
+	LD		(IY+O_OBJUNDER),0
+	LD		(IY+O_OBJUNDER+1),0
 	LD		A,H
 	AND		A
 	RET		Z
@@ -8964,7 +8972,7 @@ CSIT_7:
 	POP		IX
 	BIT		1,(IX+O_SPRFLAGS)
 	JR		Z,CSIT_9
-	BIT		4,(IX-7)										;; (IX-07)
+	BIT		4,(IX-OBJECT_LENGTH+O_IMPACT)				;; (IX-07 = IX-&12+O_IMPACT)
 	JR		CSIT_10
 CSIT_9:
 	BIT		4,(IX+O_IMPACT)
@@ -9399,7 +9407,7 @@ pgmen_1:
 	DEFB	3 	   					;; MENU_NB_ITEMS : Number of items
 	DEFB	&09    					;; MENU_INIT_COL : Initial column
 	DEFB	&09    					;; MENU_INIT_ROW : Initial row
-	DEFB	&A0						;; MENU_SEL_STRINGID : Selected item ; default String ID (&A0 = "OLD GAME")
+	DEFB	Print_StrID_Old_Game	;; MENU_SEL_STRINGID : Selected item ; default String ID (&A0 = "OLD GAME")
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Game over Screen
@@ -9450,7 +9458,7 @@ goverscr_2:
 	CALL 	SavedWorldCount								;; count number of saved worlds
 	LD		A,E											;; get number from E
 	CALL 	Print_2Digits_LeftAligned					;; print value in A (left aligned)
-	LD		 A,Print_StringID_Planets					;; String "PLANETS
+	LD		A,Print_StringID_Planets					;; String "PLANETS
 	CALL 	Print_String
 goverscr_3
 	CALL 	Play_HoH_Tune								;; Play main Theme
@@ -9508,7 +9516,7 @@ mstepc_1
 	LD B,(IX+MENU_INIT_ROW)								;; B = row number
 	RES 7,B												;; make sure bit 7 is 0
 	LD C,(IX+MENU_INIT_COL)								;; C = col number
-	LD (&2F16),BC										;; store current cursor position
+	LD (MenuCursor),BC									;; store current cursor position
 	CALL Set_Cursor_position
 	LD B,(IX+MENU_NB_ITEMS)								;; number of menu items
 	LD C,(IX+MENU_CURR_SEL)								;; currently selected item
@@ -9539,7 +9547,7 @@ br_30EE
 	CALL Print_String
 	POP HL
 	PUSH HL
-	LD BC,(&2F16)										;; restore current cursor position
+	LD BC,(MenuCursor)									;; restore current cursor position
 	LD A,L
 	AND A
 	JR NZ,br_310E
@@ -9559,7 +9567,7 @@ br_310E
 br_3123
 	POP BC
 	INC B
-	LD (&2F16),BC										;; next cursor position
+	LD (MenuCursor),BC									;; next cursor position
 	CALL Set_Cursor_position
 	POP BC
 	DJNZ drwmen_loop
@@ -11235,7 +11243,7 @@ br_3ADF
 ;; object made out of two subcomponents, and both must be
 ;; unlinked.
 .Unlink:
-	BIT		3,(IY+O_FLAGS)
+	BIT		3,(IY+O_FLAGS)										;; "Tall" bit
 	JR		Z,UnlinkObj
 	PUSH	HL
 	CALL	UnlinkObj
@@ -12342,7 +12350,7 @@ savecont_2:
 	LDI													;; do once : LD (DE),(HL); DE++, HL++, BC--
 	CP &03
 	JR Z,SaveContinue_3
-	LD HL,TODO_2496									;; ???
+	LD HL,TODO_2496										;; ???
 	CP (HL)
 	JR NZ,SaveContinue_3
 	LD HL,&BB31											;; save 4 bytes in buffer
@@ -12720,7 +12728,7 @@ cbi2:
 	JR		Z,gs_1										;; if only one reached the end, skip, else:
 	LD		HL,&1002									;; points = 1002 (BCD)
 gs_1:
-	LD		BC,&0010									;; BC= 16 (&10 not BCD)
+	LD		BC,16										;; BC= 16 (&10 not BCD)
 	CALL 	MulAccBCD									;; HL = DE (BCD) * BC
 	PUSH 	HL
 	CALL 	PurseHooterCount							;; Count Purse and Hooter in DE
@@ -12940,10 +12948,9 @@ Rand_seed_2:
 	POP 	HL
 	CALL 	DrawObject
 	POP 	IX
-	SET 	7,(IX+O_FLAGS)
-	;; Transfer top bit of Phase to IX+&0A
+	SET 	7,(IX+O_FLAGS)										;; set "ignore object" bit
 	LD		A,(Do_Objects_Phase)								;; get Do_Objects_Phase
-	LD		C,(IX+O_FUNC)
+	LD		C,(IX+O_FUNC)										;; phase bit
 	XOR 	C
 	AND 	&80													;; get function and flip the bit7 (phase)
 	XOR 	C
@@ -13210,8 +13217,8 @@ Draw_sprite_3x32:
 	JP		Erase_forward_Block_RAM						;; Continue on Erase_forward_Block_RAM (will have a RET)
 
 ;; -----------------------------------------------------------------------------------------------------------
-TBD_4657:
-	DEFB 	&00							;; ????this has the curr character (facing) direction
+Movement_Facing:
+	DEFB 	&00											;; ????this has the curr character (facing) direction when moving
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; access_new_room_code:
@@ -13264,7 +13271,7 @@ NR_Direction:
 	SUB 	L
 	LD		H,A											;; HL = MoveTbl + A*5 (A the dir code 0 to 7)
 	LD		A,(HL)										;; facing LRDU value
-	LD		(&4657),A					 				;; Load first value here LRDU direct of ????
+	LD		(Movement_Facing),A					 		;; Load first value here LRDU direct of ????
 	INC 	HL
 	LD		E,(HL)
 	INC 	HL
@@ -13359,12 +13366,12 @@ NR_Direction:
 .PM_BFound:
 	PUSH HL
 	POP IX
-	LD A,(&4657)										;; (read the saved facing LRDU value)
+	LD A,(Movement_Facing)								;; (read the saved facing LRDU value)
 	BIT 1,(IX+O_SPRFLAGS)								;; Second part of double-height is character or object?
 	JR Z,PM_Found2
     ;; Adjust first, then.
-	AND (IX-6)											;; (IX+&0C-18) ; -6
-	LD (IX-6),A											;; (IX+&0C-18) ; -6
+	AND (IX-OBJECT_LENGTH+&0C)							;; (IX-&12+&0C) ; -6
+	LD (IX-OBJECT_LENGTH+&0C),A							;; (IX-&12+&0C) ; -6
 	JR PM_Found3
 
 ;; Otherwise, adjust it.
@@ -14608,27 +14615,27 @@ ObjFnCannonFire:
 ;; When the player stands on it, the sandwich will move in the same direction
 ;; the player is facing until an obstacle and stops. Seems to ignore any new
 ;; direction until it reached a stopping point.
-ObjFn35Bool:
+ObjFnDrivenBool:
 	DEFB	&00											;; can be 0 or FF (FF during Sub_FnDriven is processed, else 0)
 
 ObjFnDriven:
-	LD HL,ObjFn35Bool
-	LD (HL),&FF
-	PUSH HL
-	CALL Sub_FnDriven
-	POP HL
-	LD (HL),&00
+	LD		HL,ObjFnDrivenBool
+	LD		(HL),&FF
+	PUSH	HL
+	CALL	Sub_FnDriven
+	POP		HL
+	LD		(HL),&00
 	RET
 
 Sub_FnDriven:
-	LD A,(ObjDir)
-	INC A
-	JR NZ,ObjFnEnd2
-	LD A,(IY+&0C)
-	AND &20												;; test bit 5
-	RET NZ
-	LD BC,(character_direction)							;; get character_direction LRDU in C
-	JR ObjFnEnd
+	LD		A,(ObjDir)
+	INC		A
+	JR		NZ,ObjFnEnd2
+	LD		A,(IY+&0C)
+	AND		&20											;; test bit 5
+	RET		NZ
+	LD		BC,(character_direction)					;; get character_direction LRDU in C
+	JR		ObjFnEnd
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Used by TAP in the room &220 or &320, they activate (ie. moves forward
@@ -14636,77 +14643,77 @@ Sub_FnDriven:
 ;; radar beams on all 4 sides).
 ;; If we are standing in their diagonal we are invisible to them)
 ObjFnRadarBeams:
-	LD A,(ObjDir)
-	INC A
-	JR NZ,ObjFnEnd2
-	CALL CharDistAndDir
-	OR &F3												;; ~&0C ; Clear one axis of direction bits
-	CP C
-	JR Z,ObjFnEnd
-	LD A,C
-	OR &FC
-	CP C
-	RET NZ
+	LD		A,(ObjDir)
+	INC		A
+	JR		NZ,ObjFnEnd2
+	CALL	CharDistAndDir
+	OR		&F3											;; ~&0C ; Clear one axis of direction bits
+	CP		C
+	JR		Z,ObjFnEnd
+	LD		A,C
+	OR		&FC
+	CP		C
+	RET		NZ
 ObjFnEnd:
-	LD (IY+&0C),C
-	JR ObjFnEnd2
+	LD		(IY+&0C),C
+	JR		ObjFnEnd2
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; The function associated with a firing donut object.
 ObjFnFire:
-	CALL AnimateMe
-	CALL ObjFnSub
-	JR c,ObjFF2
-	CALL ObjFnSub
+	CALL	AnimateMe
+	CALL	ObjFnSub
+	JR		c,ObjFF2
+	CALL	ObjFnSub
 ObjFF2:
-	JP c,Fadeify
-	JR ObjDraw2
+	JP		c,Fadeify
+	JR		ObjDraw2
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; when pushed, the object will "roll" like a ball until it collides with something.
 ;; can be pushed by playable characters or moving enemies
 ObjFnBall:
-	LD A,(ObjDir)										;; get diraction
-	INC A
-	JR NZ,ObjFnEnd2										;; if not FF jump ObjFnEnd2
-	LD A,(IY+&0C)										;; else:
-	INC A
-	JR Z,ObjFnEnd4
+	LD		A,(ObjDir)									;; get diraction
+	INC		A
+	JR		NZ,ObjFnEnd2								;; if not FF jump ObjFnEnd2
+	LD		A,(IY+&0C)									;; else:
+	INC		A											;; test if was FF (A=0 in that case)
+	JR		Z,ObjFnEnd4
 ObjFnEnd2:
-	CALL ObjAgain8
-	CALL ObjFnSub
+	CALL	ObjAgain8
+	CALL	ObjFnSub
 ObjDraw2:
-	JP ObjDraw
+	JP		ObjDraw
 
 ObjFnEnd4:
-	PUSH IY
-	CALL ObjFnPushable
-	POP IY
-	LD (IY+O_IMPACT),&FF
+	PUSH	IY
+	CALL	ObjFnPushable
+	POP		IY
+	LD		(IY+O_IMPACT),&FF
 	RET
 
 ObjFnSub:
-	LD A,(ObjDir)
-	AND (IY+&0C)
+	LD		A,(ObjDir)
+	AND		(IY+&0C)
 	CALL 	DirCode_from_LRDU							;; get dir code (0 to 7 or FF), from LRDU
-	CP &FF
+	CP		&FF
 	SCF
-	RET Z
-	CALL  MoveCurrent									;; move current object in HL
-	RET c
-	PUSH AF
-	CALL UpdateObjExtents
-	POP AF
-	PUSH AF
-	CALL UpdateCurrPos
-	POP AF
-	LD HL,(ObjFn35Bool)									;; L = ObjFn35Bool boolean (0 or FF)
-	INC L												;; +1 to test if was FF
-	RET Z												;; RET if was FF, else:
-	CALL  MoveCurrent									;; move current object in HL
-	RET c
-	CALL UpdateCurrPos
-	AND A
+	RET		Z
+	CALL	MoveCurrent									;; move current object in HL
+	RET		c
+	PUSH	AF
+	CALL	UpdateObjExtents
+	POP		AF
+	PUSH	AF
+	CALL	UpdateCurrPos
+	POP		AF
+	LD		HL,(ObjFnDrivenBool)						;; L = ObjFnDrivenBool boolean (0 or FF)
+	INC		L											;; +1 to test if was FF
+	RET		Z											;; RET if was FF, else:
+	CALL	MoveCurrent									;; move current object in HL
+	RET		c
+	CALL	UpdateCurrPos
+	AND		A
 	RET
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -14723,49 +14730,49 @@ ObjFnSub:
 ;; (eg. a Dissolve2 object will become undissolvable if in the same room)
 ObjFnSwitch:
     ;; First check if we're touched. If not, clear &11 and return.
-	LD A,(IY+&0C)
-	OR &C0
-	INC A
-	JR NZ,objfnsw_1
-	LD (IY+O_SPECIAL),A
+	LD		A,(IY+&0C)
+	OR		&C0
+	INC		A
+	JR		NZ,objfnsw_1
+	LD		(IY+O_SPECIAL),A
 	RET
 
 ;; Otherwise, check if there was a previous touch.
 ;; If so, clear &0C and return.
 objfnsw_1:
-	LD A,(IY+O_SPECIAL)
-	AND A
-	JR Z,objfnsw_2
-	LD (IY+&0C),&FF
+	LD		A,(IY+O_SPECIAL)
+	AND		A
+	JR		Z,objfnsw_2
+	LD		(IY+&0C),&FF
 	RET
 
 ;; Mark as previously touched...
 objfnsw_2:
-	DEC (IY+O_SPECIAL)
-	CALL ObjAgain7
+	DEC		(IY+O_SPECIAL)
+	CALL	ObjAgain7
 	;; Call PerObj on each object in the main object list...
-	LD HL,ObjectLists + 2
+	LD		HL,ObjectLists + 2
 objfnsw_loop:
-	LD A,(HL)
-	INC HL
-	LD H,(HL)
-	LD L,A
-	OR H
-	JR Z,objfnsw_3
-	PUSH HL
-	PUSH HL
-	POP IX
-	CALL PerObjSwitch							    	;; Call with the object in HL and IX
-	POP HL
-	JR objfnsw_loop
+	LD		A,(HL)
+	INC		HL
+	LD		H,(HL)
+	LD		L,A
+	OR		H
+	JR		Z,objfnsw_3
+	PUSH	HL
+	PUSH	HL
+	POP		IX
+	CALL	PerObjSwitch							   	;; Call with the object in HL and IX
+	POP		HL
+	JR		objfnsw_loop
 
 ;; End part, mark for redraw and toggle the switch state flag.
 objfnsw_3:
-	CALL MarkToDraw
-	LD A,(IY+O_FLAGS)
-	XOR %00010000										;; flip bit4 of O_FLAGS
-	LD (IY+O_FLAGS),A
-	JP ObjDraw
+	CALL	MarkToDraw
+	LD		A,(IY+O_FLAGS)
+	XOR		%00010000									;; flip bit4 of O_FLAGS
+	LD		(IY+O_FLAGS),A
+	JP		ObjDraw
 
 ;; for each object in the room (ObjectLists + 2 list), that is not
 ;; the switch itself, neither is fading, apply the switch if needed
@@ -14809,8 +14816,8 @@ ObjFnHeliplat:
 ;; The cushions around the room &ABD (all but the ones under the doors)
 ;; use this feature.
 ObjFnColapse:
-	BIT		5,(IY+&0C)
-	RET		NZ
+	BIT		5,(IY+&0C)									;; test bit5 of &0C
+	RET		NZ											;; leave if 1, else is 0:
 	CALL	ObjAgain9
 	JP		ObjDraw
 
@@ -14880,46 +14887,46 @@ ObjFnDisappear:
 ;; -----------------------------------------------------------------------------------------------------------
 ;;The Spring stool will give the player extra jumping force
 ObjFnSpring:
-	LD B,(IY+O_SPRITE)
-	BIT 5,(IY+&0C)										;; test bit5
-	SET 5,(IY+&0C)										;; and set it
-	LD A,SPR_SPRUNG
-	JR Z,ofn_spring_end									;; if previous bit5 was 0, jump to ofn_spring_end
-	LD A,(IY+O_ANIM)									;; else : [7:3] = anim code, [2:0] = frame
-	AND A
-	JR NZ,br_4DBD
-	LD A,SPR_SPRUNG
-	CP B
-	JR NZ,ObjFnPushable
-	LD (IY+O_ANIM),&50									;; [7:3] = anim code = &0A (index9 in AnimTable = ANIM_SPRING), [2:0] = frame = 0
-	LD A,&04											;; noise when we land on the spring?
-	CALL SetSound
-	JR ObjFnStuff
+	LD		B,(IY+O_SPRITE)
+	BIT		5,(IY+&0C)									;; test bit5
+	SET		5,(IY+&0C)									;; and set it
+	LD		A,SPR_SPRUNG
+	JR		Z,ofn_spring_end							;; if previous bit5 was 0, jump to ofn_spring_end
+	LD		A,(IY+O_ANIM)								;; else : [7:3] = anim code, [2:0] = frame
+	AND		A
+	JR		NZ,br_4DBD
+	LD		A,SPR_SPRUNG
+	CP		B
+	JR		NZ,ObjFnPushable
+	LD		(IY+O_ANIM),&50								;; [7:3] = anim code = &0A (index9 in AnimTable = ANIM_SPRING), [2:0] = frame = 0
+	LD		A,&04										;; noise when we land on the spring?
+	CALL	SetSound
+	JR		ObjFnStuff
 
 br_4DBD
-	AND &07
-	JR NZ,ObjFnStuff
-	LD A,SPR_SPRING
+	AND		&07
+	JR		NZ,ObjFnStuff
+	LD		A,SPR_SPRING
 ofn_spring_end
-	LD (IY+O_SPRITE),A
-	LD (IY+O_ANIM),0									;; reset [7:3] = anim code = 0, [2:0] = frame = 0
-	CP B
-	JR Z,ObjFnPushable
-	JR ObjFnStuff
+	LD		(IY+O_SPRITE),A
+	LD		(IY+O_ANIM),0								;; reset [7:3] = anim code = 0, [2:0] = frame = 0
+	CP		B
+	JR		Z,ObjFnPushable
+	JR		ObjFnStuff
 
 ;; -----------------------------------------------------------------------------------------------------------
 ObjFnSpecial:
-	LD A,(IY+O_ANIM)									;; [7:3] = anim code, [2:0] = frame
-	AND &F0
-	JR Z,ObjFnPushable
+	LD		A,(IY+O_ANIM)								;; [7:3] = anim code, [2:0] = frame
+	AND		&F0
+	JR		Z,ObjFnPushable
 ObjFnStuff:
-	CALL UpdateObjExtents
-	CALL AnimateMe
+	CALL	UpdateObjExtents
+	CALL	AnimateMe
 .ObjFnPushable:		;; can be pushed
-	CALL ObjAgain8
-	LD A,&FF
-	CALL TestCollisions
-	JP ObjDraw
+	CALL	ObjAgain8
+	LD		A,&FF
+	CALL	TestCollisions
+	JP		ObjDraw
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; The Different ways an object can move.
@@ -15326,39 +15333,39 @@ hmin_2:
 ;; collision check?
 ;; input A = ??; IY = ??
 TestCollisions:
-	AND (IY+&0C)										;; ????TODO???
-	CP &FF												;; test if A = FF
-	LD (Collided),A										;; no collision
-	RET Z												;; A was FF leave with Zero and Collided=FF
+	AND		(IY+&0C)									;; ????TODO???
+	CP		&FF											;; test if A = FF
+	LD		(Collided),A								;; no collision
+	RET		Z											;; A was FF leave with Zero and Collided=FF
 	CALL 	DirCode_from_LRDU							;; else get dir code (0 to 7 or FF), from LRDU
-	CP &FF												;; was dir code = no movement?
-	LD (Collided),A										;; no collision
-	RET Z												;; no movement, leave with Zero and Collided=FF
-	PUSH AF												;; else: Save A
-	LD (Collided),A										;; reached here if A != &FF = collision
-	CALL MoveCurrent									;; move current object in HL; Carry set if collision
-	POP BC												;; get prev value of A in B
+	CP		&FF											;; was dir code = no movement?
+	LD		(Collided),A								;; no collision
+	RET		Z											;; no movement, leave with Zero and Collided=FF
+	PUSH	AF											;; else: Save A
+	LD 		(Collided),A								;; reached here if A != &FF = collision
+	CALL	MoveCurrent									;; move current object in HL; Carry set if collision
+	POP		BC											;; get prev value of A in B
 	CCF													;; invert Carry, now collision = NC
-	JP NC,br_501F
-	PUSH AF
-	CP B
-	JR NZ,br_5016
-	LD A,&FF
-	LD (Collided),A										;; no collision
+	JP		NC,br_501F
+	PUSH	AF
+	CP		B
+	JR		NZ,br_5016
+	LD		A,&FF
+	LD		(Collided),A								;; no collision
 br_5016:
-	CALL UpdateObjExtents
-	POP AF
-	CALL UpdateCurrPos
+	CALL	UpdateObjExtents
+	POP		AF
+	CALL	UpdateCurrPos
 	SCF
 	RET
 
 br_501F:
-	LD A,(ObjDir)										;; change direction on collision?
-	INC A												;; return the new direction
-	RET Z												;; Leave with Zero flag if A=0
+	LD		A,(ObjDir)									;; change direction on collision?
+	INC		A											;; return the new direction
+	RET		Z											;; Leave with Zero flag if A=0
 ObjAgain7:
-	LD A,&06											;; else: Sound_ID 06
-	JP SetSound											;; will RET
+	LD		A,&06										;; else: Sound_ID 06
+	JP		SetSound									;; will RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; check something and return Carry or NotCarry.
@@ -15368,49 +15375,49 @@ ObjAgain7:
 ;; when the result is NC (will reconvert DirCode_to_LRDU).
 ;; Else the ObjFnVisor1 (or ObjFnMonocat) won't get the new dirCode.
 ObjAgain8:
-	BIT 4,(IY+&0C)
-	JR Z,ObjAgain10
+	BIT		4,(IY+&0C)
+	JR		Z,ObjAgain10
 ObjAgain9:
-	LD HL,(CurrObject)
-	CALL DoContact2
-	JR NC,OA9c
+	LD		HL,(CurrObject)
+	CALL	DoContact2
+	JR		NC,OA9c
 	CCF
-	JR NZ,OA9b
-	BIT 4,(IY+&0C)
-	RET NZ
-	JR ObjAgain10
+	JR		NZ,OA9b
+	BIT		4,(IY+&0C)
+	RET		NZ
+	JR		ObjAgain10
 
 OA9b:
-	BIT 4,(IY+&0C)
+	BIT		4,(IY+&0C)
 	SCF
-	JR NZ,OA9c
-	RES 4,(IY+O_IMPACT)
+	JR		NZ,OA9c
+	RES		4,(IY+O_IMPACT)
 	RET
 
 OA9c:
-	PUSH AF												;; save Carry
-	CALL UpdateObjExtents
-	RES 5,(IY+O_IMPACT)
-	INC (IY+O_Z)										;; increase Z coord (goes down)
-	LD A,Sound_ID_Didididip								;; falling
-	CALL SetSound
-	POP AF												;; Restore Carry
-	RET c												;; leave if Carry set
-	INC (IY+O_Z)										;; else increase Z coord (down) again
+	PUSH	AF											;; save Carry
+	CALL	UpdateObjExtents
+	RES		5,(IY+O_IMPACT)
+	INC		(IY+O_Z)									;; increase Z coord (goes down)
+	LD		A,Sound_ID_Didididip						;; falling
+	CALL	SetSound
+	POP		AF											;; Restore Carry
+	RET		c											;; leave if Carry set
+	INC		(IY+O_Z)									;; else increase Z coord (down) again
 	SCF													;; leave with Carry set
 	RET
 
 ObjAgain10:
-	LD HL,(CurrObject)
-	CALL ChkSatOn
-	RES 4,(IY+O_IMPACT)
-	JR NC,br_5072
-	CCF
-	RET Z
+	LD		HL,(CurrObject)
+	CALL	ChkSatOn
+	RES		4,(IY+O_IMPACT)								;; reset bit4 of impact
+	JR		NC,br_5072                       			;; NC set (Carry reset) goto br_5072
+	CCF                                           		;; else NC reset, (Carry set), invert Carry and
+	RET		Z											;; leave with Carry reset if ??? was 0, else was 1:
 br_5072
-	CALL UpdateObjExtents
-	DEC (IY+O_Z)
-	SCF
+	CALL	UpdateObjExtents
+	DEC		(IY+O_Z)									;; up
+	SCF                            					    ;; leave with Carry set
 	RET
 
 ;; -----------------------------------------------------------------------------------------------------------
