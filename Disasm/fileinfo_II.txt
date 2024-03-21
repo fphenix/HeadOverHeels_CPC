@@ -611,10 +611,10 @@ copy_array_direction:
 	03AD A2 39 			DEFW 	SaveRestore_Block2							;; Argument 2: ObjListIdx (39A2)
 	03AF CD F4 03       CALL 	Copy_Data
 	03B2 19 00 			DEFW 	&0019										;; Argument 1: length &0019 (25 bytes)
-	03B4 92 24			DEFW 	SaveRestore_Block3							;; Argument 2: ???? (TODO_2492), EntryPosn, Corrying, ??? (TODO_2496), FireObject
+	03B4 92 24			DEFW 	SaveRestore_Block3							;; Argument 2: saved_room_access_code, EntryPosition_uvz, saved_selected_chars, Corrying, and FireObject
 	03B6 CD F4 03       CALL 	Copy_Data
 	03B9 F0 03			DEFW 	&03F0										;; Argument 1: length ObjectsLen (&03F0 = 56 x 18 bytes = 1008)
-	03BB 40 6A			DEFW 	SaveRestore_Block4							;; Argument 2: Objects (6A40)
+	03BB 40 6A			DEFW 	SaveRestore_Block4							;; Argument 2: ObjectsBuffer (6A40)
 	03BD C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -652,8 +652,8 @@ arg_copy_character_variables:
 Clear_character_objects:
 	03D8 2A BD 39       LD		HL,(Saved_Object_Destination)				;; get Saved_Object_Destination
 	03DB 22 A3 39       LD		(Object_Destination),HL						;; update Object_Destination
-	03DE 21 AD 39       LD		HL,ObjectLists + 4							;; erase from &39AD (ObjectLists + 1*4)
-	03E1 01 08 00       LD		BC,8										;; for 8 bytes
+	03DE 21 AD 39       LD		HL,ObjList_NextRoomV_Far2Near				;; erase from &39AD (ObjectLists + 4)
+	03E1 01 08 00       LD		BC,8										;; for 8 bytes: these are the "Next rooms U and V" lists
 	03E4 C3 67 24       JP		Erase_forward_Block_RAM						;; Continue on Erase_forward_Block_RAM (will have a RET)
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -725,7 +725,7 @@ smc_copy_func:
 	042E EE 80          XOR 	%10000000									;; toggle b7
 	0430 32 10 01       LD		(Do_Objects_Phase),A						;; update Do_Objects_Phase
 	0433 CD 51 25       CALL 	Characters_Update
-	0436 2A AB 39       LD		HL,(ObjectLists+2)							;; get object pointer
+	0436 2A AB 39       LD		HL,(ObjList_Regular_Near2Far)				;; get object pointer : Usual A list
 	0439 18 1D          JR		Sub_Do_Objects_entry
 
 doob_loop:
@@ -733,7 +733,7 @@ doob_loop:
 	043C 7E             LD		A,(HL)
 	043D 23             INC 	HL
 	043E 66             LD		H,(HL)
-	043F 6F             LD		L,A											;; get next object pointer in HL from (ObjectLists+2)
+	043F 6F             LD		L,A											;; get next object pointer in HL from (ObjList_Regular_Near2Far)
 	0440 E3             EX		(SP),HL										;; exchange object pointers (curr and next (next is now on the stack))
 	0441 EB             EX		DE,HL										;; put current pointer in DE
 	0442 21 0A 00       LD		HL,O_FUNC									;; O_FUNC = offset &0A in TmpObj_variables
@@ -5723,7 +5723,7 @@ unext_3:
 	1D23 BA             CP		D
 	1D24 38 0C          JR		c,drwc_2
 	;; Draw the next room in the V direction.
-	1D26 21 AD 39       LD		HL,ObjectLists + 4									;; ObjectLists + 1*4
+	1D26 21 AD 39       LD		HL,ObjList_NextRoomV_Far2Near
 	1D29 D5             PUSH 	DE
 	1D2A CD 64 1D       CALL 	Blit_Objects
 	1D2D D1             POP 	DE
@@ -5749,14 +5749,15 @@ drwc_2:
 	1D46 BA             CP		D
 	1D47 38 06          JR		c,drwc_1
 	;; Draw the next room in U direction.
-	1D49 21 B1 39       LD		HL,ObjectLists + 8									;; ObjectLists + 2*4
+	1D49 21 B1 39       LD		HL,ObjList_NextRoomU_Far2Near
 	1D4C CD 64 1D       CALL 	Blit_Objects
 drwc_1:
-	1D4F 21 B5 39       LD		HL,ObjectLists + 12									;; ObjectLists + 3*4 = Far
+	;; Draw from far to Near, the Back, the mid, the front
+	1D4F 21 B5 39       LD		HL,ObjList_Far_Far2Near
 	1D52 CD 64 1D       CALL 	Blit_Objects
-	1D55 21 A9 39       LD		HL,ObjectLists										;; Main object list
+	1D55 21 A9 39       LD		HL,ObjList_Regular_Far2Near							;; Main object list
 	1D58 CD 64 1D       CALL 	Blit_Objects
-	1D5B 21 B9 39       LD		HL,ObjectLists + 16  								;; ObjectLists + 4*4 = Near
+	1D5B 21 B9 39       LD		HL,ObjList_Near_Far2Near
 	1D5E CD 64 1D       CALL 	Blit_Objects
 	1D61 C3 A7 05       JP		Blit_screen
 
@@ -6105,6 +6106,7 @@ BaseFlags:																	;; object flags when builing a room
 ;;			 	Lower 6 bits are object function.
 ;; Offset B: O_IMPACT
 ;;				Bottom 4 bits are roller direction... last move dir for updated things.
+;;              The value in there will impact the direction of what on this object.
 ;; Offset C: O_????
 ;;				bits3:0 : LRDU direction bitmask? how we're being pushed?
 ;;				bit4 :
@@ -6120,6 +6122,8 @@ BaseFlags:																	;; object flags when builing a room
 ;;				On/Off state for switch
 ;;				special indexd for specials items.
 ;; -----------------------------------------------------------------------------------------------------------
+O_NEAR2FAR_LST			EQU		&00
+O_FAR2NEAR_LST			EQU		&02
 O_FLAGS					EQU 	&04
 O_U						EQU 	&05
 O_V						EQU 	&06
@@ -6136,8 +6140,8 @@ O_SPECIAL				EQU 	&11
 
 ;; Buffer for an object used during unpacking
 .TmpObj_variables:								;; 18 bytes
-	1E98 00	00			DEFW 	&0000			;;	0&1 :
-	1E9A 00	00			DEFW 	&0000			;;	2&3 :
+	1E98 00	00			DEFW 	&0000			;;	0&1 : O_NEAR2FAR_LST (A list)
+	1E9A 00	00			DEFW 	&0000			;;	2&3 : O_FAR2NEAR_LST (B list)
 	1E9C 00				DEFB 	&00				;;	4 : O_FLAGS
 	1E9D 00				DEFB 	&00				;;	5 : O_U coordinate
 	1E9E 00				DEFB 	&00				;;	6 : O_V coordinate
@@ -7406,21 +7410,22 @@ Jump_Height:
 
 ;; -----------------------------------------------------------------------------------------------------------
 .SaveRestore_Block3:										;; Save/Restore Block 3 : &19 (25 bytes)
-TODO_2492:
-	2492 00				DEFB 	&00							;; ??? a stored value of room access code (0=Stay,1=Down,2=Right,3=Up,4=Left,5=Below,6=Above,7=Teleport)
-.EntryPosn:
-	2493 00 00 00		DEFB 	&00, &00, &00				;; Where we entered the room (for when we die).
-TODO_2496:
-	2496 03				DEFB 	&03  					    ;; ???
-
+.Restored_if_death_block:									;; 5 values in buffer BB31 will be restored here when dying
+saved_room_access_code:
+	2492 00				DEFB 	&00							;; a stored value of room access code (0=Stay,1=Down,2=Right,3=Up,4=Left,5=Below,6=Above,7=Teleport)
+.EntryPosition_uvz:
+	2493 00 00 00		DEFB 	&00, &00, &00				;; UVZ Where we entered the room (for when we die).
+saved_selected_chars:
+	2496 03				DEFB 	&03  					    ;; a saved version of selected_character
+Restored_if_death_block_end:
 Carrying:
 	2497 00 00 			DEFW 	&0000  		           		;; Pointer to carried object.
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Fired Donut Object
 FiredObj_variables:  										;; &12 = 18
-	2499 00 00			DEFW	&0000						;;	0&1 :
-	249B 00 00 			DEFW	&0000						;;	2&3 :
+	2499 00 00			DEFW	&0000						;;	0&1 : O_NEAR2FAR_LST
+	249B 00 00 			DEFW	&0000						;;	2&3 : O_FAR2NEAR_LST
 	249D 20				DEFB	&20							;;	4 : O_FLAGS
 	249E 28 			DEFB	&28							;;	5 : O_U coordinate
 	249F 0B 			DEFB	&0B							;;	6 : O_V coordinate
@@ -7452,8 +7457,8 @@ Movement:
 Head_offset 			EQU 	OBJECT_LENGTH
 
 Heels_variables:											;; &12 = 18
-	24B0 00 00 			DEFW 	&0000						;;	0&1 :
-	24B2 00 00 			DEFW 	&0000						;;	2&3 :
+	24B0 00 00 			DEFW 	&0000						;;	0&1 : O_NEAR2FAR_LST
+	24B2 00 00 			DEFW 	&0000						;;	2&3 : O_FAR2NEAR_LST
 	24B4 08 			DEFB 	&08							;;	4 : O_FLAGS
 	24B5 28 			DEFB 	&28							;;	5 : O_U coordinate
 	24B6 0B 			DEFB 	&0B							;;	6 : O_V coordinate
@@ -7471,8 +7476,8 @@ Heels_variables:											;; &12 = 18
 
 ;; Head_variables addr = Heels_variables + Head_offset
 Head_variables:												;; &12 = 18
-	24C2 00 00			DEFW	&0000						;;	0&1 :
-	24C4 00 00			DEFW	&0000						;;	2&3 :
+	24C2 00 00			DEFW	&0000						;;	0&1 : O_NEAR2FAR_LST
+	24C4 00 00			DEFW	&0000						;;	2&3 : O_FAR2NEAR_LST
 	24C6 08				DEFB	&08							;;	4 : O_FLAGS
 	24C7 28				DEFB	&28							;;	5 : O_U coordinate
 	24C8 0B				DEFB	&0B							;;	6 : O_V coordinate
@@ -7688,80 +7693,81 @@ br_25B6
 	25B6 CD 87 27       CALL 	CharThing4
 
 br_25B9:
-	25B9 CD 3B 2B       CALL Get_curr_Char_variables						;; HL = pointer on current selected character's variables
-	25BC E5             PUSH HL
-	25BD FD E1          POP IY
-	25BF FD 7E 07       LD A,(IY+O_Z)
-	25C2 FE 84          CP &84
-	25C4 30 0F          JR NC,CheckFired
-	25C6 AF             XOR A
-	25C7 32 8F 24       LD (Jump_Height),A
-	25CA 3A BC 1E       LD A,(FloorAboveFlag)
-	25CD A7             AND A
-	25CE 20 05          JR NZ,CheckFired
-	25D0 3E 06          LD A,&06											;; code 6 = "go room Above"
-	25D2 32 58 46       LD (access_new_room_code),A							;; update access_new_room_code (0=Stay,1=Down,2=Right,3=Up,4=Left,5=Below,6=Above,7=Teleport)
+	25B9 CD 3B 2B       CALL	Get_curr_Char_variables						;; HL = pointer on current selected character's variables
+	25BC E5             PUSH	HL
+	25BD FD E1          POP		IY
+	25BF FD 7E 07       LD		A,(IY+O_Z)
+	25C2 FE 84          CP		&84
+	25C4 30 0F          JR		NC,CheckFired
+	25C6 AF             XOR		A
+	25C7 32 8F 24       LD		(Jump_Height),A
+	25CA 3A BC 1E       LD		A,(FloorAboveFlag)
+	25CD A7             AND		A
+	25CE 20 05          JR		NZ,CheckFired
+	25D0 3E 06          LD		A,&06										;; code 6 = "go room Above"
+	25D2 32 58 46       LD		(access_new_room_code),A					;; update access_new_room_code (0=Stay,1=Down,2=Right,3=Up,4=Left,5=Below,6=Above,7=Teleport)
 .CheckFired:
 	;; Check for Fire being pressed
-	25D5 3A 15 01       LD A,(FireDonuts_Pressed)							;; get FireDonuts_Pressed
+	25D5 3A 15 01       LD		A,(FireDonuts_Pressed)						;; get FireDonuts_Pressed
 	25D8 1F             RRA													;; get bit0 in Carry
-	25D9 30 66          JR NC,CheckDying									;; Carry reset so not pressed, jump to CheckDying, else:
-	25DB 3A 84 24       LD A,(selected_characters)							;; get selected_characters
-	25DE F6 FD          OR &FD												;; ~&02 test for Head
-	25E0 3C             INC A												;; if bit1 was 1, then A is now 0
-	25E1 21 AC 24       LD HL,Saved_Objects_List_index						;; point on Saved_Objects_List_index
-	25E4 B6             OR (HL)
-	25E5 20 57          JR NZ,CantFireDonut 								;; Skips if not Head (alone)
-	25E7 3A 7B 24       LD A,(Inventory)									;; get inventory
-	25EA F6 F9          OR &F9												;; ~&06 test bits 2 (Donuts) and 1 (Hooter)
-	25EC 3C             INC A												;; A is now 0 if we have both Hotter and donuts
-	25ED 20 4F          JR NZ,CantFireDonut 								;; Skips to CantFireDonut if don't have donuts and a hooter, else:
-	25EF 3A A8 24       LD A,(FiredObj_variables+O_ANIM)					;; [7:3] = anim code, [2:0] = frame
-	25F2 FE 08          CP &08												;; anim code 1; frame 0
-	25F4 20 48          JR NZ,CantFireDonut									;; if there is an Anim loop jump CantFireDonut, else:
-	25F6 21 C7 24       LD HL,Head_variables+O_U							;; Head U
-	25F9 11 9E 24       LD DE,FiredObj_variables+O_U						;; FiredObj U
-	25FC 01 03 00       LD BC,&0003											;; U,V and Z
+	25D9 30 66          JR		NC,CheckDying								;; Carry reset so not pressed, jump to CheckDying, else:
+	25DB 3A 84 24       LD		A,(selected_characters)						;; get selected_characters
+	25DE F6 FD          OR		&FD											;; ~&02 test for Head
+	25E0 3C             INC		A											;; if bit1 was 1, then A is now 0
+	25E1 21 AC 24       LD		HL,Saved_Objects_List_index					;; point on Saved_Objects_List_index
+	25E4 B6             OR		(HL)
+	25E5 20 57          JR		NZ,CantFireDonut 							;; Skips if not Head (alone)
+	25E7 3A 7B 24       LD		A,(Inventory)								;; get inventory
+	25EA F6 F9          OR		&F9											;; ~&06 test bits 2 (Donuts) and 1 (Hooter)
+	25EC 3C             INC		A											;; A is now 0 if we have both Hotter and donuts
+	25ED 20 4F          JR		NZ,CantFireDonut 							;; Skips to CantFireDonut if don't have donuts and a hooter, else:
+	25EF 3A A8 24       LD		A,(FiredObj_variables+O_ANIM)				;; [7:3] = anim code, [2:0] = frame
+	25F2 FE 08          CP		&08											;; anim code 1; frame 0
+	25F4 20 48          JR		NZ,CantFireDonut							;; if there is an Anim loop jump CantFireDonut, else:
+	25F6 21 C7 24       LD		HL,Head_variables+O_U						;; Head U
+	25F9 11 9E 24       LD		DE,FiredObj_variables+O_U					;; FiredObj U
+	25FC 01 03 00       LD		BC,&0003									;; 3 : U,V and Z
 	25FF ED B0          LDIR												;; Copies X/Y/Z coordinate from Head to fired donut. repeat LD (DE),(HL); DE++, HL++, BC-- until BC=0
-	2601 21 99 24       LD HL,FiredObj_variables
-	2604 E5             PUSH HL
-	2605 FD E1          POP IY												;; Sets IY to FiredObj_variables
-	2607 3A 10 01       LD A,(Do_Objects_Phase)								;; get Do_Objects_Phase
-	260A F6 19          OR OBJFN_FIRE
-	260C 32 A3 24       LD (FiredObj_variables+O_FUNC),A
-	260F FD 36 04 00    LD (IY+O_FLAGS),0									;; Init fire obj flags ;
-	2613 3A AB 24       LD A,(character_direction)							;; get LRDU character_direction
-	2616 32 A4 24       LD (FiredObj_variables+O_IMPACT),A
-	2619 FD 36 0C FF    LD (IY+&0C),&FF										;; fire obj ????
-	261D FD 36 0F 20    LD (IY+O_ANIM),&20									;; anim code in [7:3] = &04 (index3 in AminTable = ANIM_VAPE2) and frame = 0
-	2621 CD 66 3A 		CALL EnlistAux
+	2601 21 99 24       LD		HL,FiredObj_variables
+	2604 E5             PUSH	HL
+	2605 FD E1          POP		IY											;; Sets IY to FiredObj_variables
+	2607 3A 10 01       LD		A,(Do_Objects_Phase)						;; get Do_Objects_Phase
+	260A F6 19          OR		OBJFN_FIRE
+	260C 32 A3 24       LD		(FiredObj_variables+O_FUNC),A				;; fire function + phase set
+	260F FD 36 04 00    LD		(IY+O_FLAGS),0								;; Init fire obj flags ;
+	2613 3A AB 24       LD		A,(character_direction)						;; get LRDU character_direction
+	2616 32 A4 24       LD		(FiredObj_variables+O_IMPACT),A
+	2619 FD 36 0C FF    LD		(IY+&0C),&FF								;; fire obj ????
+	261D FD 36 0F 20    LD		(IY+O_ANIM),&20								;; anim code in [7:3] = &04 (index3 in AminTable = ANIM_VAPE2) and frame = 0
+	2621 CD 66 3A 		CALL	EnlistAux
 	;; Use up a donut
-	2624 3E 06       	LD A,CNT_DONUTS
-	2626 CD 43 41       CALL Decrement_counter_and_display
-	2629 06 48          LD B,Sound_ID_Donut_Firing							;; Sound ID &48 = Donut use
-	262B CD 91 0D       CALL Play_Sound
-	262E 3A 82 24       LD A,(nb_donuts)
-	2631 A7             AND A												;; To test if A==0
-	2632 20 0D          JR NZ,CheckDying									;; if A > 0 then can shoot Donut  ; if we put a &18 0D (JR CheckDying) then we have infinite Shoots
-	2634 21 7B 24       LD HL,Inventory										;; point on inventory
-	2637 CB 96          RES 2,(HL)
-	2639 CD 9C 45       CALL Draw_Screen_Periphery
-	263C 18 03          JR CheckDying
+	2624 3E 06       	LD		A,CNT_DONUTS
+	2626 CD 43 41       CALL	Decrement_counter_and_display				;; used a Donut, so decrement counter
+	2629 06 48          LD		B,Sound_ID_Donut_Firing						;; Sound ID &48 = Donut use
+	262B CD 91 0D       CALL	Play_Sound
+	262E 3A 82 24       LD		A,(nb_donuts)
+	2631 A7             AND		A											;; To test if A==0 (donut available?)
+	2632 20 0D          JR		NZ,CheckDying								;; if A > 0 then can shoot Donut  ; if we put a &18 0D (JR CheckDying) then we have infinite Shoots
+	2634 21 7B 24       LD		HL,Inventory								;; else no more donuts remaining, point on inventory
+	2637 CB 96          RES		2,(HL)										;; remove Donut tray from inventory
+	2639 CD 9C 45       CALL	Draw_Screen_Periphery						;; update HUD
+	263C 18 03          JR		CheckDying
 
 .CantFireDonut:
-	263E CD 71 02       CALL Play_Sound_NoCanDo
-.CheckDying:
-	2641 21 58 46       LD HL,access_new_room_code							;; point on access_new_room_code
-	2644 7E             LD A,(HL)											;; get access_new_room_code (0=Stay,1=Down,2=Right,3=Up,4=Left,5=Below,6=Above,7=Teleport)
-	2645 E6 7F          AND &7F												;; ignore bit7
-	2647 C8             RET Z												;; if (&80 () or &00 (staying in same room)) leave, else (change room):
-	2648 3A 59 46       LD A,(DyingAnimFrameIndex)							;; get DyingAnimFrameIndex
-	264B A7             AND A												;; test
-	264C 28 03          JR Z,FinishedDying									;; if 0 (finished dying) continue at FinishedDying, else (Dying):
-	264E 36 00          LD (HL),0											;; indicate we stay in the room, we can't change room when dying
+	263E CD 71 02       CALL	Play_Sound_NoCanDo							;; reached here if cannont fire a donut
+.CheckDying:																;; then check is character dying
+	2641 21 58 46       LD		HL,access_new_room_code						;; point on access_new_room_code
+	2644 7E             LD		A,(HL)										;; get access_new_room_code (0=Stay,1=Down,2=Right,3=Up,4=Left,5=Below,6=Above,7=Teleport)
+	2645 E6 7F          AND		&7F											;; ignore bit7
+	2647 C8             RET		Z											;; if (&80 () or &00 (staying in same room)) leave, else (change room):
+	2648 3A 59 46       LD		A,(DyingAnimFrameIndex)						;; get DyingAnimFrameIndex
+	264B A7             AND		A											;; test
+	264C 28 03          JR		Z,FinishedDying								;; if 0 (finished dying) continue at FinishedDying, else (Dying):
+	264E 36 00          LD		(HL),0										;; indicate we stay in the room, we can't change room when dying
 	2650 C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
+;; Death anim finished playing
 FinishedDying:
 	2651 3A 85 24       LD		A,(both_in_same_room)						;; get both_in_same_room
 	2654 A7             AND		A											;; test
@@ -7770,20 +7776,20 @@ FinishedDying:
 	265A E5             PUSH	HL
 	265B FD E1          POP		IY											;; IY = current character
 	265D CD F1 3A       CALL	Unlink
-	2660 3A 84 24       LD		A,(selected_characters)						;; get selected_characters (
+	2660 3A 84 24       LD		A,(selected_characters)						;; get selected_characters (bit0:Heels, bit1:Head, bit2:next)
 	2663 FE 03          CP		&03
-	2665 28 22          JR		Z,nfc_end
-	2667 21 96 24       LD		HL,TODO_2496								;; TODO???
+	2665 28 22          JR		Z,nfc_end									;; both selected, jump nfc_end
+	2667 21 96 24       LD		HL,saved_selected_chars						;; else: point on saved_selected_chars
 	266A BE             CP		(HL)
 	266B 28 05          JR		Z,br_2672
-	266D EE 03          XOR		&03
+	266D EE 03          XOR		&03											;; flip selected
 	266F 77             LD		(HL),A
 	2670 18 0B          JR		br_267D
 
 br_2672
-	2672 21 31 BB       LD		HL,&BB31									;; copy the 5 bytes in the buffer in the 3 variables from 2492
-	2675 11 92 24       LD		DE,&2492
-	2678 01 05 00       LD		BC,&0005
+	2672 21 31 BB       LD		HL,&BB31									;; copy the 5 bytes from the buffer in the 3 variables starting at 2492
+	2675 11 92 24       LD		DE,Restored_if_death_block
+	2678 01 05 00       LD		BC,&0005									;; restore saved_room_access_code, EntryPosition_uvz and saved_selected_chars
 	267B ED B0          LDIR												;; Copy: repeat LD (DE),(HL); DE++, HL++, BC-- until BC=0
 
 br_267D
@@ -7847,31 +7853,30 @@ br_26CA
 	26DB 3A 85 24       LD		A,(both_in_same_room)						;; get both_in_same_room
 	26DE A7             AND		A											;; test A
 	26DF 28 1E          JR		Z,HD_6										;; if 0 (not in same room) jump HD_6, else (same room):
-	26E1 3A 96 24       LD		A,(TODO_2496)
-	26E4 FE 03          CP		&03											;; TODO is this to share a life when one has 0, borrow 1 life to the other char.
-	26E6 20 0C          JR		NZ,hddth_1
-	26E8 7E             LD		A,(HL)
-	26E9 A7             AND		A
-	26EA 3E 01          LD		A,&01
-	26EC 20 01          JR		NZ,br_26EF
+	26E1 3A 96 24       LD		A,(saved_selected_chars)					;; else are same room
+	26E4 FE 03          CP		&03											;; were both characters selected?
+	26E6 20 0C          JR		NZ,hddth_1									;; no, jump to hddth_1
+	26E8 7E             LD		A,(HL)										;; else read Heels lives
+	26E9 A7             AND		A											;; test
+	26EA 3E 01          LD		A,&01										;; prepare A=1
+	26EC 20 01          JR		NZ,br_26EF									;; if
 	26EE 3C             INC		A
 br_26EF
-	26EF 32 96 24       LD		(TODO_2496),A
+	26EF 32 96 24       LD		(saved_selected_chars),A
 	26F2 18 1D          JR		HD_8
 
-hddth_1:
-	26F4 1F             RRA
-	26F5 38 01          JR		c,hddth_skip_inc
-	26F7 23             INC		HL
+hddth_1:																	;; one character was selected
+	26F4 1F             RRA													;; Heels' selected status in Carry
+	26F5 38 01          JR		c,hddth_skip_inc							;; if Heels selected, jump hddth_skip_inc
+	26F7 23             INC		HL											;; else point on Head's lives
 hddth_skip_inc:
-	26F8 7E             LD		A,(HL)
-	26F9 A7             AND		A
-	26FA 20 12          JR		NZ,br_270E
-	26FC 32 85 24       LD		(both_in_same_room),A						;; update both_in_same_room; InSameRoom
+	26F8 7E             LD		A,(HL)										;; read lives for currently selected character
+	26F9 A7             AND		A											;; test if 0
+	26FA 20 12          JR		NZ,br_270E									;; not 0, jump br_270E
+	26FC 32 85 24       LD		(both_in_same_room),A						;; else, A=0 (curr char no more lives); reset both_in_same_room
 
 HD_6:
-	;; Current character has no more lives, switch to other character"
-	26FF CD 92 02       CALL	Switch_Character
+	26FF CD 92 02       CALL	Switch_Character							;; switch other character
 	2702 21 00 00       LD		HL,&0000
 	2705 22 59 46       LD		(DyingAnimFrameIndex),HL					;; reset DyingAnimFrameIndex and Dying
 HD_7:
@@ -7879,20 +7884,20 @@ HD_7:
 	270B CB C6          SET		0,(HL)
 	270D C9             RET
 
-br_270E
+br_270E																		;; one character with at least one life remaining
 	270E CD 08 27       CALL	HD_7
 HD_8
-	2711 3A 96 24       LD		A,(TODO_2496)
-	2714 32 84 24       LD		(selected_characters),A						;; update selected_characters
+	2711 3A 96 24       LD		A,(saved_selected_chars)
+	2714 32 84 24       LD		(selected_characters),A						;; recover selected_characters
 	2717 CD 7B 27       CALL	CharThing3
 	271A CD 3B 2B       CALL	Get_curr_Char_variables						;; HL = pointer on current selected character's variables
-	271D 11 05 00       LD		DE,&0005									;; object link list is 5 bytes per element
-	2720 19             ADD		HL,DE										;; update pointer
-	2721 EB             EX		DE,HL
-	2722 21 93 24       LD		HL,EntryPosn
-	2725 01 03 00       LD		BC,&0003
-	2728 ED B0          LDIR												;; repeat LD (DE),(HL); DE++, HL++, BC-- until BC=0
-	272A 3A 92 24       LD		A,(TODO_2492)
+	271D 11 05 00       LD		DE,&0005									;; O_U
+	2720 19             ADD		HL,DE										;; update pointer to char O_U
+	2721 EB             EX		DE,HL										;; in DE
+	2722 21 93 24       LD		HL,EntryPosition_uvz						;; HL points on the stored UVZ when we entered the room
+	2725 01 03 00       LD		BC,&0003									;; U, V and Z
+	2728 ED B0          LDIR												;; Copy EntryPosition_uvz into character's UVZ: repeat LD (DE),(HL); DE++, HL++, BC-- until BC=0
+	272A 3A 92 24       LD		A,(saved_room_access_code)					;; restored stored access code
 	272D 32 58 46       LD		(access_new_room_code),A					;; update access_new_room_code (0=Stay,1=Down,2=Right,3=Up,4=Left,5=Below,6=Above,7=Teleport)
 	2730 C3 B9 01       JP		Long_move_to_new_room
 
@@ -8041,7 +8046,7 @@ EPIC_40:
 	2847 FD CB 0B A6    RES		4,(IY+O_IMPACT)
 br_284B
 	284B AF             XOR		A
-	284C 32 8E 24       LD		(TODO_248e),A								;; reset TODO_248e value
+	284C 32 8E 24       LD		(TODO_248e),A								;; reset TODO_248e value to 0
 	284F CD 8A 2A       CALL	DoCarry
 	2852 CD 10 2A       CALL	DoJump
 br_2855
@@ -8154,17 +8159,17 @@ do_blink:
 CharThing22:
 	2902 21 8E 24       LD HL,TODO_248e
 	2905 7E             LD A,(HL)											;; get TODO_248e value
-	2906 A7             AND A												;; test
+	2906 A7             AND A												;; test (can be 0 or FF)
 	2907 36 FF          LD (HL),&FF											;; and update value to FF
 	2909 28 0E          JR Z,CharThing24									;; if was Zero, skip to CharThing24 with A=0
-	290B CD 8A 2A       CALL DoCarry										;; else
+	290B CD 8A 2A       CALL DoCarry										;; else, was FF
 	290E CD 10 2A       CALL DoJump
 	2911 AF             XOR A
 	2912 18 05          JR CharThing24										;; skip to CharThing24 with A=0
 
 CharThing23:
-	2914 AF             XOR A
-	2915 32 8E 24       LD (TODO_248e),A									;; reset TODO_248e value to 0
+	2914 AF             XOR A												;; A=0
+	2915 32 8E 24       LD (TODO_248e),A									;; TODO_248e value = 0
 	2918 3C             INC A												;; A=1
 CharThing24:
 	2919 4F             LD C,A												;; C can be either 0 (coming from CharThing22) or 1 (coming from CharThing23)
@@ -8520,7 +8525,7 @@ carryLoop:
 	2B3E CB 46          BIT 	0,(HL)										;; is Heels selected?
 	2B40 21 B0 24       LD		HL,Heels_variables							;; prepare return HL = Heels var
 	2B43 C0             RET 	NZ											;; if Heels selected then return pointer on Heels_variables
-	2B44 21 C2 24       LD		 HL,Head_variables
+	2B44 21 C2 24       LD		HL,Head_variables
 	2B47 C9             RET													;; else return pointer on Head_variables
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -8533,14 +8538,14 @@ CharThing15:
 	2B54 32 A8 24       LD		(FiredObj_variables+O_ANIM),A				;; reset Fired_Obj anim
 	2B57 CD 28 03       CALL	Set_Character_Flags
 	2B5A 3A 84 24       LD		A,(selected_characters)						;; get selected_characters
-	2B5D 32 96 24       LD		(TODO_2496),A								;; update
+	2B5D 32 96 24       LD		(saved_selected_chars),A					;; save it
 	2B60 CD 3B 2B       CALL	Get_curr_Char_variables						;; HL = pointer on current selected character's variables
 	2B63 E5             PUSH	HL
-	2B64 E5             PUSH	HL
+	2B64 E5             PUSH	HL											;; push curr char twice
 	2B65 E5             PUSH	HL
-	2B66 FD E1          POP		IY
+	2B66 FD E1          POP		IY											;; IY = curr character
 	2B68 3A 58 46       LD		A,(access_new_room_code)					;; get access_new_room_code (0=Stay,1=Down,2=Right,3=Up,4=Left,5=Below,6=Above,7=Teleport)
-	2B6B 32 92 24       LD		(TODO_2492),A								;; store ???
+	2B6B 32 92 24       LD		(saved_room_access_code),A					;; store access_new_room_code value
 	2B6E F5             PUSH	AF
 	2B6F D6 01          SUB		1											;; at this point the value in A is (0=Down,1=Right,2=Up,3=Left,4=Below,5=Above,6=Teleport)
 	2B71 F5             PUSH	AF
@@ -8645,7 +8650,7 @@ EPIC_97:
 	2C01 E1             POP HL
 	2C02 11 05 00       LD DE,&0005
 	2C05 19             ADD HL,DE
-	2C06 11 93 24       LD DE,EntryPosn
+	2C06 11 93 24       LD DE,EntryPosition_uvz
 	2C09 01 03 00       LD BC,&0003
 	2C0C ED B0          LDIR												;; repeat LD (DE),(HL); DE++, HL++, BC-- until BC=0
 	2C0E FD 36 0D 00    LD (IY+O_OBJUNDER),&00
@@ -8707,6 +8712,7 @@ WallSideBitmap: 									;; index 0 = 8 = bit3, index 1 = 4 = bit2 etc.
 .ObjContact:
 	2C62 00 00 			DEFW 	&0000
 
+;; -----------------------------------------------------------------------------------------------------------
 .DoorContact:
 	2C64 CD 6E 2C       CALL	GetDoorHeight
 	2C67 FD 7E 07       LD		A,(IY+O_Z)
@@ -8716,28 +8722,27 @@ WallSideBitmap: 									;; index 0 = 8 = bit3, index 1 = 4 = bit2 etc.
 
 ;; Takes object in IY, returns height of relevant door.
 .GetDoorHeight:
-    ;; Return &C0 if SavedObjListIdx == 0.
-	2C6E 0E C0          LD		C,&C0
+	2C6E 0E C0          LD		C,&C0										;; Return &C0 if SavedObjListIdx == 0.
 	2C70 3A AC 24       LD		A,(Saved_Objects_List_index)				;; get Saved_Objects_List_index
 	2C73 A7             AND		A											;; test
 	2C74 C8             RET		Z											;; if index = 0 leave, else:
 	2C75 DD 21 EE 1E    LD		IX,DoorHeights
-	2C79 DD 4E 00       LD		C,(IX+0) 									;; return IX+&00 if near MaxV
+	2C79 DD 4E 00       LD		C,(IX+0) 									;; return IX+&00 (DoorHeights+0) if near MaxV
 	2C7C 3A C5 1E       LD		A,(Max_min_UV_Table+3)						;; MaxV
 	2C7F D6 03          SUB		&03
 	2C81 FD BE 06       CP		(IY+O_V)
 	2C84 D8             RET		c
-	2C85 DD 4E 02       LD		C,(IX+2)									;; return IX+&02 if near MinV
+	2C85 DD 4E 02       LD		C,(IX+2)									;; return IX+&02 (DoorHeights+2) if near MinV
 	2C88 3A C3 1E       LD		A,(Max_min_UV_Table+1)						;; MinV
 	2C8B C6 02          ADD		A,&02
 	2C8D FD BE 06       CP		(IY+O_V)
 	2C90 D0             RET		NC
-	2C91 DD 4E 01       LD		C,(IX+1)									;; Return IX+&01 if near MaxU
+	2C91 DD 4E 01       LD		C,(IX+1)									;; Return IX+&01 (DoorHeights+1) if near MaxU
 	2C94 3A C4 1E       LD		A,(Max_min_UV_Table+2)						;; MaxU
 	2C97 D6 03          SUB		&03
 	2C99 FD BE 05       CP		(IY+O_U)
 	2C9C D8             RET		c
-	2C9D DD 4E 03       LD		C,(IX+3)									;; Otherwise, return IX+&03
+	2C9D DD 4E 03       LD		C,(IX+3)									;; Otherwise, return IX+&03 (DoorHeights+3)
 	2CA0 C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -8878,7 +8883,7 @@ DOC_2:
 ;;
 ;; Object extents should be in primed registers.
 .ChkSitOn:
-	2D54 21 AB 39       LD		HL,ObjectLists + 2								;; list pointer
+	2D54 21 AB 39       LD		HL,ObjList_Regular_Near2Far						;; list pointer
 CSIT_nextobject:
 	2D57 7E             LD		A,(HL)
 	2D58 23             INC		HL
@@ -8999,7 +9004,7 @@ CSIT_11:
 	2E0A 4F             LD		C,A											;; C = 7 under bottom
 	2E0B D9             EXX
 	;; Traverse list of objects in main object list
-	2E0C 21 AB 39       LD		HL,ObjectLists + 2							;; list pointer
+	2E0C 21 AB 39       LD		HL,ObjList_Regular_Near2Far					;; list pointer
 gsu_1:
 	2E0F 7E             LD		A,(HL)
 	2E10 23             INC		HL
@@ -9036,7 +9041,7 @@ gsu_2:
 	2E36 D9             EXX
 	2E37 AF             XOR		A
 	2E38 32 62 2C       LD		(ObjContact),A								;; reset ObjContact
-	2E3B 21 AB 39       LD		HL,ObjectLists + 2							;; list pointer
+	2E3B 21 AB 39       LD		HL,ObjList_Regular_Near2Far					;; list pointer
 CSAT_nextobj:
 	2E3E 7E             LD		A,(HL)
 	2E3F 23             INC		HL
@@ -9495,82 +9500,82 @@ goverscr_3
 
 ;; -----------------------------------------------------------------------------------------------------------
 .Step_Menu:
-	309F CD 3C 0A       CALL Test_Enter_Shift_keys							;; output : Carry=1 : no key pressed, else Carry=0 and C=0:Enter, C=1:Shift, C=2:other
-	30A2 D8             RET c
-	30A3 79             LD A,C
+	309F CD 3C 0A       CALL	Test_Enter_Shift_keys						;; output : Carry=1 : no key pressed, else Carry=0 and C=0:Enter, C=1:Shift, C=2:other
+	30A2 D8             RET		c
+	30A3 79             LD		A,C
 .MenuStepCore:
-	30A4 A7             AND A
-	30A5 C8             RET Z
-	30A6 DD 7E 00       LD A,(IX+MENU_CURR_SEL)
-	30A9 3C             INC A
-	30AA DD BE 01       CP (IX+MENU_NB_ITEMS)								;; if reached last then
-	30AD 38 01          JR c,mstepc_1
-	30AF AF             XOR A												;; loop over
+	30A4 A7             AND		A
+	30A5 C8             RET		Z
+	30A6 DD 7E 00       LD		A,(IX+MENU_CURR_SEL)
+	30A9 3C             INC		A
+	30AA DD BE 01       CP		(IX+MENU_NB_ITEMS)							;; if reached last then
+	30AD 38 01          JR		c,mstepc_1
+	30AF AF             XOR		A											;; loop over
 mstepc_1
-	30B0 DD 77 00       LD (IX+MENU_CURR_SEL),A
-	30B3 DD E5          PUSH IX
-	30B5 06 88          LD B,Sound_ID_Menu_Blip								;; &88 Menu blip
-	30B7 CD 91 0D       CALL Play_Sound
-	30BA DD E1          POP IX
+	30B0 DD 77 00       LD		(IX+MENU_CURR_SEL),A
+	30B3 DD E5          PUSH 	IX
+	30B5 06 88          LD		B,Sound_ID_Menu_Blip						;; &88 Menu blip
+	30B7 CD 91 0D       CALL	Play_Sound
+	30BA DD E1          POP		IX
 .Draw_Menu:
-	30BC DD 46 03       LD B,(IX+MENU_INIT_ROW)								;; B = row number
-	30BF CB B8          RES 7,B												;; make sure bit 7 is 0
-	30C1 DD 4E 02       LD C,(IX+MENU_INIT_COL)								;; C = col number
-	30C4 ED 43 16 2F    LD (MenuCursor),BC									;; store current cursor position
-	30C8 CD 7C 4B       CALL Set_Cursor_position
-	30CB DD 46 01       LD B,(IX+MENU_NB_ITEMS)								;; number of menu items
-	30CE DD 4E 00       LD C,(IX+MENU_CURR_SEL)								;; currently selected item
-	30D1 0C             INC C
+	30BC DD 46 03       LD		B,(IX+MENU_INIT_ROW)						;; B = row number
+	30BF CB B8          RES		7,B											;; make sure bit 7 is 0
+	30C1 DD 4E 02       LD		C,(IX+MENU_INIT_COL)						;; C = col number
+	30C4 ED 43 16 2F    LD		(MenuCursor),BC								;; store current cursor position
+	30C8 CD 7C 4B       CALL	Set_Cursor_position
+	30CB DD 46 01       LD		B,(IX+MENU_NB_ITEMS)						;; number of menu items
+	30CE DD 4E 00       LD		C,(IX+MENU_CURR_SEL)						;; currently selected item
+	30D1 0C             INC		C
 drwmen_loop:
-	30D2 3E AF          LD A,&AF											;; STR_ARROW_NONSEL
-	30D4 0D             DEC C
-	30D5 C5             PUSH BC
-	30D6 20 16          JR NZ,br_30EE
-	30D8 DD CB 03 7E    BIT 7,(IX+MENU_INIT_ROW)
-	30DC 20 09          JR NZ,br_30E7
-	30DE 3E 04          LD A,Print_DoubleSize								;; Text_double_size
-	30E0 CD C2 4A       CALL Print_String
-	30E3 3E AE          LD A,&AE											;; Arrows for Selected item
-	30E5 18 07          JR br_30EE
+	30D2 3E AF          LD		A,&AF										;; STR_ARROW_NONSEL
+	30D4 0D             DEC		C
+	30D5 C5             PUSH	BC
+	30D6 20 16          JR		NZ,br_30EE
+	30D8 DD CB 03 7E    BIT		7,(IX+MENU_INIT_ROW)
+	30DC 20 09          JR		NZ,br_30E7
+	30DE 3E 04          LD		A,Print_DoubleSize							;; Text_double_size
+	30E0 CD C2 4A       CALL	Print_String
+	30E3 3E AE          LD		A,&AE										;; Arrows for Selected item
+	30E5 18 07          JR		br_30EE
 
 br_30E7
-	30E7 3E 03          LD A,Print_SingleSize								;; Text_single_size
-	30E9 CD C2 4A       CALL Print_String
-	30EC 3E AE          LD A,&AE											;; Arrows for Selected item
+	30E7 3E 03          LD		A,Print_SingleSize							;; Text_single_size
+	30E9 CD C2 4A       CALL	Print_String
+	30EC 3E AE          LD		A,&AE										;; Arrows for Selected item
 br_30EE
-	30EE CD C2 4A       CALL Print_String
-	30F1 DD 7E 01       LD A,(IX+MENU_NB_ITEMS)
-	30F4 C1             POP BC
-	30F5 C5             PUSH BC
-	30F6 90             SUB B
-	30F7 DD 86 04       ADD A,(IX+MENU_SEL_STRINGID)						;; Currently selected item String
-	30FA CD C2 4A       CALL Print_String
-	30FD E1             POP HL
-	30FE E5             PUSH HL
-	30FF ED 4B 16 2F    LD BC,(MenuCursor)									;; restore current cursor position
-	3103 7D             LD A,L
-	3104 A7             AND A
-	3105 20 07          JR NZ,br_310E
-	3107 DD CB 03 7E    BIT 7,(IX+MENU_INIT_ROW)
-	310B 20 01          JR NZ,br_310E
-	310D 04             INC B
+	30EE CD C2 4A       CALL	Print_String
+	30F1 DD 7E 01       LD		A,(IX+MENU_NB_ITEMS)
+	30F4 C1             POP		BC
+	30F5 C5             PUSH	BC
+	30F6 90             SUB		B
+	30F7 DD 86 04       ADD		A,(IX+MENU_SEL_STRINGID)					;; Currently selected item String
+	30FA CD C2 4A       CALL	Print_String
+	30FD E1             POP		HL
+	30FE E5             PUSH	HL
+	30FF ED 4B 16 2F    LD		BC,(MenuCursor)								;; restore current cursor position
+	3103 7D             LD		A,L
+	3104 A7             AND		A
+	3105 20 07          JR		NZ,br_310E
+	3107 DD CB 03 7E    BIT		7,(IX+MENU_INIT_ROW)
+	310B 20 01          JR		NZ,br_310E
+	310D 04             INC		B
 br_310E
-	310E 04             INC B
-	310F C5             PUSH BC
-	3110 CD 7C 4B       CALL Set_Cursor_position
-	3113 3E 03          LD A,Print_SingleSize								;; Text_single_size
-	3115 CD C2 4A       CALL Print_String
-	3118 DD CB 03 7E    BIT 7,(IX+MENU_INIT_ROW)
-	311C 20 05          JR NZ,br_3123
-	311E 3E 02          LD A,Print_ClrEOL									;; String ID 02 = Clear end of line
-	3120 CD C2 4A       CALL Print_String
+	310E 04             INC		B
+	310F C5             PUSH	BC
+	3110 CD 7C 4B       CALL	Set_Cursor_position
+	3113 3E 03          LD		A,Print_SingleSize							;; Text_single_size
+	3115 CD C2 4A       CALL	Print_String
+	3118 DD CB 03 7E    BIT		7,(IX+MENU_INIT_ROW)
+	311C 20 05          JR		NZ,br_3123
+	311E 3E 02          LD		A,Print_ClrEOL								;; String ID 02 = Clear end of line
+	3120 CD C2 4A       CALL	Print_String
 br_3123
-	3123 C1             POP BC
-	3124 04             INC B
-	3125 ED 43 16 2F    LD (MenuCursor),BC									;; next cursor position
-	3129 CD 7C 4B       CALL Set_Cursor_position
-	312C C1             POP BC
-	312D 10 A3          DJNZ drwmen_loop
+	3123 C1             POP		BC
+	3124 04             INC		B
+	3125 ED 43 16 2F    LD		(MenuCursor),BC								;; next cursor position
+	3129 CD 7C 4B       CALL	Set_Cursor_position
+	312C C1             POP		BC
+	312D 10 A3          DJNZ	drwmen_loop
 	312F 37             SCF
 	3130 C9             RET
 
@@ -10064,26 +10069,26 @@ table2_decomp:
 ;;             X coordinate in C, Y coordinate in B
 ;; Returns: X extent in BC, Y extent in HL
 .GetSprExtents:
-	354A 32 38 35       LD (Sprite_Code),A									;; update sprite code
-	354D E6 7F          AND &7F
-	354F FE 10          CP &10
-	3551 38 34          JR c,Case3x56										;; Codes < &10 are 3x56 so go Case3x56, else:
-	3553 11 06 06       LD DE,&0606											;; 3x24 or 3x32 (3x32 will be modified)
-	3556 26 12          LD H,&12
-	3558 FE 54          CP &54
-	355A 38 05          JR c,gsext_1
-	355C 11 08 08       LD DE,&0808					 						;; Codes >= &54 are 4x28
-	355F 26 14          LD H,&14
+	354A 32 38 35       LD		(Sprite_Code),A								;; update sprite code
+	354D E6 7F          AND		&7F
+	354F FE 10          CP		&10
+	3551 38 34          JR		c,Case3x56									;; Codes < &10 are 3x56 so go Case3x56, else:
+	3553 11 06 06       LD		DE,&0606									;; 3x24 or 3x32 (3x32 will be modified)
+	3556 26 12          LD		H,&12
+	3558 FE 54          CP		&54
+	355A 38 05          JR		c,gsext_1
+	355C 11 08 08       LD		DE,&0808					 				;; Codes >= &54 are 4x28
+	355F 26 14          LD		H,&14
 gsext_1:
-	3561 FE 18          CP &18
-	3563 30 0F          JR NC,SSW_2
-	3565 3A A2 1C       LD A,(SpriteFlags)
-	3568 E6 02          AND &02												;; bit1 of stored SPRFLAGS
-	356A 16 04          LD D,&04
-	356C 26 0C          LD H,&0C
-	356E 28 04          JR Z,SSW_2
-	3570 16 00          LD D,&00
-	3572 26 10          LD H,&10
+	3561 FE 18          CP		&18
+	3563 30 0F          JR		NC,SSW_2
+	3565 3A A2 1C       LD		A,(SpriteFlags)
+	3568 E6 02          AND		&02											;; bit1 of stored SPRFLAGS
+	356A 16 04          LD		D,&04
+	356C 26 0C          LD		H,&0C
+	356E 28 04          JR		Z,SSW_2
+	3570 16 00          LD		D,&00
+	3572 26 10          LD		H,&10
     ;; All cases but 3x56 join up here:
     ;; D is Y extent down, H is Y extent up
     ;; E is half-width (in double-pixels)
@@ -10095,22 +10100,22 @@ gsext_1:
     ;;
     ;; The 3x32 case is split into 2 parts of height 16 each.
 SSW_2:
-	3574 78             LD A,B
-	3575 82             ADD A,D
-	3576 6F             LD L,A
-	3577 92             SUB D
-	3578 94             SUB H
-	3579 67             LD H,A
-	357A 79             LD A,C
-	357B 83             ADD A,E
-	357C 4F             LD C,A
-	357D 93             SUB E
-	357E 93             SUB E
-	357F 47             LD B,A						 						;; B = C - 2*E
-	3580 7B             LD A,E
-	3581 A7             AND A
+	3574 78             LD		A,B
+	3575 82             ADD		A,D
+	3576 6F             LD		L,A
+	3577 92             SUB		D
+	3578 94             SUB		H
+	3579 67             LD		H,A
+	357A 79             LD		A,C
+	357B 83             ADD		A,E
+	357C 4F             LD		C,A
+	357D 93             SUB		E
+	357E 93             SUB		E
+	357F 47             LD		B,A						 					;; B = C - 2*E
+	3580 7B             LD		A,E
+	3581 A7             AND		A
 	3582 1F             RRA													;; And save width in bytes to SpriteWidth
-	3583 32 37 35       LD (Sprite_Width),A									;; update Sprite_Width
+	3583 32 37 35       LD		(Sprite_Width),A							;; update Sprite_Width
 	3586 C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -10123,36 +10128,36 @@ SSW_2:
     ;; slightly wrong in the AddObject case for doors.
     ;;
     ;; TODO: Tie these into the object definitions and flags
-	3587 2A 71 1D       LD HL,(smc_CurrObject2+1)
-	358A 23             INC HL
-	358B 23             INC HL
-	358C CB 6E          BIT 5,(HL)											;; Bit 5 = is LHS door
-	358E 08             EX AF,AF'
-	358F 7E             LD A,(HL)
-	3590 D6 10          SUB &10												;; NC for < 9 or > 30 - ie near doors
-	3592 FE 20          CP &20
-	3594 2E 04          LD L,&04
-	3596 30 02          JR NC,br_359A
-	3598 2E 08          LD L,&08
+	3587 2A 71 1D       LD		HL,(smc_CurrObject2+1)
+	358A 23             INC		HL
+	358B 23             INC		HL
+	358C CB 6E          BIT		5,(HL)										;; Bit 5 = is LHS door
+	358E 08             EX		AF,AF'
+	358F 7E             LD		A,(HL)
+	3590 D6 10          SUB		&10											;; NC for < 9 or > 30 - ie near doors
+	3592 FE 20          CP		&20
+	3594 2E 04          LD		L,&04
+	3596 30 02          JR		NC,br_359A
+	3598 2E 08          LD		L,&08
 br_359A
-	359A 78             LD A,B					 							;; L = (Flag - &10) >= &20 ? 8 : 4
-	359B 85             ADD A,L
-	359C 6F             LD L,A
-	359D D6 38          SUB &38
-	359F 67             LD H,A
-	35A0 08             EX AF,AF'
-	35A1 79             LD A,C
-	35A2 06 08          LD B,&08
-	35A4 20 02          JR NZ,br_35A8
-	35A6 06 04          LD B,&04
+	359A 78             LD		A,B					 						;; L = (Flag - &10) >= &20 ? 8 : 4
+	359B 85             ADD		A,L
+	359C 6F             LD		L,A
+	359D D6 38          SUB		&38
+	359F 67             LD		H,A
+	35A0 08             EX		AF,AF'
+	35A1 79             LD		A,C
+	35A2 06 08          LD		B,&08
+	35A4 20 02          JR		NZ,br_35A8
+	35A6 06 04          LD		B,&04
 br_35A8
 	;; Use 8 for left doors, 4 for right.
-	35A8 80             ADD A,B												;; B = (Flag & 0x20) ? 8 : 4
-	35A9 4F             LD C,A
-	35AA D6 0C          SUB &0C
-	35AC 47             LD B,A
-	35AD 3E 03          LD A,&03											;; Always 3 bytes wide.
-	35AF 32 37 35       LD (Sprite_Width),A									;; update Sprite_Width
+	35A8 80             ADD		A,B											;; B = (Flag & 0x20) ? 8 : 4
+	35A9 4F             LD		C,A
+	35AA D6 0C          SUB		&0C
+	35AC 47             LD		B,A
+	35AD 3E 03          LD		A,&03										;; Always 3 bytes wide.
+	35AF 32 37 35       LD		(Sprite_Width),A							;; update Sprite_Width
 	35B2 C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -10164,72 +10169,72 @@ SPR_first_3x32_sprite	EQU		SPR_VISOROHALF		;; &10
 ;; Looks up based on SpriteCode. Top bit set means flip horizontally.
 ;; Return height in B, image in DE, mask in HL.
 .Load_sprite_image_address_into_DE:
-	35B3 3A 38 35       LD A,(Sprite_Code)									;; get sprite code
-	35B6 E6 7F          AND &7F												;; Top bit holds 'reverse?'. Ignore.
-	35B8 FE 54          CP SPR_first_4x28_sprite							;; >= 0x54 -> 4x28 (&54 is the SPR_DOORSTEP, the first of the 4x28 sprites)
-	35BA D2 7C 36       JP NC,Sprite4x28
-	35BD FE 18          CP SPR_first_3x24_sprite							;; >= 0x18 -> 3x24 (&18 is the SPR_HEELS1, the first of the 3x24 sprites)
-	35BF 30 7E          JR NC,Sprite3x24
-	35C1 FE 10          CP SPR_first_3x32_sprite							;; >= 0x10 -> 3x32
-	35C3 26 00          LD H,&00
-	35C5 30 4B          JR NC,Sprite3x32
-	35C7 6F             LD L,A
-	35C8 ED 5B 71 1D    LD DE,(smc_CurrObject2+1)
-	35CC 13             INC DE
-	35CD 13             INC DE
+	35B3 3A 38 35       LD		A,(Sprite_Code)								;; get sprite code
+	35B6 E6 7F          AND		&7F											;; Top bit holds 'reverse?'. Ignore.
+	35B8 FE 54          CP		SPR_first_4x28_sprite						;; >= 0x54 -> 4x28 (&54 is the SPR_DOORSTEP, the first of the 4x28 sprites)
+	35BA D2 7C 36       JP		NC,Sprite4x28
+	35BD FE 18          CP		SPR_first_3x24_sprite						;; >= 0x18 -> 3x24 (&18 is the SPR_HEELS1, the first of the 3x24 sprites)
+	35BF 30 7E          JR		NC,Sprite3x24
+	35C1 FE 10          CP		SPR_first_3x32_sprite						;; >= 0x10 -> 3x32
+	35C3 26 00          LD		H,&00
+	35C5 30 4B          JR		NC,Sprite3x32
+	35C7 6F             LD		L,A
+	35C8 ED 5B 71 1D    LD		DE,(smc_CurrObject2+1)
+	35CC 13             INC		DE
+	35CD 13             INC		DE
 	;; Normal case if the object's flag & 3 != 3
-	35CE 1A             LD A,(DE)
-	35CF F6 FC          OR &FC												;; ~&03
-	35D1 3C             INC A
-	35D2 20 26          JR NZ,Sprite3x56
+	35CE 1A             LD		A,(DE)
+	35CF F6 FC          OR		&FC											;; ~&03
+	35D1 3C             INC		A
+	35D2 20 26          JR		NZ,Sprite3x56
 	;; flag & 3 == 3 case:
-	35D4 3A 38 35       LD A,(Sprite_Code)									;; get sprite code
-	35D7 4F             LD C,A
+	35D4 3A 38 35       LD		A,(Sprite_Code)								;; get sprite code
+	35D7 4F             LD		C,A
 	35D8 17             RLA
-	35D9 3A B9 1E       LD A,(RoomDimensionsIdx)
-	35DC 38 04          JR c,br_35E2										;; Flip bit set?
-	35DE FE 06          CP &06												;; Narrow-in-U-direction room?
-	35E0 18 02          JR br_35E4
+	35D9 3A B9 1E       LD		A,(RoomDimensionsIdx)
+	35DC 38 04          JR		c,br_35E2									;; Flip bit set?
+	35DE FE 06          CP		&06											;; Narrow-in-U-direction room?
+	35E0 18 02          JR		br_35E4
 
 br_35E2
-	35E2 FE 03          CP &03												;; Narrow-in-V-direction room?
+	35E2 FE 03          CP		&03											;; Narrow-in-V-direction room?
 br_35E4
-	35E4 28 14          JR Z,Sprite3x56
+	35E4 28 14          JR		Z,Sprite3x56
 	;; Use DoorwayBuf.
-	35E6 3A ED 36       LD A,(DoorwayFlipped)
-	35E9 A9             XOR C
+	35E6 3A ED 36       LD		A,(DoorwayFlipped)
+	35E9 A9             XOR		C
 	35EA 17             RLA
-	35EB 11 C0 B9       LD DE,DoorwayImgBuf + MOVE_OFFSET
-	35EE 21 68 BA       LD HL,DoorwayMaskBuf + MOVE_OFFSET					;; DoorwayMaskBuf : DoorwayBuf + 56 * 3
-	35F1 D0             RET NC
+	35EB 11 C0 B9       LD		DE,DoorwayImgBuf + MOVE_OFFSET
+	35EE 21 68 BA       LD		HL,DoorwayMaskBuf + MOVE_OFFSET				;; DoorwayMaskBuf : DoorwayBuf + 56 * 3
+	35F1 D0             RET		NC
 	;; And flip it if necessary.
-	35F2 79             LD A,C
-	35F3 32 ED 36       LD (DoorwayFlipped),A
-	35F6 06 70          LD B,&70											;; 56*2
-	35F8 18 66          JR FlipSprite3
+	35F2 79             LD		A,C
+	35F3 32 ED 36       LD		(DoorwayFlipped),A
+	35F6 06 70          LD		B,&70										;; 56*2
+	35F8 18 66          JR		FlipSprite3
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Deal with a 3 byte x sprite 56 pixels high.
 ;; Same parameters/return as Load_sprite_image_address_into_DE.
 .Sprite3x56:
-	35FA 7D             LD A,L
-	35FB 5F             LD E,A												;; *1
-	35FC 87             ADD A,A												;; *2
-	35FD 87             ADD A,A												;; *4
-	35FE 83             ADD A,E												;; *5
-	35FF 87             ADD A,A												;; *10
-	3600 6F             LD L,A
-	3601 29             ADD HL,HL											;; *20
-	3602 29             ADD HL,HL											;; *40
-	3603 29             ADD HL,HL											;; 80x
-	3604 7B             LD A,E												;; *1
-	3605 84             ADD A,H												;; *256
-	3606 67             LD H,A												;; finally 336x = 3x56x2x
-	3607 11 70 82       LD DE,&8270											;; IMG_3x56
-	360A 19             ADD HL,DE
-	360B 11 A8 00       LD DE,&00A8											;; 56*3 ; Point to mask
-	360E 06 70          LD B,&70											;; 56*2 ; Height of image + height of mask
-	3610 18 46          JR Sprite3Wide
+	35FA 7D             LD		A,L
+	35FB 5F             LD		E,A											;; *1
+	35FC 87             ADD		A,A											;; *2
+	35FD 87             ADD		A,A											;; *4
+	35FE 83             ADD		A,E											;; *5
+	35FF 87             ADD		A,A											;; *10
+	3600 6F             LD		L,A
+	3601 29             ADD		HL,HL										;; *20
+	3602 29             ADD		HL,HL										;; *40
+	3603 29             ADD		HL,HL										;; 80x
+	3604 7B             LD		A,E											;; *1
+	3605 84             ADD		A,H											;; *256
+	3606 67             LD		H,A											;; finally 336x = 3x56x2x
+	3607 11 70 82       LD		DE,&8270									;; IMG_3x56
+	360A 19             ADD		HL,DE
+	360B 11 A8 00       LD		DE,&00A8									;; 56*3 ; Point to mask
+	360E 06 70          LD		B,&70										;; 56*2 ; Height of image + height of mask
+	3610 18 46          JR		Sprite3Wide
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Deal with a 3 byte x 32 pixel high sprite.
@@ -10238,36 +10243,36 @@ br_35E4
 ;; Returns a half-height offset sprite if bit 2 is not set, since the
 ;; 3x32 sprites are broken into 2 16-bit-high chunks.
 .Sprite3x32:
-	3612 D6 10          SUB &10
-	3614 6F             LD L,A
-	3615 87             ADD A,A
-	3616 85             ADD A,L
-	3617 6F             LD L,A
-	3618 29             ADD HL,HL
-	3619 29             ADD HL,HL
-	361A 29             ADD HL,HL
-	361B 29             ADD HL,HL
-	361C 29             ADD HL,HL
-	361D 29             ADD HL,HL											;; 3x32x2x
-	361E 11 50 8A       LD DE,&8A50											;; IMG_3x32
-	3621 19             ADD HL,DE
-	3622 11 60 00       LD DE,&0060											;; 32*3 : number of bytes in image
-	3625 06 40          LD B,&40											;; 32*2 : height image + height mask
-	3627 EB             EX DE,HL
-	3628 19             ADD HL,DE
+	3612 D6 10          SUB		&10
+	3614 6F             LD		L,A
+	3615 87             ADD		A,A
+	3616 85             ADD		A,L
+	3617 6F             LD		L,A
+	3618 29             ADD		HL,HL
+	3619 29             ADD		HL,HL
+	361A 29             ADD		HL,HL
+	361B 29             ADD		HL,HL
+	361C 29             ADD		HL,HL
+	361D 29             ADD		HL,HL										;; 3x32x2x
+	361E 11 50 8A       LD		DE,&8A50									;; IMG_3x32
+	3621 19             ADD		HL,DE
+	3622 11 60 00       LD		DE,&0060									;; 32*3 : number of bytes in image
+	3625 06 40          LD		B,&40										;; 32*2 : height image + height mask
+	3627 EB             EX		DE,HL
+	3628 19             ADD		HL,DE
 	3629 D9             EXX
-	362A CD BE 36       CALL NeedsFlip
+	362A CD BE 36       CALL	NeedsFlip
 	362D D9             EXX
-	362E D4 60 36       CALL NC,FlipSprite3
+	362E D4 60 36       CALL	NC,FlipSprite3
 	;; If bit 2 is not set, move half a sprite down.
-	3631 3A A2 1C       LD A,(SpriteFlags)
-	3634 E6 02          AND &02
-	3636 C0             RET NZ
-	3637 01 30 00       LD BC,&0030
-	363A 09             ADD HL,BC
-	363B EB             EX DE,HL
-	363C 09             ADD HL,BC
-	363D EB             EX DE,HL
+	3631 3A A2 1C       LD		A,(SpriteFlags)
+	3634 E6 02          AND		&02
+	3636 C0             RET		NZ
+	3637 01 30 00       LD		BC,&0030
+	363A 09             ADD		HL,BC
+	363B EB             EX		DE,HL
+	363C 09             ADD		HL,BC
+	363D EB             EX		DE,HL
 	363E C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -10275,115 +10280,115 @@ br_35E4
 ;; Same parameters/return as Load_sprite_image_address_into_DE.
 ;; Return : height image+mask in B, image in DE, mask in HL.
 .Sprite3x24:
-	363F D6 18          SUB SPR_first_3x24_sprite							;; Sprite code was >= &18, realign number at &00 for 1st sprite (SPR_HEELS1) and so on
-	3641 57             LD D,A												;; A = D = sprite number in img_3x24 table
-	3642 1E 00          LD E,&00											;; DE = sprite number * 256
-	3644 63             LD H,E												;; init H = E = 0
-	3645 87             ADD A,A												;; *2
-	3646 87             ADD A,A												;; *4
-	3647 6F             LD L,A												;; L=A
-	3648 29             ADD HL,HL											;; *8
-	3649 29             ADD HL,HL											;; HL = sprite number x16
-	364A CB 3A          SRL D												;; Carry=Dbit0 ; int(D/2);
-	364C CB 1B          RR E												;; Ebit7=Carry; these 2 lines do a DE/2, DE= sprite number * 128
-	364E 19             ADD HL,DE											;; HL = sprite number * 144 ; 144x = 2x3x24
-	364F 11 D0 8B       LD DE,&8BD0											;; IMG_3x24 base addr
-	3652 19             ADD HL,DE											;; from base addr, add the offset of the sprite we want
-	3653 11 48 00       LD DE,&0048											;; &48=72=24*3 (offset for mask = number of bytes in image)
-	3656 06 30          LD B,&30											;; &30=48=24*2 (height image + height mask)
+	363F D6 18          SUB		SPR_first_3x24_sprite						;; Sprite code was >= &18, realign number at &00 for 1st sprite (SPR_HEELS1) and so on
+	3641 57             LD		D,A											;; A = D = sprite number in img_3x24 table
+	3642 1E 00          LD		E,&00										;; DE = sprite number * 256
+	3644 63             LD		H,E											;; init H = E = 0
+	3645 87             ADD		A,A											;; *2
+	3646 87             ADD		A,A											;; *4
+	3647 6F             LD		L,A											;; L=A
+	3648 29             ADD		HL,HL										;; *8
+	3649 29             ADD		HL,HL										;; HL = sprite number x16
+	364A CB 3A          SRL		D											;; Carry=Dbit0 ; int(D/2);
+	364C CB 1B          RR		E											;; Ebit7=Carry; these 2 lines do a DE/2, DE= sprite number * 128
+	364E 19             ADD		HL,DE										;; HL = sprite number * 144 ; 144x = 2x3x24
+	364F 11 D0 8B       LD		DE,&8BD0									;; IMG_3x24 base addr
+	3652 19             ADD		HL,DE										;; from base addr, add the offset of the sprite we want
+	3653 11 48 00       LD		DE,&0048									;; &48=72=24*3 (offset for mask = number of bytes in image)
+	3656 06 30          LD		B,&30										;; &30=48=24*2 (height image + height mask)
 .Sprite3Wide:
-	3658 EB             EX DE,HL											;; HL = offset mask, DE = img addr
-	3659 19             ADD HL,DE											;; HL = mask addr
+	3658 EB             EX		DE,HL										;; HL = offset mask, DE = img addr
+	3659 19             ADD		HL,DE										;; HL = mask addr
 	365A D9             EXX													;; DE = mask addr, HL = img addr, save BC
-	365B CD BE 36       CALL NeedsFlip
+	365B CD BE 36       CALL	NeedsFlip
 	365E D9             EXX													;; HL = mask addr, DE = img addr, restore B=height*2
-	365F D8             RET c												;; if Carry set, no need to flip, else flip
+	365F D8             RET		c											;; if Carry set, no need to flip, else flip
 ;; Flip a 3-character-wide sprite. Height in B, source in DE.
 .FlipSprite3:
-	3660 E5             PUSH HL
-	3661 D5             PUSH DE
-	3662 EB             EX DE,HL
-	3663 16 69          LD D,RevTable / 256									;; &69 = RevTable >> 8
+	3660 E5             PUSH	HL
+	3661 D5             PUSH	DE
+	3662 EB             EX		DE,HL
+	3663 16 69          LD		D,RevTable / 256							;; &69 = RevTable >> 8
 fspr3_loop:
-	3665 4E             LD C,(HL)
-	3666 22 71 36       LD (smc_flipsprite3+1),HL							;; Self-modifying code! will put the value in the "LD (???),A"
-	3669 23             INC HL
-	366A 5E             LD E,(HL)
-	366B 1A             LD A,(DE)
-	366C 77             LD (HL),A
-	366D 23             INC HL
-	366E 5E             LD E,(HL)
-	366F 1A             LD A,(DE)
+	3665 4E             LD		C,(HL)
+	3666 22 71 36       LD		(smc_flipsprite3+1),HL						;; Self-modifying code! will put the value in the "LD (???),A"
+	3669 23             INC		HL
+	366A 5E             LD		E,(HL)
+	366B 1A             LD		A,(DE)
+	366C 77             LD		(HL),A
+	366D 23             INC		HL
+	366E 5E             LD		E,(HL)
+	366F 1A             LD		A,(DE)
 smc_flipsprite3:
-	3670 32 00 00		LD (&0000),A										;; Target of self-modifying code. value is set at &3666
+	3670 32 00 00		LD		(&0000),A									;; Target of self-modifying code. value is set at &3666
 	;;3671 DEFW 00 00
-	3673 59             LD E,C
-	3674 1A             LD A,(DE)
-	3675 77             LD (HL),A
-	3676 23             INC HL
-	3677 10 EC          DJNZ fspr3_loop
-	3679 D1             POP DE
-	367A E1             POP HL
+	3673 59             LD		E,C
+	3674 1A             LD		A,(DE)
+	3675 77             LD		(HL),A
+	3676 23             INC		HL
+	3677 10 EC          DJNZ	fspr3_loop
+	3679 D1             POP		DE
+	367A E1             POP		HL
 	367B C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Looks up a 4x28 sprite.
 ;; Same parameters/return as Load_sprite_image_address_into_DE.
 .Sprite4x28:
-	367C D6 54          SUB SPR_first_4x28_sprite							;; SPR_DOORSTEP ID &54 becomes id 0 and so on
-	367E 57             LD D,A
+	367C D6 54          SUB		SPR_first_4x28_sprite						;; SPR_DOORSTEP ID &54 becomes id 0 and so on
+	367E 57             LD		D,A
 	367F 07             RLCA
 	3680 07             RLCA
-	3681 26 00          LD H,&00
-	3683 6F             LD L,A
-	3684 5C             LD E,H
-	3685 29             ADD HL,HL
-	3686 29             ADD HL,HL
-	3687 29             ADD HL,HL
-	3688 EB             EX DE,HL
-	3689 ED 52          SBC HL,DE											;; 224x = 4x28x2x
-	368B 11 30 AA       LD DE,&AA30											;; IMG_4x28
-	368E 19             ADD HL,DE
-	368F 11 70 00       LD DE,&0070											;; 28*4 = number of bytes in image
-	3692 06 38          LD B,&38											;; 28*2 = height of image + height of mask
-	3694 EB             EX DE,HL
-	3695 19             ADD HL,DE
+	3681 26 00          LD		H,&00
+	3683 6F             LD		L,A
+	3684 5C             LD		E,H
+	3685 29             ADD		HL,HL
+	3686 29             ADD		HL,HL
+	3687 29             ADD		HL,HL
+	3688 EB             EX		DE,HL
+	3689 ED 52          SBC		HL,DE										;; 224x = 4x28x2x
+	368B 11 30 AA       LD		DE,&AA30									;; IMG_4x28
+	368E 19             ADD		HL,DE
+	368F 11 70 00       LD		DE,&0070									;; 28*4 = number of bytes in image
+	3692 06 38          LD		B,&38										;; 28*2 = height of image + height of mask
+	3694 EB             EX		DE,HL
+	3695 19             ADD		HL,DE
 	3696 D9             EXX
-	3697 CD BE 36       CALL NeedsFlip
+	3697 CD BE 36       CALL	NeedsFlip
 	369A D9             EXX
-	369B D8             RET c
+	369B D8             RET		c
 ;; Flip a 4-character-wide sprite. Height in B, source in DE.
 flipSprite4:
-	369C E5             PUSH HL
-	369D D5             PUSH DE
-	369E EB             EX DE,HL
-	369F 16 69          LD D,RevTable / 256									;; &69 = RevTable >> 8
+	369C E5             PUSH	HL
+	369D D5             PUSH	DE
+	369E EB             EX		DE,HL
+	369F 16 69          LD		D,RevTable / 256							;; &69 = RevTable >> 8
 fspr4_loop:
-	36A1 4E             LD C,(HL)
-	36A2 22 B3 36       LD (smc_fs_addr+1),HL								;; Self-modifying code at 3683
-	36A5 23             INC HL
-	36A6 5E             LD E,(HL)
-	36A7 23             INC HL
-	36A8 1A             LD A,(DE)
-	36A9 5E             LD E,(HL)
-	36AA 77             LD (HL),A
-	36AB 2B             DEC HL
-	36AC 1A             LD A,(DE)
-	36AD 77             LD (HL),A
-	36AE 23             INC HL
-	36AF 23             INC HL
-	36B0 5E             LD E,(HL)
-	36B1 1A             LD A,(DE)
+	36A1 4E             LD		C,(HL)
+	36A2 22 B3 36       LD		(smc_fs_addr+1),HL							;; Self-modifying code at 3683
+	36A5 23             INC		HL
+	36A6 5E             LD		E,(HL)
+	36A7 23             INC		HL
+	36A8 1A             LD		A,(DE)
+	36A9 5E             LD		E,(HL)
+	36AA 77             LD		(HL),A
+	36AB 2B             DEC		HL
+	36AC 1A             LD		A,(DE)
+	36AD 77             LD		(HL),A
+	36AE 23             INC		HL
+	36AF 23             INC		HL
+	36B0 5E             LD		E,(HL)
+	36B1 1A             LD		A,(DE)
 smc_fs_addr:
-	36B2 32 00 00       LD (&0000),A										;; Target of self-modifying code
+	36B2 32 00 00       LD		(&0000),A									;; Target of self-modifying code
 	;;3683 DEFW 00 00														; modified at addr 36A2
-	36B5 59             LD E,C
-	36B6 1A             LD A,(DE)
-	36B7 77             LD (HL),A
-	36B8 23             INC HL
-	36B9 10 E6          DJNZ fspr4_loop
-	36BB D1             POP DE
-	36BC E1             POP HL
+	36B5 59             LD		E,C
+	36B6 1A             LD		A,(DE)
+	36B7 77             LD		(HL),A
+	36B8 23             INC		HL
+	36B9 10 E6          DJNZ	fspr4_loop
+	36BB D1             POP		DE
+	36BC E1             POP		HL
 	36BD C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -10533,7 +10538,7 @@ initobj_2:
 	3763 C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; Takes an object pointer in DE (From Objects buffer 6A40-...), and
+;; Takes an object pointer in DE (From ObjectsBuffer 6A40-...), and
 ;; index the object function in A.
 ;; Note that the function ID starts at 1, so to align on the ObjFnTbl
 ;; table, need to do a -1.
@@ -10700,7 +10705,7 @@ AnimMonocatB:
 	3852 				DEFB 	SPR_MONOCATB1, SPR_MONOCATB1, SPR_MONOCATB2, SPR_MONOCATB2, &00        			;; SPR_MONOCATB1,SPR_MONOCATB1,SPR_MONOCATB2,SPR_MONOCATB2,&00
 AnimVape3:
 	3857 				DEFB 	SPR_VAPE3, SPR_VAPE2, SPR_VAPE3, SPR_FLIP or SPR_VAPE3							;; SPR_VAPE3,SPR_VAPE2,SPR_VAPE3,&80|SPR_VAPE3
-	385B				DEFB	SPR_FLIP or SPR_VAPE2, SPR_FLIP or SPR_VAPE3, &00									;; &80|SPR_VAPE2,&80|SPR_VAPE3,&00
+	385B				DEFB	SPR_FLIP or SPR_VAPE2, SPR_FLIP or SPR_VAPE3, &00								;; &80|SPR_VAPE2,&80|SPR_VAPE3,&00
 AnimRobomouse:
 	385E 				DEFB 	SPR_ROBOMOUSE, &00         														;; SPR_ROBOMOUSE,&00
 AnimRobomouseB:
@@ -10771,20 +10776,20 @@ OBJFN_RESPECT			EQU		&25
 
 ;; -----------------------------------------------------------------------------------------------------------
 .ObjFnTbl:
-	387F DC 4D			DEFW	ObjFnPushable		;; OBJFN_PUSHABLE: 	01 ObjFnPushable   4DDC
-	3881 46 4D			DEFW 	ObjFnRollers1		;; OBJFN_ROLLERS1: 	02 ObjFnRollers1	4D46
-	3883 4A 4D			DEFW 	ObjFnRollers2		;; OBJFN_ROLLERS2: 	03 ObjFnRollers2	4D4A
-	3885 4E 4D			DEFW 	ObjFnRollers3		;; OBJFN_ROLLERS3: 	04 ObjFnRollers3	4D4E
-	3887 52 4D			DEFW 	ObjFnRollers4		;; OBJFN_ROLLERS4: 	05 ObjFnRollers4	4D52
-	3889 F3 4D			DEFW 	ObjFnVisor1			;; OBJFN_VISOR1:   	06 ObjFnVisor1	4DF3
-	388B F8 4D			DEFW 	ObjFnMonocat		;; OBJFN_MONOCAT:  	07 ObjFnMonocat	4DF8
-	388D FD 4D			DEFW 	ObjFnAnticlock		;; OBJFN_ANTICLOCK:	08 ObjFnAnticlock	4DFD
-	388F 11 4E			DEFW 	ObjFnRandB			;; OBJFN_RANDB:    	09 ObjFnRandB	4E11
-	3891 86 4C			DEFW 	ObjFnBall			;; OBJFN_BALL:     	0A ObjFnBall	4C86
-	3893 02 4E			DEFW 	ObjFnBee			;; OBJFN_BEE:      	0B ObjFnBee	4E02
-	3895 07 4E			DEFW 	ObjFnRandQ			;; OBJFN_RANDQ:    	0c ObjFnRandQ	4E07
-	3897 0C 4E			DEFW 	ObjFnRandR			;; OBJFN_RANDR:    	0d ObjFnRandR	4E0C
-	3899 D6 4C			DEFW 	ObjFnSwitch			;; OBJFN_SWITCH:   	0e ObjFnSwitch	4CD6
+	387F DC 4D			DEFW	ObjFnPushable		;; OBJFN_PUSHABLE: 	01 ObjFnPushable 4DDC
+	3881 46 4D			DEFW 	ObjFnRollers1		;; OBJFN_ROLLERS1: 	02 ObjFnRollers1 4D46
+	3883 4A 4D			DEFW 	ObjFnRollers2		;; OBJFN_ROLLERS2: 	03 ObjFnRollers2 4D4A
+	3885 4E 4D			DEFW 	ObjFnRollers3		;; OBJFN_ROLLERS3: 	04 ObjFnRollers3 4D4E
+	3887 52 4D			DEFW 	ObjFnRollers4		;; OBJFN_ROLLERS4: 	05 ObjFnRollers4 4D52
+	3889 F3 4D			DEFW 	ObjFnVisor1			;; OBJFN_VISOR1:   	06 ObjFnVisor1 4DF3
+	388B F8 4D			DEFW 	ObjFnMonocat		;; OBJFN_MONOCAT:  	07 ObjFnMonocat 4DF8
+	388D FD 4D			DEFW 	ObjFnAnticlock		;; OBJFN_ANTICLOCK:	08 ObjFnAnticlock 4DFD
+	388F 11 4E			DEFW 	ObjFnRandB			;; OBJFN_RANDB:    	09 ObjFnRandB 4E11
+	3891 86 4C			DEFW 	ObjFnBall			;; OBJFN_BALL:     	0A ObjFnBall 4C86
+	3893 02 4E			DEFW 	ObjFnBee			;; OBJFN_BEE:      	0B ObjFnBee 4E02
+	3895 07 4E			DEFW 	ObjFnRandQ			;; OBJFN_RANDQ:    	0c ObjFnRandQ 4E07
+	3897 0C 4E			DEFW 	ObjFnRandR			;; OBJFN_RANDR:    	0d ObjFnRandR 4E0C
+	3899 D6 4C			DEFW 	ObjFnSwitch			;; OBJFN_SWITCH:   	0e ObjFnSwitch 4CD6
 	389B 16 4E			DEFW 	ObjFnHomeIn			;; OBJFN_HOMEIN:   	0f ObjFnHomeIn 4E16
 	389D 82 4E			DEFW 	ObjFnHeliplat3		;; OBJFN_HELIPLAT3:	10 ObjFnHeliplat3 4E82
 	389F 80 4D			DEFW 	ObjFnFade			;; OBJFN_FADE:     	11 ObjFnFade 4D80
@@ -10807,7 +10812,7 @@ OBJFN_RESPECT			EQU		&25
 	38C1 92 4D			DEFW 	ObjFnDisappear		;; OBJFN_DISAPPEAR:	22 ObjFnDisappear 4D92
 	38C3 3F 4C			DEFW 	ObjFnDriven			;; OBJFN_DRIVEN:   	23 ObjFnDriven 4C3F
 	38C5 29 4C			DEFW 	ObjFnCannonFire		;; OBJFN_CANNONBALL: 24 ObjFnCannonFire 4C29 (victory room)
-	38C7 1B 4E			DEFW 	ObjFnRespectful		;; OBJFN_RESPECT:   25 ObjFnRespectful	4E1B (Emperor's Guard)
+	38C7 1B 4E			DEFW 	ObjFnRespectful		;; OBJFN_RESPECT:   25 ObjFnRespectful 4E1B (Emperor's Guard)
 
 ;; -----------------------------------------------------------------------------------------------------------
 ANIM_VAPE1				EQU		&81
@@ -10937,40 +10942,90 @@ ObjVars:
 	3986 1B 			DEFB 	&1B								;; length : 27 bytes
 ObjVars_reset_data:
 	3987 00 			DEFB 	&00								;; reset for idx Objects
-	3988 40 6A 			DEFW 	Objects         				;; reset for dest Objects 6A40
-	398A A9 39 			DEFW 	ObjectLists      				;; reset for ALstPtr ObjectLists + 0	39A9
-	398C AB 39 			DEFW 	ObjectLists + 2 				;; reset for BLstPtr ObjectLists + 2  	39AB
-	398E 00 00 			DEFW 	&0000							;; reset for AList
-	3990 00 00 00 00 	DEFW 	&0000							;; reset for BList
-	3992 00 00 00 00 	DEFW 	&0000, &0000					;; reset for Next V room
-	3996 00 00 00 00 	DEFW 	&0000, &0000					;; reset for Next U room
-	399A 00 00 00 00 	DEFW 	&0000, &0000					;; reset for Next Far room
-	399E 00 00 00 00 	DEFW 	&0000, &0000					;; reset for Next Near room
+	3988 40 6A 			DEFW 	ObjectsBuffer      				;; reset for dest Objects 6A40
+	398A A9 39 			DEFW 	ObjList_Regular_Far2Near		;; reset for B List Pointer ObjectLists + 0 39A9
+	398C AB 39 			DEFW 	ObjList_Regular_Near2Far		;; reset for A List Pointer ObjectLists + 2 39AB
+	398E 00 00 			DEFW 	&0000, &0000					;; reset for B and A usual list 1st item
+	3992 00 00 00 00 	DEFW 	&0000, &0000					;; reset for Next V room B & A
+	3996 00 00 00 00 	DEFW 	&0000, &0000					;; reset for Next U room B & A
+	399A 00 00 00 00 	DEFW 	&0000, &0000					;; reset for Next Far room B & A
+	399E 00 00 00 00 	DEFW 	&0000, &0000					;; reset for Next Near room B & A
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; The index into ObjectLists.
+;; Two lists are produced. They are in reverse order from eachother (B=far to near, A=Near to far).
+;; Exemple: Lets say we have this in memory (it is Heels in Room ID &157, Fish already taken)
+;;  =====================================================
+;; 		24B0	00 00 C0 6A 10 3D 27 C0 18 21 80 FF FF 00 00 00 00 00   ; Heels_variables
+;; 		24C2	64 6A 00 00 10 3D 29 BA 1F 25 01 FF FF 64 6A 00 00 00   ; Head_variables
+;; 		...
+;; 		39A5	A9 39			; B list start pointer
+;; 		39A7	AB 39			; A list start pointer
+;; 		39A9	B2 24			; B start @ 24B2 = First item in B list is Heels
+;; 		39AB	AC 6A			; A start @ 6AAC = First item in A list is the Drum object
+;; 		39AD	00 00 00 00		; no extra V room
+;; 		39B1	00 00 00 00		; no extra U room
+;; 		39B5	54 6A 40 6A		; First Far B list @ 6A54 (NE doorway), First Far A list @ 6A40 (NE doorway)
+;; 		39B9	78 6A 88 6A		; First Near B list @ 6A78 (SE doorway), First Near A list @ 6A88 (SW doorway)
+;; 		...
+;;	.ObjectsBuffer:		; objects list Buffer
+;; 		6a40	52 6A 00 00 17 4C 24 AE 00 00 02 FF FF 00 00 00 00 08   ; NE right side doorway (flipped)
+;; 		6a52	00 00 42 6A 15 4C 2C AE 01 00 02 FF FF 00 00 00 00 08   ; NE left side doorway (flipped)
+;; 		6a64	76 6A 9C 6A 05 24 14 C0 00 00 02 FF FF 00 00 00 00 08   ; SE left side doorway
+;; 		6a76	00 00 66 6A 04 2C 14 C0 01 00 02 FF FF 00 00 00 00 08   ; SE right side doorway
+;; 		6a88	9A 6A 00 00 36 04 24 C0 00 00 02 FF FF 00 00 00 00 08   ; SW right side (flipped)
+;; 		6a9a	64 6A 8A 6A 34 04 2C C0 01 00 02 FF FF 00 00 00 00 08   ; SW left side (flipped)
+;; 		6aac	BE 6A 00 00 40 0C 1C C0 46 00 81 FF FF 00 00 00 02 08 	; Drum object
+;; 		6abe	B0 24 AE 6A 01 24 2C C0 5A 00 81 FF FF 00 00 00 02 08	; Anvil object
+;; 		6ad2	...
+;;  =====================================================
+;; The B list is: at 39A5 we get 39A9 which points on 24B2 (Heels O_NEXT_BLIST) with value 6AC0.
+;; At 6AC0 (Anvil) we have 6AAE; At 6AAE (Drum) we have 0, so "end of the list".
+;; To sum up B list has : Heels, Anvil, Drum
+;; Similarly, the A list is: (39A7)=39AB, (39AB)=6AAC (Drum), (6AAC)=6ABE (Anvil), (6ABE)=24B0 (Heels), (24B0)=0 (end)
+;; In other words the A list has Drum, Anvil, Heels.
+;; In the same way the Far lists are:
+;; 		B: NEdoor (left/farside), NEdoor(right/nearside), end
+;; 		A: NEdoor(right/nearside), NEdoor (left/farside), end
+;; and the Near lists are:
+;; 		B: SEdoor (right/farside), SEdoor (left/nearside), SWdoor (left/farside), SWdoor (right/nearside), end
+;;		A: SWdoor (right/nearside), SWdoor (left/farside), SEdoor (left/nearside), SEdoor (right/farside), end
+;; -----------------------------------------------------------------------------------------------------------
+
 .SaveRestore_Block2:											;; Save/Restore block 2 : &1D (29 bytes)
-.ObjListIdx:
+.ObjListIdx:													;; The index into ObjectLists.
 	39A2 00 			DEFB 	&00								;; list index
 Object_Destination:												;; Current pointer for where we write objects into (6A40 buffer)
-	39A3 40 6A 			DEFW 	Objects
-.ObjListAPtr:													;; 'A' list item pointers are offset +2 from 'B' list pointers.
-	39A5 A9 39 			DEFW 	ObjectLists 					;; ObjectLists + 0 : 39A9
+	39A3 40 6A 			DEFW 	ObjectsBuffer
+;; 'A' list item pointers are offset +2 from 'B' list pointers.
 .ObjListBPtr:
-	39A7 AB 39 			DEFW 	ObjectLists + 2					;; ObjectLists + 2 : 39AB
-;; Each list consists of a pair of pointers to linked lists of
-;; objects (ListA and ListB). They're opposite directions in a
-;; doubly-linked list, and each side has a head node, it seems.
+	39A5 A9 39 			DEFW 	ObjList_Regular_Far2Near		;; pointer on the B list start (ObjectLists + 0 : 39A9)
+.ObjListAPtr:
+	39A7 AB 39 			DEFW 	ObjList_Regular_Near2Far		;; pointer on the A list start (ObjectLists + 2 : 39AB)
+
 ObjectLists:
-	39A9 00 00 			DEFW 	&0000 							;; ObjectLists + 0   ; Usual list
-	39AB 00 00 			DEFW 	&0000             				;; ObjectLists + 2   ; Usual list
-	39AD 00 00 00 00 	DEFW 	&0000, &0000            		;; ObjectLists + 1*4 ; Next room in V direction
-	39B1 00 00 00 00 	DEFW 	&0000, &0000            		;; ObjectLists + 2*4 ; Next room in U direction
-	39B5 00 00 00 00 	DEFW 	&0000, &0000            		;; ObjectLists + 3*4 ; Far
-	39B9 00 00 00 00 	DEFW 	&0000, &0000            		;; ObjectLists + 4*4 ; Near
+ObjList_Regular_Far2Near:
+	39A9 00 00 			DEFW 	&0000 							;; ObjectLists + 0 ; Usual B (Far to Near) list 1st item pointer
+ObjList_Regular_Near2Far:
+	39AB 00 00 			DEFW 	&0000             				;; ObjectLists + 2 ; Usual A (Near to Far) list 1st item pointer
+ObjList_NextRoomV_Far2Near:
+	39AD 00 00			DEFW 	&0000            				;; ObjectLists + 4 ; Next room in V direction B list pointers
+ObjList_NextRoomV_Near2Far:
+	39AF 00 00			DEFW 	&0000		            		;; ObjectLists + 6 ; Next room in V direction A list pointers
+ObjList_NextRoomU_Far2Near:
+	39B1 00 00			DEFW 	&0000							;; ObjectLists + 8 ; Next room in U direction B list pointers
+ObjList_NextRoomU_Near2Far:
+	39B3 00 00			DEFW 	&0000							;; ObjectLists + 10 ; Next room in U direction A list pointers
+ObjList_Far_Far2Near:
+	39B5 00 00			DEFW 	&0000							;; ObjectLists + 12 ; Far B list pointers
+ObjList_Far_Near2Far:
+	39B7 00 00			DEFW 	&0000							;; ObjectLists + 14 ; Far A list pointers
+ObjList_Near_Far2Near:
+	39B9 00 00			DEFW 	&0000							;; ObjectLists + 16 ; Near B list pointers
+ObjList_Near_Near2Far:
+	39BB 00 00			DEFW 	&0000							;; ObjectLists + 18 ; Near A list pointers
 
 Saved_Object_Destination:
-	39BD 40 6A 			DEFW 	Objects							;; Objects : 6A40
+	39BD 40 6A 			DEFW 	ObjectsBuffer					;; ObjectsBuffer : 6A40
 .SaveRestore_Block2_end
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -10988,10 +11043,10 @@ Saved_Object_Destination:
 	39C9 CE 39          ADC		A,ObjectLists / 256							;; &39 = ObjectLists >> 8 ; &39A9+offset
 	39CB 95             SUB		L
 	39CC 67             LD		H,A											;; HL = ObjectLists + 4*index
-	39CD 22 A5 39       LD		(ObjListAPtr),HL							;; pointer A
+	39CD 22 A5 39       LD		(ObjListBPtr),HL							;; pointer B list
 	39D0 23             INC		HL
 	39D1 23             INC		HL											;; next word in list
-	39D2 22 A7 39       LD		(ObjListBPtr),HL							;; pointer B
+	39D2 22 A7 39       LD		(ObjListAPtr),HL							;; pointer A list
 	39D5 C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -11166,10 +11221,10 @@ elonjax_1:
 	3AAA CD C1 39       CALL	SetObjList
 	;; will fall in DepthInsertHd
 ;; -----------------------------------------------------------------------------------------------------------
-;; Does a DepthInsert on the list pointed to by ObjListAPtr
+;; Does a DepthInsert on the list pointed to by ObjListBPtr
 .DepthInsertHd:
-	3AAD 2A A5 39       LD		HL,(ObjListAPtr)
-;; Object extents in alt registers, 'A' pointer in HL.
+	3AAD 2A A5 39       LD		HL,(ObjListBPtr)
+;; Object extents in alt registers, 'B' pointer (far to near) in HL.
 ;; Object to insert is on the stack.
 ;;
 ;; I believe this traverses a list sorted far-to-near, and
@@ -11211,10 +11266,10 @@ elonjax_1:
     ;; Put DE's new 'next' pointer into HL.
 	3AD5 69             LD		L,C
 	3AD6 67             LD		H,A
-	;; And if it's zero, load HL with pointer referred to by ObjListBPtr
+	;; And if it's zero, load HL with pointer referred to by ObjListAPtr
 	3AD7 B1             OR		C
 	3AD8 20 05          JR		NZ,br_3ADF
-	3ADA 2A A7 39       LD		HL,(ObjListBPtr)
+	3ADA 2A A7 39       LD		HL,(ObjListAPtr)
 	3ADD 23             INC		HL
 	3ADE 23             INC		HL
 br_3ADF
@@ -11280,7 +11335,7 @@ br_3ADF
 	3B07 13             INC		DE
 	3B08 13             INC		DE
 	3B09 20 04          JR		NZ,ulnk_1
-	3B0B ED 5B A5 39    LD		DE,(ObjListAPtr)
+	3B0B ED 5B A5 39    LD		DE,(ObjListBPtr)
 	;; HL pointer at 'A' pointer now. Copy *HL to *DE, saving
     ;; value in HL.
 ulnk_1:
@@ -11291,11 +11346,11 @@ ulnk_1:
 	3B14 12             LD		(DE),A
 	3B15 67             LD		H,A
 	3B16 69             LD		L,C
-	;; If the pointer was null, put the head of the B list in HL.
+	;; If the pointer was null, put the head of the A list in HL.
 	3B17 B1             OR		C
 	3B18 2B             DEC		HL
 	3B19 20 04          JR		NZ,br_3B1F
-	3B1B 2A A7 39       LD		HL,(ObjListBPtr)
+	3B1B 2A A7 39       LD		HL,(ObjListAPtr)
 	3B1E 23             INC		HL
 br_3B1F
 	;; Make HL's next B object the saved DE B pointer.
@@ -11466,174 +11521,174 @@ GUVZE_z_zm18:
 ;;  A = 0 if there's an overlap in 2 dimensions, &FF otherwise
 .DepthCmp:
     ;; L < H' && H > L' -> U Overlap
-	3BA5 7D             LD A,L
+	3BA5 7D             LD		A,L
 	3BA6 D9             EXX
-	3BA7 BC             CP H
-	3BA8 7D             LD A,L
+	3BA7 BC             CP		H
+	3BA8 7D             LD		A,L
 	3BA9 D9             EXX
-	3BAA 30 03          JR NC,NoUOverlap
-	3BAC BC             CP H
-	3BAD 38 37          JR c,UOverlap
+	3BAA 30 03          JR		NC,NoUOverlap
+	3BAC BC             CP		H
+	3BAD 38 37          JR		c,UOverlap
 .NoUOverlap:
     ;; E < D' && D > E' -> V Overlap
-	3BAF 7B             LD A,E
+	3BAF 7B             LD		A,E
 	3BB0 D9             EXX
-	3BB1 BA             CP D
-	3BB2 7B             LD A,E
+	3BB1 BA             CP		D
+	3BB2 7B             LD		A,E
 	3BB3 D9             EXX
-	3BB4 30 03          JR NC,dpth_1
-	3BB6 BA             CP D
-	3BB7 38 64          JR c,VNoUOverlap
+	3BB4 30 03          JR		NC,dpth_1
+	3BB6 BA             CP		D
+	3BB7 38 64          JR		c,VNoUOverlap
 dpth_1
-	3BB9 79             LD A,C
+	3BB9 79             LD		A,C
 	3BBA D9             EXX
-	3BBB B8             CP B
+	3BBB B8             CP		B
 NoUVOverlap:
     ;; C < B' && B > C' -> Z Overlap
-	3BBC 79             LD A,C
+	3BBC 79             LD		A,C
 	3BBD D9             EXX
-	3BBE 30 03          JR NC,NoUVZOverlap
-	3BC0 B8             CP B
-	3BC1 38 17          JR c,ZNoUVOverlap
+	3BBE 30 03          JR		NC,NoUVZOverlap
+	3BC0 B8             CP		B
+	3BC1 38 17          JR		c,ZNoUVOverlap
 .NoUVZOverlap:
     ;; No overlaps at all - simple depth comparison
     ;; HL = U + V + Z (lower coords)
-	3BC3 7D             LD A,L
-	3BC4 83             ADD A,E													;; HL = L + E + C
-	3BC5 81             ADD A,C
-	3BC6 6F             LD L,A
-	3BC7 CE 00          ADC A,0													;; Add Carry
-	3BC9 95             SUB L
-	3BCA 67             LD H,A
+	3BC3 7D             LD		A,L
+	3BC4 83             ADD		A,E												;; HL = L + E + C
+	3BC5 81             ADD		A,C
+	3BC6 6F             LD		L,A
+	3BC7 CE 00          ADC		A,0												;; Add Carry
+	3BC9 95             SUB		L
+	3BCA 67             LD		H,A
 	;; DE = U' + V' + Z' (lower co-ords)
 	3BCB D9             EXX
-	3BCC 7D             LD A,L
-	3BCD 83             ADD A,E
-	3BCE 81             ADD A,C
+	3BCC 7D             LD		A,L
+	3BCD 83             ADD		A,E
+	3BCE 81             ADD		A,C
 	3BCF D9             EXX
-	3BD0 5F             LD E,A
-	3BD1 CE 00          ADC A,0													;; Add Carry
-	3BD3 93             SUB E
-	3BD4 57             LD D,A
+	3BD0 5F             LD		E,A
+	3BD1 CE 00          ADC		A,0												;; Add Carry
+	3BD3 93             SUB		E
+	3BD4 57             LD		D,A
 	;; Compare depths
-	3BD5 ED 52          SBC HL,DE
-	3BD7 3E FF          LD A,&FF
+	3BD5 ED 52          SBC		HL,DE
+	3BD7 3E FF          LD		A,&FF
 	3BD9 C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 .ZNoUVOverlap:
     ;; Overlaps in Z, not U or V. In this case, we compare on U + V
-	3BDA 7D             LD A,L
-	3BDB 83             ADD A,E
-	3BDC 6F             LD L,A
+	3BDA 7D             LD		A,L
+	3BDB 83             ADD		A,E
+	3BDC 6F             LD		L,A
 	3BDD D9             EXX
-	3BDE 7D             LD A,L
-	3BDF 83             ADD A,E
+	3BDE 7D             LD		A,L
+	3BDF 83             ADD		A,E
 	3BE0 D9             EXX
-	3BE1 BD             CP L
+	3BE1 BD             CP		L
 	3BE2 3F             CCF
-	3BE3 3E FF          LD A,&FF
+	3BE3 3E FF          LD		A,&FF
 	3BE5 C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 .UOverlap:
     ;; E < D' && D > E' -> V Overlap
-	3BE6 7B             LD A,E
+	3BE6 7B             LD		A,E
 	3BE7 D9             EXX
-	3BE8 BA             CP D
-	3BE9 7B             LD A,E
+	3BE8 BA             CP		D
+	3BE9 7B             LD		A,E
 	3BEA D9             EXX
-	3BEB 30 03          JR NC,UNoVOverlap
-	3BED BA             CP D
-	3BEE 38 26          JR c,UVOverlap
+	3BEB 30 03          JR		NC,UNoVOverlap
+	3BED BA             CP		D
+	3BEE 38 26          JR		c,UVOverlap
 .UNoVOverlap:
     ;; C < B' && B > C' -> Z Overlap
-	3BF0 79             LD A,C
+	3BF0 79             LD		A,C
 	3BF1 D9             EXX
-	3BF2 B8             CP B
-	3BF3 79             LD A,C
+	3BF2 B8             CP		B
+	3BF3 79             LD		A,C
 	3BF4 D9             EXX
-	3BF5 30 03          JR NC,UNoVZOverlap
-	3BF7 B8             CP B
-	3BF8 38 15          JR c,UZNoVOverlap
+	3BF5 30 03          JR		NC,UNoVZOverlap
+	3BF7 B8             CP		B
+	3BF8 38 15          JR		c,UZNoVOverlap
 .UNoVZOverlap:
     ;; Compare on Z  + V
 	3BFA D9             EXX
-	3BFB 83             ADD A,E
+	3BFB 83             ADD		A,E
 	3BFC D9             EXX
-	3BFD 6F             LD L,A
-	3BFE CE 00          ADC A,0													;; Add Carry
-	3C00 95             SUB L
-	3C01 67             LD H,A
-	3C02 79             LD A,C
-	3C03 83             ADD A,E
-	3C04 5F             LD E,A
-	3C05 CE 00          ADC A,0													;; Add Carry
-	3C07 93             SUB E
-	3C08 57             LD D,A
-	3C09 ED 52          SBC HL,DE
+	3BFD 6F             LD		L,A
+	3BFE CE 00          ADC		A,0												;; Add Carry
+	3C00 95             SUB		L
+	3C01 67             LD		H,A
+	3C02 79             LD		A,C
+	3C03 83             ADD		A,E
+	3C04 5F             LD		E,A
+	3C05 CE 00          ADC		A,0												;; Add Carry
+	3C07 93             SUB		E
+	3C08 57             LD		D,A
+	3C09 ED 52          SBC		HL,DE
 	3C0B 3F             CCF
-	3C0C 3E FF          LD A,&FF
+	3C0C 3E FF          LD		A,&FF
 	3C0E C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 .UZNoVOverlap:
     ;; Compare on V
-	3C0F 7B             LD A,E
+	3C0F 7B             LD		A,E
 	3C10 D9             EXX
-	3C11 BB             CP E
+	3C11 BB             CP		E
 	3C12 D9             EXX
-	3C13 3E 00          LD A,&00
+	3C13 3E 00          LD		A,&00
 	3C15 C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 .UVOverlap:
     ;; Compare on Z
-	3C16 79             LD A,C
+	3C16 79             LD		A,C
 	3C17 D9             EXX
-	3C18 B9             CP C
+	3C18 B9             CP		C
 	3C19 D9             EXX
-	3C1A 3E 00          LD A,&00
+	3C1A 3E 00          LD		A,&00
 	3C1C C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 .VNoUOverlap:
     ;; C < B' && B > C' -> Z Overlap
-	3C1D 79             LD A,C
+	3C1D 79             LD		A,C
 	3C1E D9             EXX
-	3C1F B8             CP B
-	3C20 79             LD A,C
+	3C1F B8             CP		B
+	3C20 79             LD		A,C
 	3C21 D9             EXX
-	3C22 30 03          JR NC,VNoUZOverlap
-	3C24 B8             CP B
-	3C25 38 14          JR c,VZNoUOverlap
+	3C22 30 03          JR		NC,VNoUZOverlap
+	3C24 B8             CP		B
+	3C25 38 14          JR		c,VZNoUOverlap
 .VNoUZOverlap:
     ;; Compare on U + Z
 	3C27 D9             EXX
-	3C28 85             ADD A,L
+	3C28 85             ADD		A,L
 	3C29 D9             EXX
-	3C2A 5F             LD E,A
-	3C2B CE 00          ADC A,0													;; Add Carry
-	3C2D 93             SUB E
-	3C2E 57             LD D,A
-	3C2F 79             LD A,C
-	3C30 85             ADD A,L
-	3C31 6F             LD L,A
-	3C32 CE 00          ADC A,0													;; Add Carry
-	3C34 95             SUB L
-	3C35 67             LD H,A
-	3C36 ED 52          SBC HL,DE
-	3C38 3E FF          LD A,&FF
+	3C2A 5F             LD		E,A
+	3C2B CE 00          ADC		A,0												;; Add Carry
+	3C2D 93             SUB		E
+	3C2E 57             LD		D,A
+	3C2F 79             LD		A,C
+	3C30 85             ADD		A,L
+	3C31 6F             LD		L,A
+	3C32 CE 00          ADC		A,0												;; Add Carry
+	3C34 95             SUB		L
+	3C35 67             LD		H,A
+	3C36 ED 52          SBC		HL,DE
+	3C38 3E FF          LD		A,&FF
 	3C3A C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 .VZNoUOverlap:
     ;; Compare on U
-	3C3B 7D             LD A,L
+	3C3B 7D             LD		A,L
 	3C3C D9             EXX
-	3C3D BD             CP L
+	3C3D BD             CP		L
 	3C3E D9             EXX
-	3C3F 3E 00          LD A,&00
+	3C3F 3E 00          LD		A,&00
 	3C41 C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -11673,60 +11728,61 @@ Walls_DoorZ:
 ;; Configure the walls.
 ;; Height of highest door in A.
 .ConfigWalls:
-	3C63 32 49 3C       LD (Walls_DoorZ),A									;; door height
-	3C66 CD 85 3C       CALL VWall
+	3C63 32 49 3C       LD		(Walls_DoorZ),A								;; door height
+	3C66 CD 85 3C       CALL	VWall
     ;; Skip if there's an extra room visible in the U dir.
-	3C69 3A C0 1E       LD A,(Has_no_wall)
-	3C6C E6 04          AND 4												;; test bit 2 : wall U side (ne)
-	3C6E C0             RET NZ												;; if there is a wall, leave (else can see further into next room
+	3C69 3A C0 1E       LD		A,(Has_no_wall)
+	3C6C E6 04          AND		4											;; test bit 2 : wall U side (ne)
+	3C6E C0             RET		NZ											;; if there is a wall, leave (else can see further into next room
 	;; Put the wall mask in B' and stash the reflection flag at smc_OWFlag.
     ;; Step size in DE, direction extent in A.
-	3C6F 06 04          LD B,4
+	3C6F 06 04          LD		B,4
 	3C71 D9             EXX
-	3C72 3E 80          LD A,&80
-	3C74 32 11 3D       LD (smc_OWFlag+1),A									;; self mode code, value of "OR ..."
-	3C77 CD 82 3D       CALL GetCorner
-	3C7A 11 02 00       LD DE,&0002
-	3C7D FD 7E FF       LD A,(IY-1)											;; (IY-&01) ; MaxV
-	3C80 FD 96 FD       SUB (IY-3)											;; (IY-&03) ; MinV
-	3C83 18 1B          JR OneWall
+	3C72 3E 80          LD		A,&80
+	3C74 32 11 3D       LD		(smc_OWFlag+1),A							;; self mode code, value of "OR ..."
+	3C77 CD 82 3D       CALL	GetCorner
+	3C7A 11 02 00       LD		DE,&0002
+	3C7D FD 7E FF       LD		A,(IY-1)									;; (IY-&01) ; MaxV
+	3C80 FD 96 FD       SUB		(IY-3)										;; (IY-&03) ; MinV
+	3C83 18 1B          JR		OneWall
 
+;; -----------------------------------------------------------------------------------------------------------
 ;; Draw wall parallel to U axis.
 .VWall:
     ;; Skip if there's an extra room in the V direction.
-	3C85 3A C0 1E       LD A,(Has_no_wall)
-	3C88 E6 08          AND &08
-	3C8A C0             RET NZ
+	3C85 3A C0 1E       LD		A,(Has_no_wall)
+	3C88 E6 08          AND		&08
+	3C8A C0             RET		NZ
 	;; Put the wall mask in B' and stash the reflection flag at smc_OWFlag.
     ;; Step size in DE, direction extent in A.
-	3C8B 06 08          LD B,&08
+	3C8B 06 08          LD		B,&08
 	3C8D D9             EXX
-	3C8E AF             XOR A
-	3C8F 32 11 3D       LD (smc_OWFlag+1),A									;; self mode code, value of "OR ..."
-	3C92 CD 82 3D       CALL GetCorner
-	3C95 2D             DEC L
-	3C96 2D             DEC L
-	3C97 11 FE FF       LD DE,&FFFE											;; -2
-	3C9A FD 7E FE       LD A,(IY-2)											;; (IY-&02) ; MaxU
-	3C9D FD 96 FC       SUB (IY-4)											;; (IY-&04)   ; MinU
-;; Room extent in A, movement step in DE, BackgrdBuff pointer in HL, X/Y in B/C
-;; The flag for this wall in B'
+	3C8E AF             XOR		A
+	3C8F 32 11 3D       LD		(smc_OWFlag+1),A							;; self mode code, value of "OR ..."
+	3C92 CD 82 3D       CALL	GetCorner
+	3C95 2D             DEC		L
+	3C96 2D             DEC		L
+	3C97 11 FE FF       LD		DE,&FFFE									;; -2
+	3C9A FD 7E FE       LD		A,(IY-2)									;; (IY-&02) ; MaxU
+	3C9D FD 96 FC       SUB		(IY-4)										;; (IY-&04)   ; MinU
+;; Room extent in A, movement step in DE, BackgrdBuff pointer in HL,
+;; X/Y in B/C. The flag for this wall in B'
 .OneWall:
     ;; Divide wall extent by 16 (one panel?)
 	3CA0 1F             RRA
 	3CA1 1F             RRA
 	3CA2 1F             RRA
 	3CA3 1F             RRA
-	3CA4 E6 0F          AND &0F
+	3CA4 E6 0F          AND		&0F
 	;; Move BackgrdBuff pointer to IX.
-	3CA6 E5             PUSH HL
-	3CA7 DD E1          POP IX
+	3CA6 E5             PUSH	HL
+	3CA7 DD E1          POP		IX
 	3CA9 D9             EXX
 	;; Updated extent in C, check if this wall has a door.
-	3CAA 4F             LD C,A
-	3CAB 3A C1 1E       LD A,(Has_Door)										;; Has_Door
-	3CAE A0             AND B
-	3CAF FE 01          CP &01
+	3CAA 4F             LD		C,A
+	3CAB 3A C1 1E       LD		A,(Has_Door)								;; Has_Door
+	3CAE A0             AND		B
+	3CAF FE 01          CP		&01
 	;; Carry set means no door. Stash it in F'
 	3CB1 08             EX		AF,AF'
 	3CB2 3A BF 1E       LD		A,(WorldId)									;; which world? (for panels selection)
@@ -11763,118 +11819,118 @@ Panel_WorldData_m1		EQU		Panel_WorldData - 1							;; = &3DA9; minus 1 so that t
 	3CDE 66             LD		H,(HL)
 	3CDF 6F             LD		L,A											;; HL = Panels Base Addr for current WorldId
 	3CE0 22 42 3C       LD		(Walls_PanelBase),HL						;; Set the panel codes for the current world.
-	3CE3 3E FF          LD A,&FF
+	3CE3 3E FF          LD		A,&FF
 	;; Recover the no door flag, stick the extent in A, push A and flag.
-	3CE5 08             EX AF,AF'
-	3CE6 79             LD A,C
-	3CE7 F5             PUSH AF
+	3CE5 08             EX		AF,AF'
+	3CE6 79             LD		A,C
+	3CE7 F5             PUSH	AF
 	;; Find the location of the panel info we care about.
     ;; Extent = 4 -> B = &01
-	3CE8 D6 04          SUB 4
-	3CEA 06 01          LD B,&01
-	3CEC 28 0C          JR Z,owctd_1
+	3CE8 D6 04          SUB		4
+	3CEA 06 01          LD		B,&01
+	3CEC 28 0C          JR		Z,owctd_1
 	;; Extent = 5 -> B = &0F
-	3CEE 06 0F          LD B,&0F
-	3CF0 3C             INC A
-	3CF1 28 07          JR Z,owctd_1
+	3CEE 06 0F          LD		B,&0F
+	3CF0 3C             INC		A
+	3CF1 28 07          JR		Z,owctd_1
 	;; Extent = 6 -> B = &19
-	3CF3 06 19          LD B,&19
-	3CF5 3C             INC A
-	3CF6 28 02          JR Z,owctd_1
+	3CF3 06 19          LD		B,&19
+	3CF5 3C             INC		A
+	3CF6 28 02          JR		Z,owctd_1
 	;; Otherwise, B = &1F
-	3CF8 06 1F          LD B,&1F
+	3CF8 06 1F          LD		B,&1F
 owctd_1:
-	3CFA F1             POP AF
-	3CFB 38 06          JR c,owctd_2										;; No door? A' is &FF and we jump.
+	3CFA F1             POP		AF
+	3CFB 38 06          JR		c,owctd_2									;; No door? A' is &FF and we jump.
 	;; We have a door
-	3CFD 79             LD A,C
-	3CFE 87             ADD A,A
-	3CFF 80             ADD A,B
-	3D00 47             LD B,A												;; Add 2xC to B
-	3D01 79             LD A,C
-	3D02 08             EX AF,AF'											;; And put C (extent) in A'
+	3CFD 79             LD		A,C
+	3CFE 87             ADD		A,A
+	3CFF 80             ADD		A,B
+	3D00 47             LD		B,A											;; Add 2xC to B
+	3D01 79             LD		A,C
+	3D02 08             EX		AF,AF'										;; And put C (extent) in A'
 	;; Skip B entries, to get the panels we want.
 owctd_2:
-	3D03 CD 7A 3D       CALL FetchData2b
-	3D06 10 FB          DJNZ owctd_2
+	3D03 CD 7A 3D       CALL	FetchData2b
+	3D06 10 FB          DJNZ	owctd_2
 	;; Put 2x extent in B.
-	3D08 41             LD B,C
-	3D09 CB 20          SLA B
+	3D08 41             LD		B,C
+	3D09 CB 20          SLA		B
 	;; Then enter the wall-panel-processing loop.
 .OWPanel:
-	3D0B 08             EX AF,AF'
+	3D0B 08             EX		AF,AF'
 	;; Loop through A panels, then hit OWDoor.
-	3D0C 3D             DEC A
-	3D0D 28 32          JR Z,OWDoor
+	3D0C 3D             DEC		A
+	3D0D 28 32          JR		Z,OWDoor
 	;; Otherwise update entries in BackgrdBuff.
-	3D0F 08             EX AF,AF'
+	3D0F 08             EX		AF,AF'
 .smc_OWFlag:
-	3D10 F6 00         	OR &00
+	3D10 F6 00         	OR		&00
 	;;3D11 DEFB 00															; self-modifying code at 3D32, 3D51, 3C74, 3C8F adds a flip if needed.
-	3D12 DD 77 01       LD (IX+1),A											;; Set the wall-panel sprite
+	3D12 DD 77 01       LD		(IX+1),A									;; Set the wall-panel sprite
 	3D15 D9             EXX
-	3D16 79             LD A,C
-	3D17 C6 08          ADD A,&08
-	3D19 DD 71 00       LD (IX+0),C											;; Y start of wall (0 = clear)
-	3D1C 4F             LD C,A
-	3D1D DD 19          ADD IX,DE											;; Move to next panel (L or R)
+	3D16 79             LD		A,C
+	3D17 C6 08          ADD		A,&08
+	3D19 DD 71 00       LD		(IX+0),C									;; Y start of wall (0 = clear)
+	3D1C 4F             LD		C,A
+	3D1D DD 19          ADD		IX,DE										;; Move to next panel (L or R)
 	3D1F D9             EXX
-	3D20 CD 7A 3D       CALL FetchData2b
+	3D20 CD 7A 3D       CALL	FetchData2b
 .OWPanelLoop:
-	3D23 10 E6          DJNZ OWPanel
+	3D23 10 E6          DJNZ	OWPanel
 	3D25 D9             EXX
-	3D26 DD E5          PUSH IX
-	3D28 E1             POP HL
-	3D29 7D             LD A,L
-	3D2A FE 40          CP &40
-	3D2C D0             RET NC
+	3D26 DD E5          PUSH	IX
+	3D28 E1             POP		HL
+	3D29 7D             LD		A,L
+	3D2A FE 40          CP		&40
+	3D2C D0             RET		NC
 	;; If last entry is not clear, return
-	3D2D DD 7E 00       LD A,(IX+0)
-	3D30 A7             AND A
-	3D31 C0             RET NZ
+	3D2D DD 7E 00       LD		A,(IX+0)
+	3D30 A7             AND		A
+	3D31 C0             RET		NZ
 	;; If it is, add some Pillar.
-	3D32 3A 11 3D       LD A,(smc_OWFlag+1)									;; read value of "OR ..." ; self mod code
-	3D35 F6 05          OR &05
-	3D37 DD 77 01       LD (IX+1),A
-	3D3A 79             LD A,C
-	3D3B D6 10          SUB &10
-	3D3D DD 77 00       LD (IX+0),A
+	3D32 3A 11 3D       LD		A,(smc_OWFlag+1)							;; read value of "OR ..." ; self mod code
+	3D35 F6 05          OR		&05
+	3D37 DD 77 01       LD		(IX+1),A
+	3D3A 79             LD		A,C
+	3D3B D6 10          SUB		&10
+	3D3D DD 77 00       LD		(IX+0),A
 	3D40 C9             RET
 
 .OWDoor:
 	3D41 D9             EXX
-	3D42 3A 49 3C       LD A,(Walls_DoorZ)									;; DoorZ
-	3D45 A7             AND A
-	3D46 79             LD A,C
-	3D47 28 03          JR Z,br_3D4C
-	3D49 C6 10          ADD A,&10
-	3D4B 4F             LD C,A
+	3D42 3A 49 3C       LD		A,(Walls_DoorZ)								;; DoorZ
+	3D45 A7             AND		A
+	3D46 79             LD		A,C
+	3D47 28 03          JR		Z,br_3D4C
+	3D49 C6 10          ADD		A,&10
+	3D4B 4F             LD		C,A
 br_3D4C
-	3D4C D6 10          SUB &10
-	3D4E DD 77 00       LD (IX+0),A											;; Set height.
-	3D51 3A 11 3D       LD A,(smc_OWFlag+1)									;; read value of "OR ..." ; self mod
-	3D54 F6 04          OR &04
-	3D56 DD 77 01       LD (IX+1),A											;; Set wall to blank.
-	3D59 DD 19          ADD IX,DE
-	3D5B DD 77 01       LD (IX+1),A											;; Ditto next slot.
-	3D5E 79             LD A,C
-	3D5F D6 08          SUB 8
-	3D61 DD 77 00       LD (IX+0),A											;; And lower for the next slot.
-	3D64 C6 18          ADD A,&18
-	3D66 4F             LD C,A
-	3D67 3A 49 3C       LD A,(Walls_DoorZ)									;; DoorZ
-	3D6A A7             AND A
-	3D6B 28 04          JR Z,br_3D71
-	3D6D 79             LD A,C
-	3D6E D6 10          SUB &10
-	3D70 4F             LD C,A
+	3D4C D6 10          SUB		&10
+	3D4E DD 77 00       LD		(IX+0),A									;; Set height.
+	3D51 3A 11 3D       LD		A,(smc_OWFlag+1)							;; read value of "OR ..." ; self mod
+	3D54 F6 04          OR		&04
+	3D56 DD 77 01       LD		(IX+1),A									;; Set wall to blank.
+	3D59 DD 19          ADD		IX,DE
+	3D5B DD 77 01       LD		(IX+1),A									;; Ditto next slot.
+	3D5E 79             LD		A,C
+	3D5F D6 08          SUB		8
+	3D61 DD 77 00       LD		(IX+0),A									;; And lower for the next slot.
+	3D64 C6 18          ADD		A,&18
+	3D66 4F             LD		C,A
+	3D67 3A 49 3C       LD		A,(Walls_DoorZ)								;; DoorZ
+	3D6A A7             AND		A
+	3D6B 28 04          JR		Z,br_3D71
+	3D6D 79             LD		A,C
+	3D6E D6 10          SUB		&10
+	3D70 4F             LD		C,A
 br_3D71
-	3D71 DD 19          ADD IX,DE
-	3D73 3E FF          LD A,&FF
-	3D75 08             EX AF,AF'
+	3D71 DD 19          ADD		IX,DE
+	3D73 3E FF          LD		A,&FF
+	3D75 08             EX		AF,AF'
 	3D76 D9             EXX
-	3D77 05             DEC B
-	3D78 18 A9          JR OWPanelLoop
+	3D77 05             DEC		B
+	3D78 18 A9          JR		OWPanelLoop
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Fetch 2 bits from data in CurrData, returned in A
@@ -12323,136 +12379,136 @@ fsnum_colorattr:
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Pick up a Fish (save points)
 .SaveContinue:
-	4025 06 C2          LD B,Sound_ID_Hornpipe								;; Sound_ID &C2 = Hornpipe
-	4027 CD 91 0D       CALL Play_Sound
-	402A CD 2A 41       CALL GetContinueData								;; get current save array (18 bytes)
-	402D DD 21 EB 3D    LD IX,tab_Specials_collectible
-	4031 11 04 00       LD DE,&0004
-	4034 06 06          LD B,&06
+	4025 06 C2          LD		B,Sound_ID_Hornpipe							;; Sound_ID &C2 = Hornpipe
+	4027 CD 91 0D       CALL	Play_Sound
+	402A CD 2A 41       CALL	GetContinueData								;; get current save array (18 bytes)
+	402D DD 21 EB 3D    LD		IX,tab_Specials_collectible
+	4031 11 04 00       LD		DE,&0004
+	4034 06 06          LD		B,&06
 savecont_1:
-	4036 36 80          LD (HL),&80
+	4036 36 80          LD		(HL),&80
 savecont_2:
-	4038 DD 7E 00       LD A,(IX+0)
-	403B DD 19          ADD IX,DE
+	4038 DD 7E 00       LD		A,(IX+0)
+	403B DD 19          ADD		IX,DE
 	403D 1F             RRA
-	403E CB 1E          RR (HL)
-	4040 30 F6          JR NC,savecont_2
-	4042 23             INC HL
-	4043 10 F1          DJNZ savecont_1
-	4045 EB             EX DE,HL
-	4046 21 94 41       LD HL,Save_point_value								;; Save point value (Continues)
-	4049 34             INC (HL)											;; incr the number of active save point
-	404A 21 84 24       LD HL,selected_characters							;; points on selected_characters
-	404D 7E             LD A,(HL)											;; save selected char first byte
+	403E CB 1E          RR		(HL)
+	4040 30 F6          JR		NC,savecont_2
+	4042 23             INC		HL
+	4043 10 F1          DJNZ	savecont_1
+	4045 EB             EX		DE,HL
+	4046 21 94 41       LD		HL,Save_point_value							;; Save point value (Continues)
+	4049 34             INC		(HL)										;; incr the number of active save point
+	404A 21 84 24       LD		HL,selected_characters						;; points on selected_characters
+	404D 7E             LD		A,(HL)										;; save selected char first byte
 	404E ED A0          LDI													;; do once : LD (DE),(HL); DE++, HL++, BC--
-	4050 21 80 24       LD HL,Characters_lives								;; point on Characters_lives
+	4050 21 80 24       LD		HL,Characters_lives							;; point on Characters_lives
 	4053 ED A0          LDI													;; do once : LD (DE),(HL); DE++, HL++, BC--
 	4055 ED A0          LDI													;; do once : LD (DE),(HL); DE++, HL++, BC--
-	4057 FE 03          CP &03
-	4059 28 13          JR Z,SaveContinue_3
-	405B 21 96 24       LD HL,TODO_2496										;; ???
-	405E BE             CP (HL)
-	405F 20 0D          JR NZ,SaveContinue_3
-	4061 21 31 BB       LD HL,&BB31											;; save 4 bytes in buffer
-	4064 01 04 00       LD BC,&0004
+	4057 FE 03          CP		&03
+	4059 28 13          JR		Z,SaveContinue_3
+	405B 21 96 24       LD		HL,saved_selected_chars						;; ???
+	405E BE             CP		(HL)
+	405F 20 0D          JR		NZ,SaveContinue_3
+	4061 21 31 BB       LD		HL,&BB31									;; save 4 bytes in buffer
+	4064 01 04 00       LD		BC,&0004
 	4067 ED B0          LDIR												;; repeat LD (DE),(HL); DE++, HL++, BC-- until BC=0
-	4069 21 10 BB       LD HL,Other_Character_state + MOVE_OFFSET
-	406C 18 0B          JR SaveContinue_4
+	4069 21 10 BB       LD		HL,Other_Character_state + MOVE_OFFSET
+	406C 18 0B          JR		SaveContinue_4
 .SaveContinue_3
-	406E 21 92 24       LD HL,&2492											;; SaveRestore_Block3
-	4071 01 04 00       LD BC,&0004
+	406E 21 92 24       LD		HL,SaveRestore_Block3						;; point on saved_room_access_code and EntryPosition_uvz variables
+	4071 01 04 00       LD		BC,&0004
 	4074 ED B0          LDIR												;; repeat LD (DE),(HL); DE++, HL++, BC-- until BC=0
-	4076 21 0E 01       LD HL,current_Room_ID								;; point on current_Room_ID
+	4076 21 0E 01       LD		HL,current_Room_ID							;; point on current_Room_ID
 .SaveContinue_4:
 	4079 ED A0          LDI													;; do once : LD (DE),(HL); DE++, HL++, BC--
 	407B ED A0          LDI													;; do once : LD (DE),(HL); DE++, HL++, BC--
-	407D 21 0E 01       LD HL,current_Room_ID								;; point on current_Room_ID
+	407D 21 0E 01       LD		HL,current_Room_ID							;; point on current_Room_ID
 	4080 ED A0          LDI													;; do once : LD (DE),(HL); DE++, HL++, BC--
 	4082 ED A0          LDI													;; do once : LD (DE),(HL); DE++, HL++, BC--
 	4084 C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 .DoContinue:
-	4085 21 94 41       LD HL,Save_point_value								;; Save point value
-	4088 35             DEC (HL)											;; use a save point
-	4089 CD 2A 41       CALL GetContinueData
-	408C 7E             LD A,(HL)
-	408D E6 03          AND &03
-	408F 32 7B 24       LD (Inventory),A									;; update inventory
-	4092 7E             LD A,(HL)
+	4085 21 94 41       LD		HL,Save_point_value							;; Save point value
+	4088 35             DEC		(HL)										;; use a save point
+	4089 CD 2A 41       CALL	GetContinueData
+	408C 7E             LD		A,(HL)
+	408D E6 03          AND		&03
+	408F 32 7B 24       LD		(Inventory),A								;; update inventory
+	4092 7E             LD		A,(HL)
 	4093 1F             RRA
 	4094 1F             RRA
-	4095 E6 1F          AND &1F
-	4097 32 EA 3D       LD (saved_World_Mask),A								;; update saved_World_Mask
-	409A E5             PUSH HL
-	409B DD E1          POP IX
-	409D 21 EB 3D       LD HL,tab_Specials_collectible
-	40A0 11 04 00       LD DE,&0004
-	40A3 06 2F          LD B,NB_SPECIAL_ITEMS
-	40A5 CB 1E          RR (HL)
-	40A7 18 0A          JR br_40B3
+	4095 E6 1F          AND		&1F
+	4097 32 EA 3D       LD		(saved_World_Mask),A						;; update saved_World_Mask
+	409A E5             PUSH	HL
+	409B DD E1          POP		IX
+	409D 21 EB 3D       LD		HL,tab_Specials_collectible
+	40A0 11 04 00       LD		DE,&0004
+	40A3 06 2F          LD		B,NB_SPECIAL_ITEMS
+	40A5 CB 1E          RR		(HL)
+	40A7 18 0A          JR		br_40B3
 
 doco_loop:
-	40A9 CB 1E          RR (HL)
-	40AB DD CB 00 3E    SRL (IX+0)
-	40AF 20 07          JR NZ,br_40B8
-	40B1 DD 23          INC IX
+	40A9 CB 1E          RR		(HL)
+	40AB DD CB 00 3E    SRL		(IX+0)
+	40AF 20 07          JR		NZ,br_40B8
+	40B1 DD 23          INC		IX
 br_40B3
 	40B3 37             SCF
-	40B4 DD CB 00 1E    RR (IX+0)
+	40B4 DD CB 00 1E    RR		(IX+0)
 br_40B8
-	40B8 CB 16          RL (HL)
-	40BA 19             ADD HL,DE
-	40BB 10 EC          DJNZ doco_loop
-	40BD DD E5          PUSH IX
-	40BF E1             POP HL
-	40C0 23             INC HL
-	40C1 11 84 24       LD DE,selected_characters							;; points on selected_characters
-	40C4 7E             LD A,(HL)
+	40B8 CB 16          RL		(HL)
+	40BA 19             ADD		HL,DE
+	40BB 10 EC          DJNZ	doco_loop
+	40BD DD E5          PUSH	IX
+	40BF E1             POP		HL
+	40C0 23             INC		HL
+	40C1 11 84 24       LD		DE,selected_characters						;; points on selected_characters
+	40C4 7E             LD		A,(HL)
 	40C5 ED A0          LDI													;; do once : LD (DE),(HL); DE++, HL++, BC--
-	40C7 11 80 24       LD DE,Characters_lives								;; point on Characters_lives
+	40C7 11 80 24       LD		DE,Characters_lives							;; point on Characters_lives
 	40CA ED A0          LDI													;; do once : LD (DE),(HL); DE++, HL++, BC--
 	40CC ED A0          LDI													;; do once : LD (DE),(HL); DE++, HL++, BC--
-	40CE 11 58 46       LD DE,access_new_room_code							;; point on access_new_room_code
+	40CE 11 58 46       LD		DE,access_new_room_code						;; point on access_new_room_code
 	40D1 ED A0          LDI													;; do once : LD (DE),(HL); DE++, HL++, BC--
-	40D3 CB 47          BIT 0,A
-	40D5 11 B5 24       LD DE,Heels_variables+O_U							;; ??? Heels U?
-	40D8 28 03          JR Z,br_40DD
-	40DA 11 C7 24       LD DE,Head_variables+O_U							;; ??? Head U?
+	40D3 CB 47          BIT		0,A
+	40D5 11 B5 24       LD		DE,Heels_variables+O_U						;; ??? Heels U?
+	40D8 28 03          JR		Z,br_40DD
+	40DA 11 C7 24       LD		DE,Head_variables+O_U						;; ??? Head U?
 br_40DD
-	40DD 01 03 00       LD BC,&0003
-	40E0 ED B0          LDIR												;; repeat LD (DE),(HL); DE++, HL++, BC-- until BC=0
-	40E2 11 0E 01       LD DE,current_Room_ID								;; point on current_Room_ID
+	40DD 01 03 00       LD		BC,&0003
+	40E0 ED B0          LDIR												;; Copy : repeat LD (DE),(HL); DE++, HL++, BC-- until BC=0
+	40E2 11 0E 01       LD		DE,current_Room_ID							;; point on current_Room_ID
 	40E5 ED A0          LDI													;; do once : LD (DE),(HL); DE++, HL++, BC--
 	40E7 ED A0          LDI													;; do once : LD (DE),(HL); DE++, HL++, BC--
-	40E9 FE 03          CP &03
-	40EB 28 16          JR Z,dconti_1
-	40ED ED 4B 80 24    LD BC,(Characters_lives)							;; get Characters_lives
-	40F1 05             DEC B
-	40F2 FA 03 41       JP M,dconti_1
-	40F5 0D             DEC C
-	40F6 FA 03 41       JP M,dconti_1
-	40F9 EE 03          XOR &03
-	40FB 32 10 BB       LD (Other_Character_state + MOVE_OFFSET),A
-	40FE E5             PUSH HL
-	40FF CD 22 23       CALL InitOtherChar
-	4102 E1             POP HL
+	40E9 FE 03          CP		&03
+	40EB 28 16          JR		Z,dconti_1
+	40ED ED 4B 80 24    LD		BC,(Characters_lives)						;; get Characters_lives
+	40F1 05             DEC		B
+	40F2 FA 03 41       JP		M,dconti_1
+	40F5 0D             DEC		C
+	40F6 FA 03 41       JP		M,dconti_1
+	40F9 EE 03          XOR		&03
+	40FB 32 10 BB       LD		(Other_Character_state + MOVE_OFFSET),A
+	40FE E5             PUSH	HL
+	40FF CD 22 23       CALL	InitOtherChar
+	4102 E1             POP		HL
 dconti_1:
-	4103 11 0E 01       LD DE,current_Room_ID								;; point on current_Room_ID
+	4103 11 0E 01       LD		DE,current_Room_ID							;; point on current_Room_ID
 	4106 ED A0          LDI													;; do once : LD (DE),(HL); DE++, HL++, BC--
 	4108 ED A0          LDI													;; do once : LD (DE),(HL); DE++, HL++, BC--
-	410A ED 4B 0E 01    LD BC,(current_Room_ID)								;; get current_Room_ID
-	410E CB C1          SET 0,C
-	4110 CD CE 3E       CALL Find_Specials
-	4113 CD E3 3E       CALL GetNibbles										;; Fills in E, D from (HL+1) and B, C from (HL+2); HL will be incremented by 2
-	4116 7B             LD A,E
-	4117 08             EX AF,AF'
-	4118 11 5E 42       LD DE,UVZ_coord_Set_UVZ
-	411B 21 5B 42       LD HL,UVZ_origin
-	411E CD 75 22       CALL Set_UVZ
-	4121 3E 08          LD A,&08											;; room access code 8 = ???
-	4123 32 58 46       LD (access_new_room_code),A							;; update access_new_room_code
-	4126 32 87 24       LD (Teleport_down_anim_length),A
+	410A ED 4B 0E 01    LD		BC,(current_Room_ID)						;; get current_Room_ID
+	410E CB C1          SET		0,C
+	4110 CD CE 3E       CALL	Find_Specials
+	4113 CD E3 3E       CALL	GetNibbles									;; Fills in E, D from (HL+1) and B, C from (HL+2); HL will be incremented by 2
+	4116 7B             LD		A,E
+	4117 08             EX		AF,AF'
+	4118 11 5E 42       LD		DE,UVZ_coord_Set_UVZ
+	411B 21 5B 42       LD		HL,UVZ_origin
+	411E CD 75 22       CALL	Set_UVZ
+	4121 3E 08          LD		A,&08										;; room access code 8 = ???
+	4123 32 58 46       LD		(access_new_room_code),A					;; update access_new_room_code
+	4126 32 87 24       LD		(Teleport_down_anim_length),A
 	4129 C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -13291,172 +13347,172 @@ NR_Direction:
 .PostMove:
 	468B D9             EXX
 	;; Can't move in that direction? Return.
-	468C C8             RET Z												;; Sets C (collision).
+	468C C8             RET		Z											;; Sets C (collision).
 	;; Put the second movement function from MoveTbl into IX.
-	468D E5             PUSH HL
-	468E DD E1          POP IX
+	468D E5             PUSH	HL
+	468E DD E1          POP		IX
 	;; There are two similar loops, based on which direction we
     ;; want to traverse the object list:
-	4690 CB 51          BIT 2,C
-	4692 20 15          JR NZ,PM_Alt
+	4690 CB 51          BIT		2,C
+	4692 20 15          JR		NZ,PM_Alt
     ;; Down or right case. Traverse the object list.
-	4694 21 A9 39       LD HL,ObjectLists
+	4694 21 A9 39       LD		HL,ObjList_Regular_Far2Near
 .PM_ALoop:
-	4697 7E             LD A,(HL)
-	4698 23             INC HL
-	4699 66             LD H,(HL)
-	469A 6F             LD L,A												;; HL = (ObjectLists)
-	469B B4             OR H												;; test if HL = 0
-	469C 28 24          JR Z,PM_ABreak					 					;; if End of list - break.
-	469E E5             PUSH HL												;; else save HL
-	469F CD B2 19       CALL DoJumpIX				 						;; Call the function in IX ; from MoveTbl.
-	46A2 E1             POP HL
-	46A3 38 3B          JR c,PM_AFound										;; Found case
-	46A5 20 F0          JR NZ,PM_ALoop					 					;; Loop case
-	46A7 18 19          JR PM_ABreak										;; Break case
+	4697 7E             LD		A,(HL)
+	4698 23             INC		HL
+	4699 66             LD		H,(HL)
+	469A 6F             LD		L,A											;; HL = (ObjectLists)
+	469B B4             OR		H											;; test if HL = 0
+	469C 28 24          JR		Z,PM_ABreak					 				;; if End of list - break.
+	469E E5             PUSH	HL											;; else save HL
+	469F CD B2 19       CALL	DoJumpIX				 					;; Call the function in IX ; from MoveTbl.
+	46A2 E1             POP		HL
+	46A3 38 3B          JR		c,PM_AFound									;; Found case
+	46A5 20 F0          JR		NZ,PM_ALoop					 				;; Loop case
+	46A7 18 19          JR		PM_ABreak									;; Break case
 
 ;; Up or left case. Traverse the object list in opposite direction.
 .PM_Alt:
-	46A9 21 AB 39       LD HL,ObjectLists + 2
+	46A9 21 AB 39       LD		HL,ObjList_Regular_Near2Far
 .PM_BLoop:
-	46AC 7E             LD A,(HL)
-	46AD 23             INC HL
-	46AE 66             LD H,(HL)
-	46AF 6F             LD L,A
-	46B0 B4             OR H
-	46B1 28 09          JR Z,PM_BBreak										;; End of list - break.
-	46B3 E5             PUSH HL
-	46B4 CD B2 19       CALL DoJumpIX				 						;; Call the function from MoveTbl.
-	46B7 E1             POP HL
-	46B8 38 28          JR c,PM_BFound					 					;; Other found case
-	46BA 20 F0          JR NZ,PM_BLoop										;; Loop case
+	46AC 7E             LD		A,(HL)
+	46AD 23             INC		HL
+	46AE 66             LD		H,(HL)
+	46AF 6F             LD		L,A
+	46B0 B4             OR		H
+	46B1 28 09          JR		Z,PM_BBreak									;; End of list - break.
+	46B3 E5             PUSH	HL
+	46B4 CD B2 19       CALL	DoJumpIX				 					;; Call the function from MoveTbl.
+	46B7 E1             POP		HL
+	46B8 38 28          JR		c,PM_BFound					 				;; Other found case
+	46BA 20 F0          JR		NZ,PM_BLoop									;; Loop case
 .PM_BBreak:
-	46BC CD 3B 2B       CALL Get_curr_Char_variables						;; HL = pointer on current selected character's variables
-	46BF 5D             LD E,L
-	46C0 18 06          JR PM_Break
+	46BC CD 3B 2B       CALL	Get_curr_Char_variables						;; HL = pointer on current selected character's variables
+	46BF 5D             LD		E,L
+	46C0 18 06          JR		PM_Break
 
 .PM_ABreak:
-	46C2 CD 3B 2B       CALL Get_curr_Char_variables						;; HL = pointer on current selected character's variables
-	46C5 5D             LD E,L
-	46C6 23             INC HL
-	46C7 23             INC HL
+	46C2 CD 3B 2B       CALL	Get_curr_Char_variables						;; HL = pointer on current selected character's variables
+	46C5 5D             LD		E,L
+	46C6 23             INC		HL
+	46C7 23             INC		HL
 ;; Both "Break" cases end up here.
 ;; HL points 2 into object
 ;; TODO: ??? I think it may be checking if the other character
 ;; is relevant? Or the main character???
 .PM_Break:
-	46C8 FD CB 09 46    BIT 0,(IY+O_SPRFLAGS)								;; playable char or obj/enemy?
-	46CC 28 04          JR Z,PM_Break2
-	46CE FD 7D          LD A,IYl											;; IY low byte
-	46D0 BB             CP E
-	46D1 C8             RET Z
+	46C8 FD CB 09 46    BIT		0,(IY+O_SPRFLAGS)							;; playable char or obj/enemy?
+	46CC 28 04          JR		Z,PM_Break2
+	46CE FD 7D          LD		A,IYl										;; IY low byte
+	46D0 BB             CP		E
+	46D1 C8             RET		Z
 .PM_Break2:
-	46D2 3A AC 24       LD A,(Saved_Objects_List_index)						;; get Saved_Objects_List_index
-	46D5 A7             AND A
-	46D6 C8             RET Z												;; Sets NC (no collision).
-	46D7 CD B2 19       CALL DoJumpIX
-	46DA D0             RET NC												;; Sets NC (no collision).
+	46D2 3A AC 24       LD		A,(Saved_Objects_List_index)				;; get Saved_Objects_List_index
+	46D5 A7             AND		A
+	46D6 C8             RET		Z											;; Sets NC (no collision).
+	46D7 CD B2 19       CALL	DoJumpIX
+	46DA D0             RET		NC											;; Sets NC (no collision).
 	;; Adjust pointer and fall through...
-	46DB CD 3B 2B       CALL Get_curr_Char_variables						;; HL = pointer on current selected character's variables
-	46DE 23             INC HL
-	46DF 23             INC HL
+	46DB CD 3B 2B       CALL	Get_curr_Char_variables						;; HL = pointer on current selected character's variables
+	46DE 23             INC		HL
+	46DF 23             INC		HL
 .PM_AFound:
-	46E0 2B             DEC HL
-	46E1 2B             DEC HL
+	46E0 2B             DEC		HL
+	46E1 2B             DEC		HL
 .PM_BFound:
-	46E2 E5             PUSH HL
-	46E3 DD E1          POP IX
-	46E5 3A 57 46       LD A,(Movement_Facing)								;; (read the saved facing LRDU value)
-	46E8 DD CB 09 4E    BIT 1,(IX+O_SPRFLAGS)								;; Second part of double-height is character or object?
-	46EC 28 08          JR Z,PM_Found2
+	46E2 E5             PUSH	HL
+	46E3 DD E1          POP		IX
+	46E5 3A 57 46       LD		A,(Movement_Facing)							;; (read the saved facing LRDU value)
+	46E8 DD CB 09 4E    BIT		1,(IX+O_SPRFLAGS)							;; Second part of double-height is character or object?
+	46EC 28 08          JR		Z,PM_Found2
     ;; Adjust first, then.
-	46EE DD A6 FA       AND (IX-OBJECT_LENGTH+&0C)							;; (IX-&12+&0C) ; -6
-	46F1 DD 77 FA       LD (IX-OBJECT_LENGTH+&0C),A							;; (IX-&12+&0C) ; -6
-	46F4 18 06          JR PM_Found3
+	46EE DD A6 FA       AND		(IX-OBJECT_LENGTH+&0C)						;; (IX-&12+&0C) ; -6
+	46F1 DD 77 FA       LD		(IX-OBJECT_LENGTH+&0C),A					;; (IX-&12+&0C) ; -6
+	46F4 18 06          JR		PM_Found3
 
 ;; Otherwise, adjust it.
 .PM_Found2:
-	46F6 DD A6 0C       AND (IX+&0C)
-	46F9 DD 77 0C       LD (IX+&0C),A
+	46F6 DD A6 0C       AND		(IX+&0C)
+	46F9 DD 77 0C       LD		(IX+&0C),A
 ;; Call "ProcContact" with &FF in A.
 .PM_Found3:
-	46FC AF             XOR A
-	46FD D6 01          SUB 1												;; A=FF and sets Carry (collided).
+	46FC AF             XOR		A
+	46FD D6 01          SUB		1											;; A=FF and sets Carry (collided).
 ;; Handle contact between a pair of objects in IX and IY
 .ProcContact:
-	46FF F5             PUSH AF
-	4700 DD E5          PUSH IX
-	4702 FD E5          PUSH IY
-	4704 CD 0D 47       CALL ContactAux
-	4707 FD E1          POP IY
-	4709 DD E1          POP IX
-	470B F1             POP AF
+	46FF F5             PUSH	AF
+	4700 DD E5          PUSH	IX
+	4702 FD E5          PUSH	IY
+	4704 CD 0D 47       CALL	ContactAux
+	4707 FD E1          POP		IY
+	4709 DD E1          POP		IX
+	470B F1             POP		AF
 	470C C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; IX and IY are both objects, may be characters.
 ;; Something is in A.
 .ContactAux:
-	470D FD CB 09 46    BIT 0,(IY+O_SPRFLAGS)								;; 1st object: test if playable char or not
-	4711 20 0C          JR NZ,Contact_Player_Obj							;; yes, jump Contact_Player_Obj, else:
-	4713 DD CB 09 46    BIT 0,(IX+O_SPRFLAGS)								;; 2nd object: test if playable char or not
-	4717 28 76          JR Z,Contact_Obj_vs_Obj								;; no? then 2 object collides ; goto Contact_Obj_vs_Obj, else:
-	4719 FD E5          PUSH IY
-	471B DD E3          EX (SP),IX											;; these 3 lines swap IY and IX so we have the player in IY and the obj in IX
-	471D FD E1          POP IY
+	470D FD CB 09 46    BIT		0,(IY+O_SPRFLAGS)							;; 1st object: test if playable char or not
+	4711 20 0C          JR		NZ,Contact_Player_Obj						;; yes, jump Contact_Player_Obj, else:
+	4713 DD CB 09 46    BIT		0,(IX+O_SPRFLAGS)							;; 2nd object: test if playable char or not
+	4717 28 76          JR		Z,Contact_Obj_vs_Obj						;; no? then 2 object collides ; goto Contact_Obj_vs_Obj, else:
+	4719 FD E5          PUSH	IY
+	471B DD E3          EX		(SP),IX										;; these 3 lines swap IY and IX so we have the player in IY and the obj in IX
+	471D FD E1          POP		IY
 Contact_Player_Obj:
-	471F FD 4E 09       LD C,(IY+O_SPRFLAGS)								;; player sprite flags in C.
-	4722 FD 46 04       LD B,(IY+O_FLAGS)									;; player flags in B.
-	4725 DD CB 04 6E    BIT 5,(IX+O_FLAGS)									;; test bit5 in obj flags
-	4729 C8             RET Z												;; if bit5=0 then leave, else:
-	472A DD CB 04 76    BIT 6,(IX+O_FLAGS)									;; if bit6 of obj flags
-	472E 20 43          JR NZ,CollectSpecial								;; is set then go CollectSpecial, else:
-	4730 A7             AND A												;; test value in A????
-	4731 28 05          JR Z,DeadlyContact									;; if 0 then DeadlyContact (deadly floor or object), else:
-	4733 DD CB 09 66    BIT 4,(IX+O_SPRFLAGS)								;; test bit4 of O_SPRFLAGS = 0:object is deadly, 1:object harmless
-	4737 C0             RET NZ												;; leave if set, else:
+	471F FD 4E 09       LD		C,(IY+O_SPRFLAGS)							;; player sprite flags in C.
+	4722 FD 46 04       LD		B,(IY+O_FLAGS)								;; player flags in B.
+	4725 DD CB 04 6E    BIT		5,(IX+O_FLAGS)								;; test bit5 in obj flags
+	4729 C8             RET		Z											;; if bit5=0 then leave, else:
+	472A DD CB 04 76    BIT		6,(IX+O_FLAGS)								;; if bit6 of obj flags
+	472E 20 43          JR		NZ,CollectSpecial							;; is set then go CollectSpecial, else:
+	4730 A7             AND		A											;; test value in A????
+	4731 28 05          JR		Z,DeadlyContact								;; if 0 then DeadlyContact (deadly floor or object), else:
+	4733 DD CB 09 66    BIT		4,(IX+O_SPRFLAGS)							;; test bit4 of O_SPRFLAGS = 0:object is deadly, 1:object harmless
+	4737 C0             RET		NZ											;; leave if set, else:
 ;; IY holds character sprite. We've hit a deadly floor or object.
 ;; C is character's sprite flags (IY offset 9)
 ;; B is character's other flags (IY offset 4)
 .DeadlyContact:
-	4738 CB 58          BIT 3,B												;; test char flag if bit3=00 : joined Heels+Head
-	473A 06 03          LD B,&03											;; B[1:0] = 2b11
-	473C 20 06          JR NZ,dco_1											;; not joined, jump over this, else do:
-	473E 05             DEC B												;; B[1:0] = 2b10
-	473F CB 51          BIT 2,C												;; test sprite flag bit 2
-	4741 20 01          JR NZ,dco_1											;; if bit2=1, then only Head
-	4743 05             DEC B												;; else we are Heels, so B[1:0]=2b01
+	4738 CB 58          BIT		3,B											;; test char flag if bit3=00 : joined Heels+Head
+	473A 06 03          LD		B,&03										;; B[1:0] = 2b11
+	473C 20 06          JR		NZ,dco_1									;; not joined, jump over this, else do:
+	473E 05             DEC		B											;; B[1:0] = 2b10
+	473F CB 51          BIT		2,C											;; test sprite flag bit 2
+	4741 20 01          JR		NZ,dco_1									;; if bit2=1, then only Head
+	4743 05             DEC		B											;; else we are Heels, so B[1:0]=2b01
 dco_1:																		;; updating flag bits based on invulnerability...
-	4744 AF             XOR A												;; A=0
-	4745 21 7E 24       LD HL,Heels_invulnerability							;; a &C9 (RET) here make invulnerable!
-	4748 BE             CP (HL)												;; compare Heels' invul with 0 (active low)
-	4749 28 02          JR Z,dco_2											;; if it is 0 (Heels is invuln), don't do the RES below, else do
-	474B CB 80          RES 0,B												;; char flag bit 0=Heels invul (0=invul)
+	4744 AF             XOR		A											;; A=0
+	4745 21 7E 24       LD		HL,Heels_invulnerability					;; a &C9 (RET) here make invulnerable!
+	4748 BE             CP		(HL)										;; compare Heels' invul with 0 (active low)
+	4749 28 02          JR		Z,dco_2										;; if it is 0 (Heels is invuln), don't do the RES below, else do
+	474B CB 80          RES		0,B											;; char flag bit 0=Heels invul (0=invul)
 dco_2:
-	474D 23             INC HL												;; Head_s_invulnerability
-	474E BE             CP (HL)												;; compare Head's invul with 0 (active low)
-	474F 28 02          JR Z,dco_3											;; if it is 0 (Head is invuln), don't do the RES below, else do
-	4751 CB 88          RES 1,B												;; char flag bit 1=Head invul (0=invul)
+	474D 23             INC		HL											;; Head_s_invulnerability
+	474E BE             CP		(HL)										;; compare Head's invul with 0 (active low)
+	474F 28 02          JR		Z,dco_3										;; if it is 0 (Head is invuln), don't do the RES below, else do
+	4751 CB 88          RES		1,B											;; char flag bit 1=Head invul (0=invul)
 dco_3:
-	4753 78             LD A,B												;; final invul setting in A
-	4754 A7             AND A												;; test it
-	4755 C8             RET Z												;; if 0, then invulnerability is active, so leave. Else, death!
-	4756 21 5A 46       LD HL,Dying											;; point on Dying mask (which char is dying)
-	4759 B6             OR (HL)												;; based on the value of B (invulnerabilities)...
-	475A 77             LD (HL),A											;; ...refresh mask value at 'Dying'
-	475B 2B             DEC HL												;; points on DyingAnimFrameIndex (frame of Vape animation effect when dying)
-	475C 7E             LD A,(HL)											;; get value
-	475D A7             AND A												;; test if 0
-	475E C0             RET NZ												;; if not 0 (dying anim) return, else:
-	475F 3A EA 3D       LD A,(saved_World_Mask)								;; get saved_World_Mask
-	4762 FE 1F          CP &1F												;; if all worlds saved (then we are Emperor)
-	4764 C8             RET Z												;; then Return (invulnerable as Emperor), else
-	4765 36 0C          LD (HL),&0C											;; Set value of DyingAnimFrameIndex to &0C (dying, will count down to 0 while the vape/dying anim is played)
-	4767 3A 58 46       LD A,(access_new_room_code)							;; get access_new_room_code
-	476A A7             AND A												;; test if 0 (stay same room)
-	476B C4 D4 3F       CALL NZ,BoostInvuln2								;; ??? if merged HnH, then heels boost invuln ??? ; call BoostInvuln2 if access_new_room_code not 0 (changing room)
-	476E 06 C6          LD B,Sound_ID_Death									;; Sound_ID &C6 ; Death noise
-	4770 C3 91 0D       JP Play_Sound										;; will RET
+	4753 78             LD		A,B											;; final invul setting in A
+	4754 A7             AND		A											;; test it
+	4755 C8             RET		Z											;; if 0, then invulnerability is active, so leave. Else, death!
+	4756 21 5A 46       LD		HL,Dying									;; point on Dying mask (which char is dying)
+	4759 B6             OR		(HL)										;; based on the value of B (invulnerabilities)...
+	475A 77             LD		(HL),A										;; ...refresh mask value at 'Dying'
+	475B 2B             DEC		HL											;; points on DyingAnimFrameIndex (frame of Vape animation effect when dying)
+	475C 7E             LD		A,(HL)										;; get value
+	475D A7             AND		A											;; test if 0
+	475E C0             RET		NZ											;; if not 0 (dying anim) return, else:
+	475F 3A EA 3D       LD		A,(saved_World_Mask)						;; get saved_World_Mask
+	4762 FE 1F          CP		&1F											;; if all worlds saved (then we are Emperor)
+	4764 C8             RET		Z											;; then Return (invulnerable as Emperor), else
+	4765 36 0C          LD		(HL),&0C									;; Set value of DyingAnimFrameIndex to &0C (dying, will count down to 0 while the vape/dying anim is played)
+	4767 3A 58 46       LD		A,(access_new_room_code)					;; get access_new_room_code
+	476A A7             AND		A											;; test if 0 (stay same room)
+	476B C4 D4 3F       CALL	NZ,BoostInvuln2								;; ??? if merged HnH, then heels boost invuln ??? ; call BoostInvuln2 if access_new_room_code not 0 (changing room)
+	476E 06 C6          LD		B,Sound_ID_Death							;; Sound_ID &C6 ; Death noise
+	4770 C3 91 0D       JP		Play_Sound									;; will RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Make the special object disappear when picking it up
@@ -13715,117 +13771,117 @@ dlft_1:
 ;; -----------------------------------------------------------------------------------------------------------
 .ChkBack:
     ;; Check V coordinate
-	4893 23             INC HL
-	4894 7E             LD A,(HL)
-	4895 90             SUB B
+	4893 23             INC		HL
+	4894 7E             LD		A,(HL)
+	4895 90             SUB		B
 	4896 D9             EXX
-	4897 BC             CP H
+	4897 BC             CP		H
 	4898 D9             EXX
-	4899 38 0A          JR c,CollideContinue
+	4899 38 0A          JR		c,CollideContinue
 	;; Check Z coordinate
-	489B 23             INC HL
-	489C 7E             LD A,(HL)
-	489D 93             SUB E
+	489B 23             INC		HL
+	489C 7E             LD		A,(HL)
+	489D 93             SUB		E
 	489E D9             EXX
-	489F B8             CP B
+	489F B8             CP		B
 	48A0 D9             EXX
-	48A1 38 02          JR c,CollideContinue
+	48A1 38 02          JR		c,CollideContinue
 	;; Passed our object, can stop now.
-	48A3 AF             XOR A
+	48A3 AF             XOR		A
 	48A4 C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; No carry = no collision, non-zero = keep searching.
 ;; return -1, no Z and no Carry
 .CollideContinue:
-	48A5 3E FF          LD A,&FF
-	48A7 A7             AND A
+	48A5 3E FF          LD		A,&FF
+	48A7 A7             AND		A
 	48A8 C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 .CollideT_Left:
-	48A9 23             INC HL
-	48AA 23             INC HL
-	48AB CD 90 4A       CALL GetSimpleSize
+	48A9 23             INC		HL
+	48AA 23             INC		HL
+	48AB CD 90 4A       CALL	GetSimpleSize
 	;; Check U coordinates overlap...
-	48AE 7E             LD A,(HL)
-	48AF 91             SUB C
+	48AE 7E             LD		A,(HL)
+	48AF 91             SUB		C
 	48B0 D9             EXX
-	48B1 BA             CP D
-	48B2 7B             LD A,E
+	48B1 BA             CP		D
+	48B2 7B             LD		A,E
 	48B3 D9             EXX
-	48B4 30 DD          JR NC,ChkBack
-	48B6 91             SUB C
-	48B7 BE             CP (HL)
-	48B8 30 EB          JR NC,CollideContinue
+	48B4 30 DD          JR		NC,ChkBack
+	48B6 91             SUB		C
+	48B7 BE             CP		(HL)
+	48B8 30 EB          JR		NC,CollideContinue
 	;; U overlaps, check V for contact.
-	48BA 23             INC HL
-	48BB 7E             LD A,(HL)
-	48BC 90             SUB B
+	48BA 23             INC		HL
+	48BB 7E             LD		A,(HL)
+	48BC 90             SUB		B
 	48BD D9             EXX
-	48BE BC             CP H
+	48BE BC             CP		H
 	48BF D9             EXX
-	48C0 28 C1          JR Z,ChkZCollide   									;; U and V match.
-	48C2 18 E1          JR CollideContinue 									;; Not a collision.
+	48C0 28 C1          JR		Z,ChkZCollide   								;; U and V match.
+	48C2 18 E1          JR		CollideContinue 								;; Not a collision.
 
 ;; -----------------------------------------------------------------------------------------------------------
 .CollideT_Down:
-	48C4 CD 90 4A       CALL GetSimpleSize
+	48C4 CD 90 4A       CALL	GetSimpleSize
 	;; Check U coordinate.
 	48C7 D9             EXX
-	48C8 7B             LD A,E
+	48C8 7B             LD		A,E
 	48C9 D9             EXX
-	48CA 91             SUB C
-	48CB BE             CP (HL)
-	48CC 38 D7          JR c,CollideContinue 								;; Past it? Skip
-	48CE 23             INC HL
-	48CF 28 A6          JR Z,ChkVCollide    								;; Are we done yet?
+	48CA 91             SUB		C
+	48CB BE             CP		(HL)
+	48CC 38 D7          JR		c,CollideContinue 							;; Past it? Skip
+	48CE 23             INC		HL
+	48CF 28 A6          JR		Z,ChkVCollide    							;; Are we done yet?
 	;; U coordinate matches.
 .ChkFront:
     ;; Check U coordinate.
 	48D1 D9             EXX
-	48D2 7D             LD A,L
+	48D2 7D             LD		A,L
 	48D3 D9             EXX
-	48D4 90             SUB B
-	48D5 BE             CP (HL)
-	48D6 38 CD          JR c,CollideContinue
+	48D4 90             SUB		B
+	48D5 BE             CP		(HL)
+	48D6 38 CD          JR		c,CollideContinue
 	;; Check Z coordinate.
-	48D8 23             INC HL
-	48D9 7E             LD A,(HL)
-	48DA 83             ADD A,E
+	48D8 23             INC		HL
+	48D9 7E             LD		A,(HL)
+	48DA 83             ADD		A,E
 	48DB D9             EXX
-	48DC B8             CP B
+	48DC B8             CP		B
 	48DD D9             EXX
-	48DE 30 C5          JR NC,CollideContinue
+	48DE 30 C5          JR		NC,CollideContinue
 	;; Passed our object, can stop now.
-	48E0 AF             XOR A
+	48E0 AF             XOR		A
 	48E1 C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 .CollideT_Right:
-	48E2 CD 90 4A       CALL GetSimpleSize
+	48E2 CD 90 4A       CALL	GetSimpleSize
 	;; Check U coordinate overlap...
 	48E5 D9             EXX
-	48E6 7B             LD A,E
+	48E6 7B             LD		A,E
 	48E7 D9             EXX
-	48E8 91             SUB C
-	48E9 BE             CP (HL)
-	48EA 23             INC HL
-	48EB 30 E4          JR NC,ChkFront
-	48ED 2B             DEC HL
-	48EE 7E             LD A,(HL)
-	48EF 91             SUB C
+	48E8 91             SUB		C
+	48E9 BE             CP		(HL)
+	48EA 23             INC		HL
+	48EB 30 E4          JR		NC,ChkFront
+	48ED 2B             DEC		HL
+	48EE 7E             LD		A,(HL)
+	48EF 91             SUB		C
 	48F0 D9             EXX
-	48F1 BA             CP D
-	48F2 7D             LD A,L
+	48F1 BA             CP		D
+	48F2 7D             LD		A,L
 	48F3 D9             EXX
-	48F4 30 AF          JR NC,CollideContinue
+	48F4 30 AF          JR		NC,CollideContinue
 	;; U overlaps, checks V for contact.
-	48F6 23             INC HL
-	48F7 90             SUB B
-	48F8 BE             CP (HL)
-	48F9 CA 83 48       JP Z,ChkZCollide						   			;; U and V match.
-	48FC 18 A7          JR CollideContinue
+	48F6 23             INC		HL
+	48F7 90             SUB		B
+	48F8 BE             CP		(HL)
+	48F9 CA 83 48       JP		Z,ChkZCollide						   		;; U and V match.
+	48FC 18 A7          JR		CollideContinue
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Up, Down, Left and Right
@@ -13837,50 +13893,50 @@ dlft_1:
 ;; Sets Z and C if you cannot.
 ;; Leaving room sets direction in NextRoom, sets C and Z.
 .MoveT_Down:
-	48FE CD 7D 4A       CALL ChkCantLeave
-	4901 28 33          JR Z,D_NoExit
+	48FE CD 7D 4A       CALL	ChkCantLeave
+	4901 28 33          JR		Z,D_NoExit
 	;; Inside the door frame to the side? Check a limited extent, then.
-	4903 CD 35 4A       CALL UD_InOtherDoor
-	4906 3E 24          LD A,&24											;; DOOR_LOW
-	4908 38 2F          JR c,D_NoExit2
+	4903 CD 35 4A       CALL	UD_InOtherDoor
+	4906 3E 24          LD		A,&24										;; DOOR_LOW
+	4908 38 2F          JR		c,D_NoExit2
 	;; If the wall has a door, and
     ;; we're the right height to fit through, and
     ;; we're lined up to go through the frame,
     ;; set 'A' to be the far side of the door.
-	490A DD CB FF 46    BIT 0,(IX-1)										;; Has_Door?
-	490E 28 14          JR Z,D_NoDoor
-	4910 3A F1 1E       LD A,(DoorHeights+3)								;; sw door
-	4913 CD 69 4A       CALL DoorHeightCheck
-	4916 38 1E          JR c,D_NoExit
-	4918 CD 59 4A       CALL UD_InFrame
-	491B 38 20          JR c,D_NearDoor
-	491D 3A C2 1E       LD A,(Max_min_UV_Table)								;; MinU
-	4920 D6 04          SUB 4
-	4922 18 09          JR D_Exit
+	490A DD CB FF 46    BIT		0,(IX-1)									;; Has_Door?
+	490E 28 14          JR		Z,D_NoDoor
+	4910 3A F1 1E       LD		A,(DoorHeights+3)							;; sw door
+	4913 CD 69 4A       CALL	DoorHeightCheck
+	4916 38 1E          JR		c,D_NoExit
+	4918 CD 59 4A       CALL	UD_InFrame
+	491B 38 20          JR		c,D_NearDoor
+	491D 3A C2 1E       LD		A,(Max_min_UV_Table)						;; MinU
+	4920 D6 04          SUB		4
+	4922 18 09          JR		D_Exit
 
 ;; If there's no wall, put the room end coordinate into 'A'...
 .D_NoDoor
-	4924 DD CB FE 46    BIT 0,(IX-2)										;; Has_no_vall
-	4928 28 0C          JR Z,D_NoExit
-	492A 3A C2 1E       LD A,(Max_min_UV_Table)								;; MinU
+	4924 DD CB FE 46    BIT		0,(IX-2)									;; Has_no_vall
+	4928 28 0C          JR		Z,D_NoExit
+	492A 3A C2 1E       LD		A,(Max_min_UV_Table)						;; MinU
 ;; Case where we can exit the room.
 .D_Exit:
-	492D BB             CP E
-	492E C0             RET NZ
-	492F 3E 01          LD A,&01
+	492D BB             CP		E
+	492E C0             RET		NZ
+	492F 3E 01          LD		A,&01
 .LeaveRoom:
-	4931 32 58 46       LD (access_new_room_code),A							;; update access_new_room_code
+	4931 32 58 46       LD		(access_new_room_code),A					;; update access_new_room_code
 	4934 37             SCF													;; set Carry
 	4935 C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; The case where we can't exit the room, but may hit the wall.
 .D_NoExit:
-	4936 3A C2 1E       LD A,(Max_min_UV_Table)								;; MinU
+	4936 3A C2 1E       LD		A,(Max_min_UV_Table)						;; MinU
 ;; (or some other value given in A).
 .D_NoExit2:
-	4939 BB             CP E
-	493A C0             RET NZ
+	4939 BB             CP		E
+	493A C0             RET		NZ
 	493B 37             SCF
 	493C C9             RET
 
@@ -13889,127 +13945,127 @@ dlft_1:
 ;; we do the normal "not door" case. Otherwise, we do that and
 ;; then nudge into the door.
 .D_NearDoor:
-	493D CD 61 4A       CALL UD_InFrameW
-	4940 38 F4          JR c,D_NoExit
-	4942 CD 36 49       CALL D_NoExit
+	493D CD 61 4A       CALL	UD_InFrameW
+	4940 38 F4          JR		c,D_NoExit
+	4942 CD 36 49       CALL	D_NoExit
 	;; Choose a direction to move based on which side of the door
     ;; we're trying to get through.
 .UD_Nudge:
-	4945 C0             RET NZ
-	4946 7D             LD A,L
-	4947 FE 25          CP &25												;; DOOR_LOW + 1
-	4949 3E F7          LD A,&F7											;; ~&08
-	494B 38 02          JR c,Nudge
-	494D 3E FB          LD A,&FB											;; ~&04
+	4945 C0             RET		NZ
+	4946 7D             LD		A,L
+	4947 FE 25          CP		&25											;; DOOR_LOW + 1
+	4949 3E F7          LD		A,&F7										;; ~&08
+	494B 38 02          JR		c,Nudge
+	494D 3E FB          LD		A,&FB										;; ~&04
 ;; Update the direction with they way to go to get through the door.
 .Nudge:
-	494F 32 AF 24       LD (Movement),A
-	4952 AF             XOR A
+	494F 32 AF 24       LD		(Movement),A
+	4952 AF             XOR		A
 	4953 37             SCF
 	4954 C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 .MoveT_Right:
-	4955 CD 7D 4A       CALL ChkCantLeave
-	4958 28 30          JR Z,R_NoExit
+	4955 CD 7D 4A       CALL	ChkCantLeave
+	4958 28 30          JR		Z,R_NoExit
 	;; Inside the door frame to the side? Check a limited extent, then.
-	495A CD 3F 4A       CALL LR_InOtherDoor
-	495D 3E 24          LD A,&24											;; DOOR_LOW
-	495F 38 2C          JR c,R_NoExit2
+	495A CD 3F 4A       CALL	LR_InOtherDoor
+	495D 3E 24          LD		A,&24										;; DOOR_LOW
+	495F 38 2C          JR		c,R_NoExit2
 	;; If the wall has a door, and
     ;; we're the right height to fit through, and
     ;; we're lined up to go through the frame,
     ;; set 'A' to be the far side of the door.
-	4961 DD CB FF 4E    BIT 1,(IX-1)										;; Has_Door
-	4965 28 14          JR Z,R_NoDoor
-	4967 3A F0 1E       LD A,(DoorHeights+2)								;; se door
-	496A CD 69 4A       CALL DoorHeightCheck
-	496D 38 1B          JR c,R_NoExit
-	496F CD 49 4A       CALL LR_InFrame
-	4972 38 1D          JR c,R_NearDoor
-	4974 3A C3 1E       LD A,(Max_min_UV_Table+1)							;; MinV
-	4977 D6 04          SUB 4
-	4979 18 09          JR R_Exit
+	4961 DD CB FF 4E    BIT		1,(IX-1)									;; Has_Door
+	4965 28 14          JR		Z,R_NoDoor
+	4967 3A F0 1E       LD		A,(DoorHeights+2)							;; se door
+	496A CD 69 4A       CALL	DoorHeightCheck
+	496D 38 1B          JR		c,R_NoExit
+	496F CD 49 4A       CALL	LR_InFrame
+	4972 38 1D          JR		c,R_NearDoor
+	4974 3A C3 1E       LD		A,(Max_min_UV_Table+1)						;; MinV
+	4977 D6 04          SUB		4
+	4979 18 09          JR		R_Exit
 
 ;; If there's no wall, put the room end coordinate into 'A'...
 .R_NoDoor:
-	497B DD CB FE 4E    BIT 1,(IX-2)										;; (IX-&02) ; Has_no_vall
-	497F 28 09          JR Z,R_NoExit
-	4981 3A C3 1E       LD A,(Max_min_UV_Table+1)							;; MinV
+	497B DD CB FE 4E    BIT		1,(IX-2)									;; (IX-&02) ; Has_no_vall
+	497F 28 09          JR		Z,R_NoExit
+	4981 3A C3 1E       LD		A,(Max_min_UV_Table+1)						;; MinV
 ;; Case where we can exit the room.
 .R_Exit:
-	4984 BD             CP L
-	4985 C0             RET NZ
-	4986 3E 02          LD A,&02
-	4988 18 A7          JR LeaveRoom
+	4984 BD             CP		L
+	4985 C0             RET		NZ
+	4986 3E 02          LD		A,&02
+	4988 18 A7          JR		LeaveRoom
 
 .R_NoExit:
-	498A 3A C3 1E       LD A,(Max_min_UV_Table+1)							;; MinV
+	498A 3A C3 1E       LD		A,(Max_min_UV_Table+1)						;; MinV
 ;; (or some other value given in A).
 .R_NoExit2:
-	498D BD             CP L
-	498E C0             RET NZ
+	498D BD             CP		L
+	498E C0             RET		NZ
 	498F 37             SCF
 	4990 C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; The case where we can't exit the room, but may hit the wall.
 .R_NearDoor:
-	4991 CD 51 4A       CALL LR_InFrameW
-	4994 38 F4          JR c,R_NoExit
-	4996 CD 8A 49       CALL R_NoExit
+	4991 CD 51 4A       CALL	LR_InFrameW
+	4994 38 F4          JR		c,R_NoExit
+	4996 CD 8A 49       CALL	R_NoExit
 ;; Choose a direction to move based on which side of the door
 ;; we're trying to get through.
 .LR_Nudge:
-	4999 C0             RET NZ
-	499A 7B             LD A,E
-	499B FE 25          CP &25
-	499D 3E FE          LD A,&FE
-	499F 38 AE          JR c,Nudge
-	49A1 3E FD          LD A,&FD
-	49A3 18 AA          JR Nudge
+	4999 C0             RET		NZ
+	499A 7B             LD		A,E
+	499B FE 25          CP		&25
+	499D 3E FE          LD		A,&FE
+	499F 38 AE          JR		c,Nudge
+	49A1 3E FD          LD		A,&FD
+	49A3 18 AA          JR		Nudge
 
 ;; -----------------------------------------------------------------------------------------------------------
 .MoveT_Up:
-	49A5 CD 7D 4A       CALL ChkCantLeave
-	49A8 28 31          JR Z,U_NoExit
+	49A5 CD 7D 4A       CALL	ChkCantLeave
+	49A8 28 31          JR		Z,U_NoExit
 	;; Inside the door frame to the side? Check a limited extent, then.
-	49AA CD 35 4A       CALL UD_InOtherDoor
-	49AD 3E 2C          LD A,&2C											;; DOOR_HIGH
-	49AF 38 2D          JR c,U_NoExit2
+	49AA CD 35 4A       CALL	UD_InOtherDoor
+	49AD 3E 2C          LD		A,&2C										;; DOOR_HIGH
+	49AF 38 2D          JR		c,U_NoExit2
 	;; If the wall has a door, and
     ;; we're the right height to fit through, and
     ;; we're lined up to go through the frame,
     ;; set 'A' to be the far side of the door.
-	49B1 DD CB FF 56    BIT 2,(IX-1)										;; (IX-&01) ; Has_Door
-	49B5 28 14          JR Z,U_NoDoor
-	49B7 3A EF 1E       LD A,(DoorHeights+1)								;; ne door
-	49BA CD 69 4A       CALL DoorHeightCheck
-	49BD 38 1C          JR c,U_NoExit
-	49BF CD 59 4A       CALL UD_InFrame
-	49C2 38 1E          JR c,U_NearDoor
-	49C4 3A C4 1E       LD A,(Max_min_UV_Table+2)							;; MaxU
-	49C7 C6 04          ADD A,4
-	49C9 18 09          JR U_Exit
+	49B1 DD CB FF 56    BIT		2,(IX-1)									;; (IX-&01) ; Has_Door
+	49B5 28 14          JR		Z,U_NoDoor
+	49B7 3A EF 1E       LD		A,(DoorHeights+1)							;; ne door
+	49BA CD 69 4A       CALL	DoorHeightCheck
+	49BD 38 1C          JR		c,U_NoExit
+	49BF CD 59 4A       CALL	UD_InFrame
+	49C2 38 1E          JR		c,U_NearDoor
+	49C4 3A C4 1E       LD		A,(Max_min_UV_Table+2)						;; MaxU
+	49C7 C6 04          ADD		A,4
+	49C9 18 09          JR		U_Exit
 
 ;; If there's no wall, put the room end coordinate into 'A'...
 .U_NoDoor:
-	49CB DD CB FE 56    BIT 2,(IX-2)										;; Has_no_vall
-	49CF 28 0A          JR Z,U_NoExit
-	49D1 3A C4 1E       LD A,(Max_min_UV_Table+2)							;; MaxU
+	49CB DD CB FE 56    BIT		2,(IX-2)									;; Has_no_vall
+	49CF 28 0A          JR		Z,U_NoExit
+	49D1 3A C4 1E       LD		A,(Max_min_UV_Table+2)						;; MaxU
 ;; Case where we can exit the room.
 .U_Exit:
-	49D4 BA             CP D
-	49D5 C0             RET NZ
-	49D6 3E 03          LD A,&03
-	49D8 C3 31 49       JP LeaveRoom
+	49D4 BA             CP		D
+	49D5 C0             RET		NZ
+	49D6 3E 03          LD		A,&03
+	49D8 C3 31 49       JP		LeaveRoom
 
 ;; The case where we can't exit the room, but may hit the wall.
 .U_NoExit:
-	49DB 3A C4 1E       LD A,(Max_min_UV_Table+2)							;; MaxU
+	49DB 3A C4 1E       LD		A,(Max_min_UV_Table+2)						;; MaxU
 .U_NoExit2
-	49DE BA             CP D												;; (or some other value given in A).
-	49DF C0             RET NZ
+	49DE BA             CP		D											;; (or some other value given in A).
+	49DF C0             RET		NZ
 	49E0 37             SCF
 	49E1 C9             RET
 
@@ -14018,53 +14074,53 @@ dlft_1:
 ;; we do the normal "not door" case. Otherwise, we do that and
 ;; then nudge into the door.
 .U_NearDoor:
-	49E2 CD 61 4A       CALL UD_InFrameW
-	49E5 38 F4          JR c,U_NoExit
-	49E7 CD DB 49       CALL U_NoExit
-	49EA C3 45 49       JP UD_Nudge
+	49E2 CD 61 4A       CALL	UD_InFrameW
+	49E5 38 F4          JR		c,U_NoExit
+	49E7 CD DB 49       CALL	U_NoExit
+	49EA C3 45 49       JP		UD_Nudge
 
 ;; -----------------------------------------------------------------------------------------------------------
 .MoveT_Left:
-	49ED CD 7D 4A       CALL ChkCantLeave
-	49F0 28 31          JR Z,L_NoExit
+	49ED CD 7D 4A       CALL	ChkCantLeave
+	49F0 28 31          JR		Z,L_NoExit
 	;; Inside the door frame to the side? Check a limited extent, then.
-	49F2 CD 3F 4A       CALL LR_InOtherDoor
-	49F5 3E 2C          LD A,&2C											;; DOOR_HIGH
-	49F7 38 2D          JR c,L_NoExit2
+	49F2 CD 3F 4A       CALL	LR_InOtherDoor
+	49F5 3E 2C          LD		A,&2C										;; DOOR_HIGH
+	49F7 38 2D          JR		c,L_NoExit2
 	;; If the wall has a door, and
     ;; we're the right height to fit through, and
     ;; we're lined up to go through the frame,
     ;; set 'A' to be the far side of the door.
-	49F9 DD CB FF 5E    BIT 3,(IX-1)										;; (IX-&01) ; Has_Door
-	49FD 28 14          JR Z,L_NoDoor
-	49FF 3A EE 1E       LD A,(DoorHeights)									;; nw door
-	4A02 CD 69 4A       CALL DoorHeightCheck
-	4A05 38 1C          JR c,L_NoExit
-	4A07 CD 49 4A       CALL LR_InFrame
-	4A0A 38 1E          JR c,L_NearDoor
-	4A0C 3A C5 1E       LD A,(Max_min_UV_Table+3)							;; MaxV
-	4A0F C6 04          ADD A,4
-	4A11 18 09          JR L_Exit
+	49F9 DD CB FF 5E    BIT		3,(IX-1)									;; (IX-&01) ; Has_Door
+	49FD 28 14          JR		Z,L_NoDoor
+	49FF 3A EE 1E       LD		A,(DoorHeights)								;; nw door
+	4A02 CD 69 4A       CALL	DoorHeightCheck
+	4A05 38 1C          JR		c,L_NoExit
+	4A07 CD 49 4A       CALL	LR_InFrame
+	4A0A 38 1E          JR		c,L_NearDoor
+	4A0C 3A C5 1E       LD		A,(Max_min_UV_Table+3)						;; MaxV
+	4A0F C6 04          ADD		A,4
+	4A11 18 09          JR		L_Exit
 
 ;; If there's no wall, put the room end coordinate into 'A'...
 .L_NoDoor:
-	4A13 DD CB FE 5E    BIT 3,(IX-2)										;; (IX-&02) ; Has_no_vall
-	4A17 28 0A          JR Z,L_NoExit
-	4A19 3A C5 1E       LD A,(Max_min_UV_Table+3)							;; MaxV
+	4A13 DD CB FE 5E    BIT		3,(IX-2)									;; (IX-&02) ; Has_no_vall
+	4A17 28 0A          JR		Z,L_NoExit
+	4A19 3A C5 1E       LD		A,(Max_min_UV_Table+3)						;; MaxV
 ;; Case where we can exit the room.
 .L_Exit:
-	4A1C BC             CP H
-	4A1D C0             RET NZ
-	4A1E 3E 04          LD A,&04
-	4A20 C3 31 49       JP LeaveRoom
+	4A1C BC             CP		H
+	4A1D C0             RET		NZ
+	4A1E 3E 04          LD		A,&04
+	4A20 C3 31 49       JP		LeaveRoom
 
 ;; The case where we can't exit the room, but may hit the wall.
 .L_NoExit
-	4A23 3A C5 1E       LD A,(Max_min_UV_Table+3)							;; MaxV
+	4A23 3A C5 1E       LD		A,(Max_min_UV_Table+3)						;; MaxV
 	;; (or some other value given in A).
 .L_NoExit2:
-	4A26 BC             CP H
-	4A27 C0             RET NZ
+	4A26 BC             CP		H
+	4A27 C0             RET		NZ
 	4A28 37             SCF
 	4A29 C9             RET
 
@@ -14073,73 +14129,73 @@ dlft_1:
 ;; we do the normal "not door" case. Otherwise, we do that and
 ;; then nudge into the door.
 .L_NearDoor:
-	4A2A CD 51 4A       CALL LR_InFrameW
-	4A2D 38 F4          JR c,L_NoExit
-	4A2F CD 23 4A       CALL L_NoExit
-	4A32 C3 99 49       JP LR_Nudge
+	4A2A CD 51 4A       CALL	LR_InFrameW
+	4A2D 38 F4          JR		c,L_NoExit
+	4A2F CD 23 4A       CALL	L_NoExit
+	4A32 C3 99 49       JP		LR_Nudge
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; If we're not inside the V extent, we must be in the doorframes to
 ;; the side. Set C if this is the case.
 .UD_InOtherDoor:
-	4A35 3A C5 1E       LD A,(Max_min_UV_Table+3)							;; MaxV
-	4A38 BC             CP H
-	4A39 D8             RET c
-	4A3A 7D             LD A,L
-	4A3B DD BE 01       CP (IX+1)											;; (IX+&01) ; MinV
+	4A35 3A C5 1E       LD		A,(Max_min_UV_Table+3)						;; MaxV
+	4A38 BC             CP		H
+	4A39 D8             RET		c
+	4A3A 7D             LD		A,L
+	4A3B DD BE 01       CP		(IX+1)										;; (IX+&01) ; MinV
 	4A3E C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; If we're not inside the U extent, we must be in the doorframes to
 ;; the side. Set C if this is the case.
 .LR_InOtherDoor:
-	4A3F 3A C4 1E       LD A,(Max_min_UV_Table+2)							;; MaxU
-	4A42 BA             CP D
-	4A43 D8             RET c
-	4A44 7B             LD A,E
-	4A45 DD BE 00       CP (IX+0)											;; (IX+&00) ; MinU
+	4A3F 3A C4 1E       LD		A,(Max_min_UV_Table+2)						;; MaxU
+	4A42 BA             CP		D
+	4A43 D8             RET		c
+	4A44 7B             LD		A,E
+	4A45 DD BE 00       CP		(IX+0)										;; (IX+&00) ; MinU
 	4A48 C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Return NC if within the interval associated with the door.
 ;; Specifically, returns NC if D <= DOOR_HIGH and E >= DOOR_LOW
 .LR_InFrame:
-	4A49 3E 2C          LD A,&2C											;; DOOR_HIGH
-	4A4B BA             CP D
-	4A4C D8             RET c
-	4A4D 7B             LD A,E
-	4A4E FE 24          CP &24												;; DOOR_LOW
+	4A49 3E 2C          LD		A,&2C										;; DOOR_HIGH
+	4A4B BA             CP		D
+	4A4C D8             RET		c
+	4A4D 7B             LD		A,E
+	4A4E FE 24          CP		&24											;; DOOR_LOW
 	4A50 C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Same, but for the whole door, not just the inner arch
 .LR_InFrameW:
-	4A51 3E 30          LD A,&30											;; DOOR_HIGH + 4
-	4A53 BA             CP D
-	4A54 D8             RET c
-	4A55 7B             LD A,E
-	4A56 FE 20          CP &20												;; DOOR_LOW - 4
+	4A51 3E 30          LD		A,&30										;; DOOR_HIGH + 4
+	4A53 BA             CP		D
+	4A54 D8             RET		c
+	4A55 7B             LD		A,E
+	4A56 FE 20          CP		&20											;; DOOR_LOW - 4
 	4A58 C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Return NC if within the interval associated with the door.
 ;; Specifically, returns NC if H <= DOOR_HIGH and L >= DOOR_LOW
 .UD_InFrame:
-	4A59 3E 2C          LD A,&2C											;; DOOR_HIGH
-	4A5B BC             CP H
-	4A5C D8             RET c
-	4A5D 7D             LD A,L
-	4A5E FE 24          CP &24												;; DOOR_LOW
+	4A59 3E 2C          LD		A,&2C										;; DOOR_HIGH
+	4A5B BC             CP		H
+	4A5C D8             RET		c
+	4A5D 7D             LD		A,L
+	4A5E FE 24          CP		&24											;; DOOR_LOW
 	4A60 C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Same, but for the whole door, not just the inner arch
 .UD_InFrameW:
-	4A61 3E 30          LD A,&30											;; DOOR_HIGH + 4
-	4A63 BC             CP H
-	4A64 D8             RET c
-	4A65 7D             LD A,L
-	4A66 FE 20          CP &20												;; DOOR_LOW - 4
+	4A61 3E 30          LD		A,&30										;; DOOR_HIGH + 4
+	4A63 BC             CP		H
+	4A64 D8             RET		c
+	4A65 7D             LD		A,L
+	4A66 FE 20          CP		&20											;; DOOR_LOW - 4
 	4A68 C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -14150,19 +14206,19 @@ dlft_1:
 ;; and heels currently). Returns NC if the character is in the right
 ;; height range to go through door.
 .DoorHeightCheck:
-	4A69 90             SUB B
-	4A6A D8             RET c
-	4A6B F5             PUSH AF
-	4A6C 3A 84 24       LD A,(selected_characters)							;; get selected_characters
-	4A6F FE 03          CP &03
-	4A71 20 05          JR NZ,dhc_1
-	4A73 F1             POP AF
-	4A74 FE 03          CP &03
+	4A69 90             SUB		B
+	4A6A D8             RET		c
+	4A6B F5             PUSH	AF
+	4A6C 3A 84 24       LD		A,(selected_characters)						;; get selected_characters
+	4A6F FE 03          CP		&03
+	4A71 20 05          JR		NZ,dhc_1
+	4A73 F1             POP		AF
+	4A74 FE 03          CP		&03
 	4A76 3F             CCF
 	4A77 C9             RET
 dhc_1:
-	4A78 F1             POP AF
-	4A79 FE 09          CP &09
+	4A78 F1             POP		AF
+	4A79 FE 09          CP		&09
 	4A7B 3F             CCF
 	4A7C C9             RET
 
@@ -14194,30 +14250,30 @@ dhc_1:
 ;; Returns V extent in B, U extent in C.
 ;; Leaves HL pointing at the U coordinate.
 .GetSimpleSize:
-	4A90 23             INC HL
-	4A91 23             INC HL
-	4A92 7E             LD A,(HL)											 ;; Load flags into A.
-	4A93 23             INC HL
-	4A94 1E 06          LD E,&06											 ;; Fixed height of 6.
-	4A96 CB 4F          BIT 1,A
-	4A98 20 08          JR NZ,GSS_1
+	4A90 23             INC		HL
+	4A91 23             INC		HL
+	4A92 7E             LD		A,(HL)										 ;; Load flags into A.
+	4A93 23             INC		HL
+	4A94 1E 06          LD		E,&06										 ;; Fixed height of 6.
+	4A96 CB 4F          BIT		1,A
+	4A98 20 08          JR		NZ,GSS_1
 	;; Cases 0, 1:
 	4A9A 1F             RRA
-	4A9B 3E 03          LD A,&03
-	4A9D CE 00          ADC A,&00
-	4A9F 47             LD B,A
-	4AA0 4F             LD C,A
+	4A9B 3E 03          LD		A,&03
+	4A9D CE 00          ADC		A,&00
+	4A9F 47             LD		B,A
+	4AA0 4F             LD		C,A
 	4AA1 C9             RET													;; Either 3x3 or 4x4.
 
 GSS_1:																		;; Cases 2, 3:
 	4AA2 1F             RRA
-	4AA3 38 04          JR c,GSS_2
+	4AA3 38 04          JR		c,GSS_2
 	;; Case 2:
-	4AA5 01 04 01       LD BC,&0104
+	4AA5 01 04 01       LD		BC,&0104
 	4AA8 C9             RET													;; 1x4
 
 GSS_2:
-	4AA9 01 01 04       LD BC,&0401
+	4AA9 01 01 04       LD		BC,&0401
 	4AAC C9             RET													;; 4x1
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -14751,7 +14807,7 @@ objfnsw_2:
 	4CED FD 35 11       DEC		(IY+O_SPECIAL)
 	4CF0 CD 24 50       CALL	ObjAgain7
 	;; Call PerObj on each object in the main object list...
-	4CF3 21 AB 39       LD		HL,ObjectLists + 2
+	4CF3 21 AB 39       LD		HL,ObjList_Regular_Near2Far
 objfnsw_loop:
 	4CF6 7E             LD		A,(HL)
 	4CF7 23             INC		HL
@@ -14774,7 +14830,7 @@ objfnsw_3:
 	4D0F FD 77 04       LD		(IY+O_FLAGS),A
 	4D12 C3 C7 4F       JP		ObjDraw
 
-;; for each object in the room (ObjectLists + 2 list), that is not
+;; for each object in the room (ObjList_Regular_Near2Far list), that is not
 ;; the switch itself, neither is fading, apply the switch if needed
 .PerObjSwitch:
 	4D15 DD 7E 0A       LD		A,(IX+O_FUNC)								;; get function code
@@ -15926,7 +15982,7 @@ RevTable:
 BackgrdBuff:
 	6A00		DEFS 	64				;; data???
 .SaveRestore_Block4:					;; Save/Restore Block 4 : &3F0 bytes (1008 = 56 x 18, each Object is 18 byte-long)
-Objects:
+ObjectsBuffer:
 	6A40		DEFS 	&3F0			;; Objects buffer
 .SaveRestore_Block4_end
 TODO_6E30:
@@ -23629,13 +23685,13 @@ Other_Character_state:
 	;; &1D bytes (29)
 	BB14 				DEFS 	1							;; Saved ObjListIdx
 	BB15 				DEFS 	2							;; Saved Object_Destination
-	BB17 				DEFS 	2							;; Saved ObjListAPtr
-	BB19 				DEFS 	2							;; Saved ObjListBPtr
+	BB17 				DEFS 	2							;; Saved ObjListBPtr
+	BB19 				DEFS 	2							;; Saved ObjListAPtr
 	BB1B 				DEFS 	20							;; Saved ObjectLists
 	BB2F 				DEFS 	2							;; Saved Saved_Object_Destination
 	;; &19 bytes (25)
 	BB31 				DEFS 	1							;; Saved ???
-	BB32 				DEFS 	3		 					;; Saved (fire) object EntryPosn
+	BB32 				DEFS 	3		 					;; Saved object EntryPosition_uvz
 	BB35 				DEFS 	1  							;; Saved ???
 	BB36 				DEFS 	2		     				;; Saved Carrying
 	BB38 				DEFS 	18							;; Saved &12 bytes FiredObj_variables
