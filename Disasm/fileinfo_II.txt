@@ -2400,7 +2400,7 @@ wa3r_1:
 ;; Sub function for Write_AY3_Registers (write one AY-3 reg)
 ;; Input: D = reg number, E = value
 .SubF_Write_AY3Reg:
-	0B71 06 F4          LD		B,PSG_PORTA									;; prepare PSG Data
+	0B71 06 F4          LD		B,PSG_PORTA	/ WORD_HIGH_BYTE				;; prepare PSG Data
 	0B73 ED 51          OUT 	(C),D										;; reg number in D  (F4dd)
 	0B75 01 00 F6       LD		BC,PSG_INACTIVE								;; prepare PSG Control
 	0B78 3E C0          LD		A,PSG_REG_SEL and WORD_LOW_BYTE				;; PSG Reg select
@@ -7863,7 +7863,7 @@ FinishedDying:
 	2670 18 0B          JR		br_267D
 
 br_2672
-	2672 21 31 BB       LD		HL,OCS_Saved								;; copy the 5 bytes from the buffer in the 3 variables starting at 2492
+	2672 21 31 BB       LD		HL,OCS_Saved + MOVE_OFFSET					;; copy the 5 bytes from the buffer in the 3 variables starting at 2492
 	2675 11 92 24       LD		DE,Restored_if_death_block
 	2678 01 05 00       LD		BC,5										;; restore 5 bytes: saved_room_access_code, EntryPosition_uvz and saved_selected_chars
 	267B ED B0          LDIR												;; Copy: repeat LD (DE),(HL); DE++, HL++, BC-- until BC=0
@@ -9324,7 +9324,7 @@ MenuCursor:
 .MainMenuSpriteList:
 	2F18 1E 60 60		DEFB 	SPR_HEAD1,				&60, &60			;; Sprite_Head_1; pos x,y &60,&60
 	2F1B 98 8C 60		DEFB 	SPR_HEELS1 or SPR_FLIP, &8C, &60			;; Sprite_Heels_1 (&18) | Sprite_Flipped (&80); pos x,y
-	2F1E 2F 60 48		DEFB 	SPR_CROWN				&60, &48			;; Sprite_Crown; pos x,y
+	2F1E 2F 60 48		DEFB 	SPR_CROWN,				&60, &48			;; Sprite_Crown; pos x,y
 	2F21 AF 8C 48		DEFB 	SPR_CROWN or SPR_FLIP, 	&8C, &48			;; Sprite_Crown (&2F) | Sprite_Flipped (&80); pos x,y
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -12369,7 +12369,7 @@ savecont_2:
 	405B 21 96 24       LD		HL,saved_selected_chars						;; ???
 	405E BE             CP		(HL)
 	405F 20 0D          JR		NZ,SaveContinue_3
-	4061 21 31 BB       LD		HL,OCS_Saved								;; save 4 bytes in buffer (Room access code and Room Entry UVZ position)=
+	4061 21 31 BB       LD		HL,OCS_Saved + MOVE_OFFSET					;; save 4 bytes in buffer (Room access code and Room Entry UVZ position)=
 	4064 01 04 00       LD		BC,&0004
 	4067 ED B0          LDIR												;; repeat LD (DE),(HL); DE++, HL++, BC-- until BC=0
 	4069 21 10 BB       LD		HL,Other_Character_state + MOVE_OFFSET
@@ -12612,17 +12612,17 @@ CounterIncrements:
 .Continue_Data:
 	;; Default Values do not matter, they'll be overwritten :
 	;; should do a  DEFS 18*11,&00
-	4195 				DEFB 	&FF, &21, &00, &F8, &CD, &41, &4D, &F6, &01, &D1, &C9, &CD, &17, &28, &C3, &4, &6C, &CD
-	41A7 				DEFB 	&67, &1D, &21, &DA, &76, &CD, &AD, &6A, &CD, &87, &55, &CD, &67, &1D, &CD, &8, &43, &CD
-	41B9 				DEFB 	&AF, &5F, &21, &00, &00, &22, &73, &76, &C3, &67, &1D, &3A, &74, &76, &B7, &A, &D6, &4B
-	41CB 				DEFB 	&3A, &73, &76, &FE, &F3, &DA, &D6, &4B, &37, &C9, &E6, &7F, &E5, &21, &73, &6, &CD, &00
-	41DD 				DEFB 	&00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &0, &00, &00
-	41EF 				DEFB 	&00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &0, &00, &00
-	4201 				DEFB 	&00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &0, &00, &00
-	4213 				DEFB 	&00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &0, &00, &00
-	4225 				DEFB 	&00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &0, &00, &00
-	4237 				DEFB 	&00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &0, &00, &00
-	4249 				DEFB 	&00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &0, &00, &00
+	4195 				DEFB 	&FF, &21, &00, &F8, &CD, &41, &4D, &F6, &01, &D1, &C9, &CD, &17, &28, &C3, &34, &6C, &CD
+	41A7 				DEFB 	&67, &1D, &21, &DA, &76, &CD, &AD, &6A, &CD, &87, &55, &CD, &67, &1D, &CD, &88, &43, &CD
+	41B9 				DEFB 	&AF, &5F, &21, &00, &00, &22, &73, &76, &C3, &67, &1D, &3A, &74, &76, &B7, &FA, &D6, &4B
+	41CB 				DEFB 	&3A, &73, &76, &FE, &F3, &DA, &D6, &4B, &37, &C9, &E6, &7F, &E5, &21, &73, &76, &CD, &00
+	41DD 				DEFB 	&00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00
+	41EF 				DEFB 	&00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00
+	4201 				DEFB 	&00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00
+	4213 				DEFB 	&00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00
+	4225 				DEFB 	&00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00
+	4237 				DEFB 	&00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00
+	4249 				DEFB 	&00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00
 
 ;; -----------------------------------------------------------------------------------------------------------
 .UVZ_origin:
