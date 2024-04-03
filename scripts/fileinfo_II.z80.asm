@@ -1,17 +1,18 @@
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Disassembly of "Head over Heels" - Amstrad CPC
-;; -----------------------------------------------------------------------------------------------------------
 ;; Author : Fred Limouzin (fphenix@hotmail.com)
-;;
-;; Tool used: mostly WinApe and Notepad++! (and a tiny bit of ManageDsk.exe (in spite of the bugs!) to get
-;; the files from the ".dsk" file.
-;; Note: This file is currently not compilable! It's mainly a text document. It shows
-;; the addresses, the machine-codes and the assembly.
 ;;
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Note: A big thanks and credit must be given to Simon Frankau (https://github.com/simon-frankau/head-over-heels)
 ;; who did a similar work for the ZX-Spectrum version (from which the CPC version has been ported hence
 ;; which is very similar). I inserted in here most of his findings to mines.
+;; -----------------------------------------------------------------------------------------------------------
+;;
+;; Tool used: mostly WinApe and Notepad++! (and a tiny bit of ManageDsk.exe (in spite of the bugs!) to get
+;; the files from the ".dsk" file.
+;; Note: This file is not compilable! It's mainly a text document. It shows the addresses, the machine-codes
+;; and the assembly. However it may be converted to a WinApe/Maxam compilable file simply by running the
+;; txt2asm.py Python script.
 ;; -----------------------------------------------------------------------------------------------------------
 
 						org		&0100										;; Origin and entry point after loading screen
@@ -24,7 +25,7 @@ Entry:
 	LD		SP,Stack									;; Stack pointer &0100 (which means the first stack byte used will be 00FF, then 00FE etc..)
 	CALL 	Init_setup									;; Initialization
 	CALL 	Keyboard_scanning_ending					;; Reset PSG Keyboard scanning
-	JR		Main										;; Continue at Main (011C)
+	JR		Main										;; Continue at Main (&011C)
 
 ;; -----------------------------------------------------------------------------------------------------------
 .SaveRestore_Block1:										;; Save/Restore block 1 (4 bytes)
@@ -34,7 +35,7 @@ Entry:
 	DEFB 	&00             			;; top bit toggles every "Do_Objects" loop
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; CFSLRDUJ user inputs and directions (Carry,Fire,Swop,Left,Right,Down,Up,Jump)
+;; "CFSLRDUJ" user inputs and directions (Carry,Fire,Swop,Left,Right,Down,Up,Jump)
 .Last_User_Inputs:
 	DEFB 	&EF
 .SaveRestore_Block1_end
@@ -66,6 +67,7 @@ Saved_Dir_ptr:
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Main : Entry point and main loop
+;; Game_over : Entry point after a game has been played
 .Game_over:																	;; when "game over" branch here and continue at 'Main'
 	CALL 	Game_over_screen
 .Main:
@@ -76,7 +78,7 @@ Saved_Dir_ptr:
 	JR		Main_game_start								;; Start the game
 
 .Main_continue_game:														;; If an old game existed (saved point fish), can continue it
-	CALL 	Play_HoH_Tune								;; Play main HoH Theme
+	CALL 	Play_HoH_Theme								;; Play main HoH Theme
 	CALL 	Init_Continue_game							;; Continue a saved (Fish) game
 .Main_game_start:															;; Play the game
 	CALL 	Show_World_Crowns_screen					;; show the Crowns/Worlds page
@@ -112,7 +114,7 @@ RoomID_Heels_1st		EQU		&8940					;; This is Heels' first room ID (894)
 ;; Set Zero flag if in Victory room, else Zero is reset (ie. "NZ" set):
 .Sub_Check_Victory_Room:
 	LD		HL,(current_Room_ID)						;; get current_Room_ID
-	LD		BC,RoomID_Victory							;; &8D30 is the Victory room ID (U=8,V=D,Z=3)
+	LD		BC,RoomID_Victory							;; &8D30 is the Victory room ID (U=8,V=&D,Z=3)
 	XOR 	A											;; A = 0
 	SBC 	HL,BC										;; test the difference "room_ID - victory_room_ID"
 	RET													;; If in victory room then Zero set (NZ=0) else (ie. NOT in victory room) Zero reset (NZ=1)
@@ -147,7 +149,7 @@ victory_song:																;; else:
 victory_message:
 	POP 	AF											;; restore prev_(HL)
 	AND		%00000001									;; test bit0 (parity) of prev_(HL), set Zero flag if == 0 (Even)
-	LD		A,Print_StringID_Freedom					;; String ID &C9 = DoubleSize+Pos(12,22)+Rainbow+"FREEDOM"
+	LD		A,Print_Freedom								;; String ID &C9 = DoubleSize+Pos(12,22)+Rainbow+"FREEDOM"
 	CALL 	Z,Print_String								;; if value prev(HL) was Even (every second frame) then Print_String (since "FREEDOM" % 3 != 0, the colors will change every time! Hence the flashing effect)
 	RET
 
@@ -180,7 +182,7 @@ move_to_nextdoor_room:
 got_increment:																;; at this point we have + or - 1 in C, now mod the appropriate coordinate to do the expected move
 	RRA													;; bit0 goes in Carry flag
 	JR		c,move_to_RL_room							;; if carry '1' then (Right/Left) move_to_RL_room, else:
-move_to_UD_BA_room:															;; else Modify U or Z coords
+move_to_UD_BA_room:															;; else Modify U (Up/Down) or Z (Below/Above) coords
 	;; A = 0 (code1 or code2), 1 (Code3 or 4), 4 (Code6) or 5 (Code5)
 	;; (HL) = room ID high byte (4b U and 4b V) if normal move
 	;; (HL) = room ID low byte (4b Z and 4b d/c) if Above or Below
@@ -191,7 +193,7 @@ move_to_UD_BA_room:															;; else Modify U or Z coords
 	RRD													;; put back new room ID value in current_Room_ID ; RRD = nibbles circular right rotation in the 12b value composed by A[3:0] and (HL)
 	JR		Long_move_to_new_room						;; go new room
 
-move_to_RL_room:															;; Modify V coord
+move_to_RL_room:															;; Modify V (Right/Left) coord
 	RRD													;; get V in A ; RRD = nibbles circular right rotation in the 12b value composed by A[3:0] and (HL)
 	ADD 	A,C											;; +/- 1
 	RLD													;; put back new room ID value in current_Room_ID ; RLD = nibbles circular left rotation in the 12b value composed by A[3:0] and (HL)
@@ -227,7 +229,7 @@ move_to_RL_room:															;; Modify V coord
 	LD		B,Sound_ID_Silence							;; else Sound id &C0 = Silence (pause)
 	CALL 	Play_Sound									;; Quiet all voices
 	CALL 	Wait_anykey_released						;; key debounce
-	LD		A,Print_StringID_Paused						;; String ID &AC = Paused Game message
+	LD		A,Print_Paused								;; String ID &AC = Paused Game message
 	CALL 	Print_String	 							;; Display overlay pause message
 pause_loop:
 	CALL 	Test_Enter_Shift_keys						;; output : Carry set : no key pressed, else Carry reset and register C=0:Enter, C=1:Shift, C=2:other
@@ -238,10 +240,10 @@ leave_pause:
 	CALL 	Wait_anykey_released						;; key debounce
 	CALL 	Update_Screen_Periph						;; Update color scheme and periphery (the room was build in black, so apply real colors now)
 	;; Redraw only the part over the pause message
-	LD		HL,&4C50									;; X extent &4C=76; &50=80 ; H contains start, L end, in double-pixels
+	LD		HL,&4C * WORD_HIGH_BYTE + &50				;; X extent &4C=76; &50=80 ; H contains start, L end, in double-pixels
 pause_message_draw_over_loop:
 	PUSH 	HL
-	LD		DE,&6088									;; Y extent &60=96; &88=136
+	LD		DE,&60 * WORD_HIGH_BYTE + &88				;; Y extent &60=96; &88=136
 	CALL 	Draw_View
 	POP 	HL											;; restore X extent
 	LD		A,L
@@ -279,7 +281,7 @@ us_skip:
 	CALL 	Update_key_pro_next_idx						;; if needed update SwopChara_Pressed (index 1)
 	BIT 	6,A											;; or was if the FireDonuts key?
 	CALL 	Update_key_pro_next_idx						;; if needed update FireDonuts_Pressed (index 2)
-	LD		C,A											;; in C bits are in order : CFSLRDUJ (Carry,Fire,Swop,Left,Right,Down,Up,Jump)
+	LD		C,A											;; in reg C, the bits are in order : CFSLRDUJ (Carry,Fire,Swop,Left,Right,Down,Up,Jump)
 	RRA													;; in A put the "Left,Right,Down,Up" bitmap in bits [3:0]
 	CALL 	DirCode_from_LRDU							;; get the resulting direction code 0 to 7 (or FF) from the LRDU (Left/Right/Down/Up) user input
 	CP		&FF											;; check vs "no move"
@@ -295,8 +297,8 @@ smc_sens_routine:
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Runs if HIGH Sensitivity is choosen in the menu (value set in smc_sens_routine)
-;; If moving diagonaly, set the a direction each time (the other one in the pair creating the diag)
-;; Input: C has the "Carry,Fire,Swop,Left,Right,Down,Up,Jump" state (active low)
+;; If moving diagonaly, set the new direction each time.
+;; Input: reg C has the "Carry,Fire,Swop,Left,Right,Down,Up,Jump" state (active low)
 .Routine_High_sensitivity:
 	LD		A,(Last_User_Inputs)						;; get Last_User_Inputs CFSLRDUJ code
 	XOR 	C											;; compare last and current user input
@@ -310,7 +312,7 @@ smc_sens_routine:
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Runs if LOW Sensitivity is choosen in the menu (value set in smc_sens_routine)
 ;; if moving diagonaly, keep the old direction (the same one in the pair creating the diag)
-;; Input: C has the "Carry,Fire,Swop,Left,Right,Down,Up,Jump" state (active low)
+;; Input: reg C has the "Carry,Fire,Swop,Left,Right,Down,Up,Jump" state (active low)
 .Routine_Low_sensitivity:
 	LD		A,(Last_User_Inputs)						;; get Last_User_Inputs CFSLRDUJ
 	XOR 	C
@@ -328,7 +330,7 @@ rls_1:
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Nothing pressed, update Current_User_Inputs with current CFSLRDUJ (active low)
-;; Input: C has the "Carry,Fire,Swop,Left,Right,Down,Up,Jump" state
+;; Input: reg C has the "Carry,Fire,Swop,Left,Right,Down,Up,Jump" state
 .No_Key_pressed:
 	LD		A,C											;; dir code was "FF", get the CFSLRDUJ direction from C
 	LD		(Current_User_Inputs),A						;; and refresh Current_User_Inputs CFSLRDUJ
@@ -336,8 +338,7 @@ rls_1:
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Provide 2 functions to update the variables in special_key_pressed array:
-;; CarryObject_Pressed (index 0),  SwopChara_Pressed (index 1),
-;; and FireDonuts_Pressed (index 2)
+;; CarryObject_Pressed (index 0),  SwopChara_Pressed (index 1) and FireDonuts_Pressed (index 2):
 ;;   * Update_key_pro_next_idx will first increment the index in HL (next special_key_pressed item)
 ;;   * Update_key_pro_curr_idx will use the current index in HL (curr index special_key_pressed)
 ;; Input : Z set = key pressed; Z reset = no key pressed
@@ -379,14 +380,14 @@ reg_key_feature_1:
 ;;     * the other character has no more lives and we can't share lives with it
 .Check_Swop:																;; Swop pressed? if so, try to swop
 	LD		A,(SwopChara_Pressed)						;; get SwopChara_Pressed
-	RRA													;; shift swop key state (bit0) in Carry
+	RRA													;; shift right the Swop key state (bit0) in Carry
 	RET 	NC											;; leave if not being pressed, else:
 	LD		A,(Saved_Objects_List_index)				;; else get Saved_Objects_List_index; can't swap if under a doorway
 	LD		HL,DyingAnimFrameIndex						;; point on DyingAnimFrameIndex
-	OR		(HL)										;; can't swap if in the process of dying!
+	OR		(HL)										;; can't swap if in the process of dying (Dying anim/vape playing)!
 	LD		HL,(Teleport_up_anim_length)				;; get Teleport_up_anim_length
 	OR		H
-	OR		L											;; can't swap if teleporting
+	OR		L											;; can't swap if teleporting (Teleport anim playing)
 	JR		NZ,Play_Sound_NoCanDo						;; if not 0 (teleporting) then Play_Sound_NoCanDo and will RET, else:
 	LD		HL,(Characters_lives)						;; else get Characters_lives
 	CP		H											;; character 1 has no lives: can't swop
@@ -405,9 +406,9 @@ swc_1:
 	LD		(HL),C										;; else Head selected; save character_direction in Saved_Dir_ptr+1 (Head)
 swc_2:
 	LD		HL,SwopChara_Pressed						;; point on SwopChara_Pressed
-	LD		IY,Heels_variables							;; IY points on Heels variables
+	LD		IY,Heels_variables							;; IY points on Heels variables (Heels Object Instance)
 	LD		A,E											;; get back selected_characters from E
-	CP		%00000011									;; Check if both are selected?
+	CP		BOTH_SELECTED								;; Check if both are selected?
 	JR		Z,Swop_Head_or_Heels						;; Zero flag set = yes then Swop_Head_or_Heels, else:
 	LD		A,(both_in_same_room)						;; get both_in_same_room value
 	AND 	A											;; test if both in same room
@@ -430,7 +431,7 @@ try_merge:																	;; else (same room)
 	JR		NC,Swop_Head_or_Heels						;; if apart V wise then Swop_Head_or_Heels; will RET
 	LD		B,A											;; save Heels V+1 in B (deltaV 0,1,2 means original deltaU was within +/-1)
 	LD		A,(IY+O_Z)									;; get Heels Z coordinate
-	SUB 	6											;; substract one "character height"
+	SUB 	6											;; substract one "character height" unit (sub in Z = going up) to check if Head is above Heels
 	CP		(IY+Head_offset+O_Z)						;; get Head Z coordinate (&19=&12+&07, the +&12 is to point on Heads_variables)
 	JR		NZ,Swop_Head_or_Heels						;; if Head not exactly on Heels then Swop_Head_or_Heels; will RET
 merge_head_on_heels:														;; if all tests passed (Head is on Heels in +/-1 in U and V), then align if needed and merge
@@ -445,11 +446,11 @@ swop_3:
 	JR		c,swop_4									;; if Carry = 1, U already aligned (C=1), else:
 	RR		C											;; Heels U+1 bit1 in Carry (0: C=0, 1: C=2)
 	CALL 	Sub_Get_displacement						;; Update displacement in E
-	JR		swop_5										;; jump swop_5
+	JR		swop_both									;; jump swop_both
 swop_4:																		;; else
 	RLC 	E											;; aligned in U, so put no movement into the next two bits of E.
 	RLC 	E
-swop_5:
+swop_both:
 	LD		A,&03										;; both characters selected!
 	INC 	E											;; test if E was FF
 	JR		Z,do_swop									;; if 0 (was FF = U and V aligned), do_swop immediately, else:
@@ -465,22 +466,22 @@ not_aligned:
 ;; Switch Head or Heels
 ;; HL = pointer on SwopChara_Pressed
 ;; Note that bit2 stores which of Head or Heels will be selected next time
-;; we swop; (cycle "Heels, Both, Head, Both").
+;; we swop; (cycle "Heels, Both, Head, Both" if joined).
 .Swop_Head_or_Heels:
 	LD		A,%00000100									;; bit2 set so a Xor will invert the bit
 	XOR 	(HL)										;; flip bit2 of SwopChara_Pressed (indicating next char to swop to)
 	LD		(HL),A										;; save new value
 	AND 	%00000100									;; get NEW value of bit2 (inverted vs old)
-	LD		A,%00000010									;; prepare Head
+	LD		A,HEAD_SELECTED								;; prepare Head
 	JR		Z,do_swop									;; if new bit2 is 0 (old was 1), will use 2b10 (Head)
-	DEC 	A											;; else (bit2 is 1 (old was 0) will use 2b01 (Heels)
+	DEC 	A											;; else use Heels ; (bit2 is 1 (old was 0) will use 2b01 (Heels)
 .do_swop:
 	LD		(selected_characters),A						;; update selected_characters
 	CALL 	Sub_Set_Character_Flags
 	CALL 	Get_Saved_direction_pointer					;; HL = Saved_Dir_ptr; Carry set if using Heels, reset for Head
-	JR		c,swop_8									;; if Heels, skip
+	JR		c,swop_redraw								;; if Heels, skip
 	INC 	HL											;; else (we are Head) HL point on Saved_Dir_ptr+1
-swop_8:
+swop_redraw:
 	LD		A,(HL)										;; get saved facing direction for current character
 	LD		(character_direction),A						;; update LRDU character_direction
 	;; If both characters are on the same screen, we just redraw the
@@ -526,7 +527,7 @@ sscf_skip:
 	LD		(IY+Head_offset+O_FUNC),1					;; else set Head O_FUNC to 1 ; &1C = Heads_variable+O_FUNC (&12+&0A)
 sscf_sk2
 	RES 	1,(IY+Head_offset+O_SPRFLAGS) 				;; Clear double-height flag on Head ; &1B=&12+&09 ; sprite flags
-	CP		%00000011									;; both selected?
+	CP		BOTH_SELECTED								;; both selected?
 	RET 	NZ											;; no, then RET, else both selected:
 	SET 	3,(IY+O_FLAGS)								;; Set the 'tall' flag on Heels ; O_FLAGS (04)
 	SET 	1,(IY+Head_offset+O_SPRFLAGS)				;; and the double-height flag on Head. &1B = Heads_variable+09 ; sprite flags
@@ -534,7 +535,7 @@ sscf_sk2
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; This compares the current Character's room to the other Charaters's room.
-;; Output: Zery flag set if they are in the same room
+;; Output: Zero flag set if they are in the same room
 .Do_We_Share_Room:
 	LD		HL,(current_Room_ID)						;; get current_Room_ID
 	LD		DE,(Other_Character_state + MOVE_OFFSET)	;; get other char room; at this point, the first word is room ID
@@ -611,16 +612,17 @@ copy_array_direction:
 	DEFW 	SaveRestore_Block2							;; Argument 2: ObjListIdx (39A2)
 	CALL 	Copy_Data
 	DEFW 	&0019										;; Argument 1: length &0019 (25 bytes)
-	DEFW 	SaveRestore_Block3							;; Argument 2: ???? (TODO_2492), EntryPosn, Corrying, ??? (TODO_2496), FireObject
+	DEFW 	SaveRestore_Block3							;; Argument 2: saved_room_access_code, EntryPosition_uvz, saved_selected_chars, Corrying, and FireObject
 	CALL 	Copy_Data
 	DEFW 	&03F0										;; Argument 1: length ObjectsLen (&03F0 = 56 x 18 bytes = 1008)
-	DEFW 	SaveRestore_Block4							;; Argument 2: Objects (6A40)
+	DEFW 	SaveRestore_Block4							;; Argument 2: ObjectsBuffer (6A40)
 	RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; This is the length of an object instance (as in OOP/Class "object")
-;; Head, Heels, a FireObject and any other item in the room (using the TmpObj)
-;; use the same data collection format, 18 bytes long.
+;; Head, Heels, a FireObject and any other item (that we also call object,
+;; but in the sense "item") in the room (using the TmpObj) use the same
+;; data collection format, 18 bytes long.
 OBJECT_LENGTH			EQU		18					;; &0012
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -634,7 +636,7 @@ arg_copy_character_variables:
 	RET
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; Copy the source into the currently selected variables array;
+;; Copy the source into the currently selected character variables array;
 ;; Then copy the Other character's vars into the initial source.
 ;; Finally it erases the ObjectLists array.
 ;; Input: DE = pointer on initial source of data (&12 bytes variables array)
@@ -652,8 +654,8 @@ arg_copy_character_variables:
 Clear_character_objects:
 	LD		HL,(Saved_Object_Destination)				;; get Saved_Object_Destination
 	LD		(Object_Destination),HL						;; update Object_Destination
-	LD		HL,ObjectLists + 4							;; erase from &39AD (ObjectLists + 1*4)
-	LD		BC,8										;; for 8 bytes
+	LD		HL,ObjList_NextRoomV_Far2Near				;; erase from &39AD (ObjectLists + 4)
+	LD		BC,8										;; for 8 bytes: these are the "Next rooms U and V" lists
 	JP		Erase_forward_Block_RAM						;; Continue on Erase_forward_Block_RAM (will have a RET)
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -722,10 +724,10 @@ smc_copy_func:
 ;; The phase mechanism allows an object to not get processed for one frame.
 .Do_Objects:
 	LD		A,(Do_Objects_Phase)						;; get Do_Objects_Phase
-	XOR 	%10000000									;; toggle b7
+	XOR 	%10000000									;; toggle bit7
 	LD		(Do_Objects_Phase),A						;; update Do_Objects_Phase
 	CALL 	Characters_Update
-	LD		HL,(ObjectLists+2)							;; get object pointer
+	LD		HL,(ObjList_Regular_Near2Far)				;; get object pointer : Usual A list
 	JR		Sub_Do_Objects_entry
 
 doob_loop:
@@ -733,7 +735,7 @@ doob_loop:
 	LD		A,(HL)
 	INC 	HL
 	LD		H,(HL)
-	LD		L,A											;; get next object pointer in HL from (ObjectLists+2)
+	LD		L,A											;; get next object pointer in HL from (ObjList_Regular_Near2Far)
 	EX		(SP),HL										;; exchange object pointers (curr and next (next is now on the stack))
 	EX		DE,HL										;; put current pointer in DE
 	LD		HL,O_FUNC									;; O_FUNC = offset &0A in TmpObj_variables
@@ -773,12 +775,48 @@ Sub_Do_Objects_entry:
 	RET
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; &0AD8 is the offset between the pre-init (data) block from &6600-ADBF that is moved at &70D8-B897
-;; in Init_table_and_crtc (see move_loaded_data_section)
-MOVE_OFFSET				EQU		&B897 - &ADBF			;; &0AD8
-JUMP_OPCODE				EQU		&C3						;; JP addr, used to generate RST7 (int handler) and 0 (reset to Entry)
+;; RST init
+JUMP_OPCODE				EQU		&C3						;; "JP addr", used to generate RST7 (int handler) and 0 (reset to Entry)
+LDAvv_OPCODE			EQU		&3E 					;; "LD A,vv", used in BlitRot<*> functions
 RST0_ADDR				EQU		&0000
 RST7_ADDR				EQU		&0038
+
+WORD_LOW_BYTE			EQU		&00FF
+WORD_HIGH_BYTE			EQU		256
+
+;; -----------------------------------------------------------------------------------------------------------
+;; Amastrad CPC System specific constants
+GATEARRAY_BORDER		EQU		&7F10
+GATEARRAY_PENS			EQU		&7F00
+GATEARRAY_INKS			EQU		&7F40
+GATEARRAY_MODE1			EQU		&7F8D
+
+CRTC_REGSEL				EQU		&BC00
+CRTC_DATAOUT			EQU		&BD00
+;;CRTC_STATUS			EQU		&BE00
+;;CRTC_DATAIN			EQU		&BF00
+
+PSG_PORTA				EQU		&F400
+PSG_PORTB				EQU		&F500
+PSG_PORTC				EQU		&F600
+PSG_INACTIVE			EQU		&F600
+PSG_KB_LINESEL			EQU		&F600
+PSG_REG_READ			EQU		&F640
+PSG_REG_WRITE			EQU		&F680
+PSG_REG_SEL				EQU		&F6C0
+PSG_PORTCTRL			EQU		&F700
+PSG_PORTA_OUT			EQU		&F782
+PSG_PORTA_IN			EQU		&F792
+
+;; -----------------------------------------------------------------------------------------------------------
+;; Data block is moved at init from 6600-ADBF to 70D8-B897. That frees the 6600-70D8 area, used by buffers.
+;; The copy is done backwards (from last byte to first)
+;; &0AD8 is the offset between the pre-init (data) block from &6600-ADBF that is moved at &70D8-B897
+;; in Init_table_and_crtc (see move_loaded_data_section)
+MOVE_BLOCK_DEST_END		EQU		&B897											;; last byte of the destination block
+MOVE_BLOCK_SOURCE_END	EQU		&ADBF											;; last byte of the source block
+MOVE_BLOCK_LENGTH		EQU		&47C0											;; length of the moved block
+MOVE_OFFSET				EQU		MOVE_BLOCK_DEST_END - MOVE_BLOCK_SOURCE_END		;; &0AD8 : gap betwwen blocks
 
 ;; -----------------------------------------------------------------------------------------------------------CPC
 ;; This will 1) Move a big block of loaded data 2) initialize some
@@ -786,9 +824,9 @@ RST7_ADDR				EQU		&0038
 .Init_table_and_crtc:
 	DI													;; Disable Interrupts
 move_loaded_data_section:
-	LD		DE,&B897									;; destination of the last byte of the destination array
-	LD		HL,&ADBF									;; Move block from 6600-ADBF to 70D8-B897 (offset: MOVE_OFFSET = #0AD8)
-	LD		BC,&47C0									;; length &47C0 bytes
+	LD		DE,MOVE_BLOCK_DEST_END						;; destination of the last byte of the destination array
+	LD		HL,MOVE_BLOCK_SOURCE_END					;; Move block from 6600-ADBF to 70D8-B897 (offset: MOVE_OFFSET = #0AD8)
+	LD		BC,MOVE_BLOCK_LENGTH						;; length &47C0 bytes
 	LDDR												;; Copy: repeats LD (DE), (HL); DE--, HL--, BC-- until BC==0
 erase_buffer_6800:
 	LD		HL,DestBuff									;; array from &6800
@@ -805,16 +843,16 @@ inth_and_rst:
 	IM 		1											;; Interrupt Mode 1 = exec a RST7 (RST &38) when an Interrupt occurs
 	CALL 	Init_6600_table
 init_CTRC_and_screen:
-	LD		BC,&7F8D									;; Gate Array Access:
+	LD		BC,GATEARRAY_MODE1							;; Gate Array Access:
 	OUT 	(C),C										;; Video Mode 1, Reset INT counter, Lower and upper ROM disabled
 	LD		HL,array_CRTC_init_values
-	LD		BC,&BC00									;; &BC00 CRTC Reg Index 0
+	LD		BC,CRTC_REGSEL								;; &BC00 CRTC Reg Index 0
 init_CRTC_loop:
 	OUT 	(C),C										;; Select reg
 	LD		A,(HL)										;; get reg value
-	INC 	B											;; &BD00 : CRTC Data Out
+	INC 	B											;; &BD00 : CRTC_DATAOUT : Write to CRTC
 	OUT 	(C),A										;; set reg value
-	DEC 	B											;; &BC00 CRTC Reg Index
+	DEC 	B											;; &BC00 : CRTC_REGSEL : CRTC Reg Index
 	INC 	HL											;; point on next value
 	INC 	C											;; next Reg
 	LD		A,C
@@ -832,7 +870,7 @@ array_CRTC_init_values:
 	DEFB 	&26					;; CRTC reg 4 value : 38; Height of the screen, in characters
 	DEFB 	&00					;; CRTC reg 5 value : 0; Measured in scanlines
 	DEFB 	&19					;; CRTC reg 6 value : 25; Height of displayed screen in characters
-	DEFB 	&21					;; CRTC reg 7 value : 33 Note: default is 30; hen to start the VSync signal, in characters.
+	DEFB 	&21					;; CRTC reg 7 value : 33 Note: default is 30; when to start the VSync signal, in characters.
 	DEFB 	&00					;; CRTC reg 8 value : 0 = No interlace
 	DEFB 	&07					;; CRTC reg 9 value : 7; Maximum scan line address
 	DEFB 	&0F					;; CRTC reg 10 value : Cursor Start Raster (0 is the default)
@@ -844,7 +882,7 @@ array_CRTC_init_values:
 
 ;; -----------------------------------------------------------------------------------------------------------
 VSYNC_wait_value:
-	DEFB 	&06
+	DEFB 	6
 
 ;; -----------------------------------------------------------------------------------------------------------CPC
 ;; The interrupt is only run every VSYNC_wait_value VSYNCs
@@ -853,7 +891,7 @@ VSYNC_wait_value:
 	PUSH 	BC											;; Save all reg
 	PUSH 	HL
 	LD		HL,VSYNC_wait_value							;; point on VSYNC_wait_value
-	LD		B,&F5										;; PortB
+	LD		B,PSG_PORTB / WORD_HIGH_BYTE				;; PortB
 	IN		C,(C)										;; Read PortB (VSYNC_active is at bit 0)
 	RR		C											;; Put bit0 of C in Carry (9-bit Rigth-Rotation, Carry goes in b7 and oldb0 goes in Carry) ; b0 or PortB = CRT interrupt VSYNC active (1) inactive (0)
 	JR		c,ih_0										;; jump if VSYNC active
@@ -903,16 +941,17 @@ init_fill_loop:
 	RET
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; Draws the screen (in black) box per box. Hides the room drawing process (draw in black).
-;; Draws screen in black with an X extent from 24 (&30/2 = 48/2 = 24)
-;; to 208 (&40 + 6*24 = 208 < 209 (&D1)), Y extent from &40 to maxY.
+;; Draws the screen, box per box, all colors black to hides the room drawing process.
+;; X extent from 24 (&30/2 = 48/2 = 24) to 208 (< 209 (&D1)) (7 boxes wide)
+;; Y extent from 64 (&40) to 255 maxY. (5 boxes high)
 X_START 				EQU 	&30
 Y_START					EQU		&40
+
 .DrawBlacked:
-	LD		A,8											;; set color scheme to 8 (all Black)
+	LD		A,COLOR_SCHEME_ALLBLACK						;; set color scheme to 8 (all Black)
 	CALL 	Set_colors
-	LD		HL,&3040									;; X extent (min=&30, first block up to &40, 16 pix, 4 bytes per block);
-	LD		DE,&4057									;; Y extent (min=&40, first block up to &57, 23 lines per block)
+	LD		HL,&30 * WORD_HIGH_BYTE + &40				;; first box X extent (min=&30, first block up to &40, 16 pix, 4pix per byts (mode1) so 4 bytes per block);
+	LD		DE,&40 * WORD_HIGH_BYTE + &57				;; first box Y extent (min=&40, first block up to &57, 23 lines per block)
 dbl_loop1:
 	PUSH 	HL
 	PUSH 	DE
@@ -921,64 +960,53 @@ dbl_loop1:
 	POP 	HL
 	LD		H,L											;; get X for next block
 	LD		A,L
-	ADD 	A,24										;; First window is 16 pix (&40-&30) wide, subsequent are 24 pix (&18).
+	ADD 	A,24										;; First window is 16 pix (&40-&30) wide, subsequent are 24 pix (&18), 6 bytes.
 	LD		L,A
 	CP		209											;; &D1 = 209 pix ; Loop across the visible core of the screen.
 	JR		c,dbl_loop1
-	LD		HL,&3040									;; return to left to the screen : initial X extent
+	LD		HL,&30 * WORD_HIGH_BYTE + &40				;; return to left to the screen : initial X extent
 	LD		D,E
 	LD		A,E											;; increment Y for next box down
-	ADD 	A,42										;; First window is 17 (&57-&40), subsequent are &2A=42.
+	ADD 	A,42										;; First window is 23 lines (&57-&40), subsequent are &2A=42.
 	LD		E,A											;; Loop all the way to row 255!
 	JR		NC,dbl_loop1
 	RET
 
-;; -----------------------------------------------------------------------------------------------------------
+;; -----------------------------------------------------------------------------------------------------------CPC
 ;; This reconfigure the value of PEN 3 only from the color Scheme numer in A
-;; Note : Apparently, this is &_NOT_USED_& !
-Set_pen3_only:
+;; Note : Apparently, this is #_NOT_USED_#!
+Set_pen3_only_UNUSED:
 	CALL 	Get_color_scheme_value						;; update HL on the first color in the current color scheme
 	INC 	HL
 	INC 	HL											;; HL+3 = pick the last of the 4 colors in the scheme
 	INC 	HL
-	LD		BC,&7F03									;; select pen 3
+	LD		BC,GATEARRAY_PENS+3							;; select pen 3
 	LD		E,1											;; only 1 pen to setup
 	JP		program_Gate_array_colors					;; program_Gate_array_colors
 
-;; -----------------------------------------------------------------------------------------------------------
+;; -----------------------------------------------------------------------------------------------------------CPC
 ;; Reconfigure the CRTC to setup the color Scheme, from the color Scheme
-;; number in A.
-;; 		Color Scheme 00 : Black, Blue, Red, Pastel_yellow
-;; 		Color Scheme 01 : Black, Red, Mauve, Pastel_yellow
-;; 		Color Scheme 02 : Black, Magenta, DarkGreen, Pastel_yellow
-;; 		Color Scheme 03 : Black, Grey, Purple, Pastel_yellow
-;; 		Color Scheme 04 : Black, DarkGreen, Red, White
-;; 		Color Scheme 05 : Black, Red, DarkGreen, White
-;; 		Color Scheme 06 : Black, DarkCyan, Orange, White
-;; 		Color Scheme 07 : Black, Red, Blue, Pastel_yellow
-;; 		Color Scheme 08 : Black, Black, Black, Black (Screen Off)
-;; 		Color Scheme 09 : Grey, DarkBlue, DarkRed, Yellow
-;; 		Color Scheme 0A : DarkRed, Yellow, Cyan, Pink
+;; number in A (0 to 10, 8 is "All black").
 .Set_colors:
 	CALL 	Get_color_scheme_value						;; HL = pointer on color Scheme data
-	LD		BC,&7F10									;; Gate array BORDER select
-	LD		E,1											;; number of colors to update (1 border)
+	LD		BC,GATEARRAY_BORDER							;; Gate array BORDER select
+	LD		E,1											;; number of colors to update (1: border)
 	CALL 	program_Gate_array_colors					;; program_Gate_array_colors
 	DEC 	HL											;; reuse last color (Border color), for pen 0
-	LD		E,4											;; need to set 4 pens (0 to 3)
-	LD		BC,&7F00									;; Select pen 0
+	LD		E,4											;; now need to set 4 pens (0 to 3)
+	LD		BC,GATEARRAY_PENS							;; Select pen 0
 program_Gate_array_colors:
 	OUT 	(C),C										;; Tell Gate array which pen we want to setup
 	INC 	C											;; prepare for next pen
 	LD		A,(HL)										;; get current color
-	OR		&40											;; convert HW color to firmware color
+	OR		GATEARRAY_INKS and WORD_LOW_BYTE			;; convert HW color to firmware color
 	OUT 	(C),A										;; write color value for current pen in GareArray
 	INC 	HL											;; next data
 	DEC 	E											;; nb_pens--
 	JR		NZ,program_Gate_array_colors				;; loop until we have done the 4 pens
 	RET
 
-;; -----------------------------------------------------------------------------------------------------------
+;; -----------------------------------------------------------------------------------------------------------CPC
 ;; This converts the color Scheme number in A to the pointer in HL
 ;; on the Color Scheme data.
 .Get_color_scheme_value:
@@ -990,21 +1018,41 @@ program_Gate_array_colors:
 	ADD 	HL,DE										;; HL points on the 4 bytes defining the colors in the scheme
 	RET
 
-;; -----------------------------------------------------------------------------------------------------------
+;; -----------------------------------------------------------------------------------------------------------CPC
 ;; Table for the Color Scheme 4 colors
 ;; (Index = color Scheme number * 4)
+C_GREY					EQU		&00
+C_CREAM					EQU		&03
+C_DKBLUE				EQU		&04
+C_PURPLE				EQU		&05
+C_DKCYAN				EQU		&06
+C_PINK					EQU		&07
+C_YELLOW				EQU		&0A
+C_WHITE					EQU		&0B
+C_RED					EQU		&0C
+C_ORANGE				EQU		&0E
+C_CYAN					EQU		&13
+C_BLACK					EQU		&14
+C_BLUE					EQU		&15
+C_DKGREEN				EQU		&16
+C_MAGENTA				EQU		&18
+C_DARKRED				EQU		&1C
+C_MAUVE					EQU		&1D
+
+COLOR_SCHEME_ALLBLACK	EQU		8
+
 array_Color_Schemes:
-	DEFB 	&14, &15, &0C, &03			;; Color Scheme 00 : Black, Blue, Red, Pastel_yellow
-	DEFB 	&14, &0C, &1D, &03			;; Color Scheme 01 : Black, Red, Mauve, Pastel_yellow (used in one before last room for exemple)
-	DEFB 	&14, &18, &16, &03			;; Color Scheme 02 : Black, Magenta, DarkGreen, Pastel_yellow
-	DEFB 	&14, &00, &05, &03			;; Color Scheme 03 : Black, Grey, Purple, Pastel_yellow
-	DEFB 	&14, &16, &0C, &0B			;; Color Scheme 04 : Black, DarkGreen, Red, White
-	DEFB 	&14, &0C, &16, &0B			;; Color Scheme 05 : Black, Red, DarkGreen, White
-	DEFB 	&14, &06, &0E, &0B			;; Color Scheme 06 : Black, DarkCyan, Orange, White (Exemple : screen showing the worlds/crowns ("The Blacktooth Empire") or the "Salute you" screen); note DarkCyan is a vert-de-gris kinda color
-	DEFB 	&14, &0C, &15, &03			;; Color Scheme 07 : Black, Red, Blue, Pastel_yellow (This is probably the one for Room 1)
-	DEFB 	&14, &14, &14, &14			;; Color Scheme 08 : Black, Black, Black, Black (Screen Off)
-	DEFB 	&00, &04, &1C, &0A			;; Color Scheme 09 : Grey, DarkBlue, DarkRed, Yellow (Exemple: Game, Controls, Sound and Sensitivity menues)
-	DEFB 	&1C, &0A, &13, &07			;; Color Scheme 0A : DarkRed, Yellow, Cyan, Pink (Exemple: Main menu)
+	DEFB 	C_BLACK,   C_BLUE, 	  C_RED, 	 C_CREAM		;; Color Scheme 00 : Black, Blue, Red, Pastel_yellow
+	DEFB 	C_BLACK,   C_RED, 	  C_MAUVE, 	 C_CREAM		;; Color Scheme 01 : Black, Red, Mauve, Pastel_yellow (used in one before last room for exemple)
+	DEFB 	C_BLACK,   C_MAGENTA, C_DKGREEN, C_CREAM		;; Color Scheme 02 : Black, Magenta, DarkGreen, Pastel_yellow
+	DEFB 	C_BLACK,   C_GREY, 	  C_PURPLE,	 C_CREAM		;; Color Scheme 03 : Black, Grey, Purple, Pastel_yellow
+	DEFB 	C_BLACK,   C_DKGREEN, C_RED, 	 C_WHITE		;; Color Scheme 04 : Black, DarkGreen, Red, White
+	DEFB 	C_BLACK,   C_RED, 	  C_DKGREEN, C_WHITE		;; Color Scheme 05 : Black, Red, DarkGreen, White
+	DEFB 	C_BLACK,   C_DKCYAN,  C_ORANGE,	 C_WHITE		;; Color Scheme 06 : Black, DarkCyan, Orange, White (Exemple : screen showing the worlds/crowns ("The Blacktooth Empire") or the "Salute you" screen); note DarkCyan is a vert-de-gris kinda color
+	DEFB 	C_BLACK,   C_RED, 	  C_BLUE, 	 C_CREAM		;; Color Scheme 07 : Black, Red, Blue, Pastel_yellow (This is probably the one for Room 1)
+	DEFB 	C_BLACK,   C_BLACK,   C_BLACK, 	 C_BLACK		;; Color Scheme 08 : Black, Black, Black, Black (Screen Off)
+	DEFB 	C_GREY,    C_DKBLUE,  C_DARKRED, C_YELLOW		;; Color Scheme 09 : Grey, DarkBlue, DarkRed, Yellow (Exemple: Game, Controls, Sound and Sensitivity menues)
+	DEFB 	C_DARKRED, C_YELLOW,  C_CYAN, 	 C_PINK			;; Color Scheme 0A : DarkRed, Yellow, Cyan, Pink (Exemple: Main menu)
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Look-up the char ID in A (note: this value already had a minus &20)
@@ -1049,7 +1097,7 @@ array_Color_Schemes:
 ;;                         C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  C  Z								CP 18
 ;;                                                                                     14 15 16 17 18 19 1A 1B 1C ... new A = A - &04
 ;; -----------------------------------------------------------------------------------------------------------
-;; Convert the CharCode - &20 to Symbol data address in DE
+;; Convert the CharCode - &20 to a Symbol data address in DE
 .Char_code_to_Addr:
 	CP		&08											;; comp with 8 ("charcode - &20" compared with &08)
 	JR		c,cc2a_0									;; jump if charcode < ID&28 (icons) else:
@@ -1070,12 +1118,12 @@ cc2a_0:
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Provides 2 functions:
-;; 	* Clear_mem_array_at_6700: This will be implicitely CALLed by
+;; 	* Clear_View_Buffer: This will be implicitely CALLed by
 ;; 			the RET of the blit subroutines (blit_sub_subroutine_1 to 6)
 ;;			It erases the sprite buffer.
 ;;	* Clear_mem_array_256bytes: This will erase a memory block from the
 ;;			addr value in HL (Starts at HL, HL++ and until Lmax = &FF)
-.Clear_mem_array_at_6700:
+.Clear_View_Buffer:
 	LD		HL,ViewBuff									;; init buffer addr
 .Clear_mem_array_256bytes:
 	XOR 	A											;; erase value = &00
@@ -1094,7 +1142,7 @@ cma_loop:
 ;; -----------------------------------------------------------------------------------------------------------
 ;; BlitScreen copies from ViewBuff to the screen coordinates of
 ;; ViewYExtent and ViewXExtent. The X extent can be from 1 up to 6 bytes
-;; (4 pix per bytes, 24 double pixels).
+;; (4 pix per bytes, so up to 24 double pixels).
 ;; The "Extent" are Max,Min values.
 ;; At the end, the selected blit subroutine (having been pushed on the stack)
 ;; is implicitely CALLed by the RET (and so is the Erase function).
@@ -1119,8 +1167,8 @@ cma_loop:
 	LD		D,&00										;; DE is the offset in the Sub_routines_table to get the addr of the blit subroutine to call
 	LD		HL,Sub_routines_table
 	ADD 	HL,DE										;; HL points on the subroutine addr pointer
-	LD		DE,Clear_mem_array_at_6700					;; The addr of the Clear_mem_array_6700_256bytes routine
-	PUSH 	DE											;; is put on the stack for next RET so that next ret will branch on it
+	LD		DE,Clear_View_Buffer						;; The addr of the Clear_mem_array_6700_256bytes routine
+	PUSH 	DE											;; is put on the Stack for next RET so that next ret will branch on it
 	LD		E,(HL)
 	INC 	HL
 	LD		D,(HL)										;; DE now has the selected blit subroutine addr
@@ -1136,7 +1184,7 @@ smc_BlitYOffset_value:
 	LD		B,A											;; topleft Y
 	CALL 	Get_screen_mem_addr							;; Screen address (from topleft point YX in BC) is now in DE
 	EX		AF,AF'										;; restore minY
-	LD		B,BlitBuff / 256							;; use the BC = &6600+X table index as input of the selected blit_sub_subroutine_1 to 6 that will be called at RET
+	LD		B,BlitBuff / WORD_HIGH_BYTE					;; use the BC = &6600+X table index as input of the selected blit_sub_subroutine_1 to 6 that will be called at RET
 	LD		HL,ViewBuff									;; use the HL = Buffer at &6700 as input for the selected blit_sub_subroutine_1 to 6 that will be called at RET
 	RET													;; This RET will CALL the selected blit subroutine pushed on the Stack!
 
@@ -1159,13 +1207,13 @@ smc_BlitYOffset_value:
 ;; They use the table initialized at 6600-66FF and a buffer at 6700-67FF.
 ;; Input: HL = image location; DE = screen location, size in lines in B.
 ;; Note : HL buffer must be 6 bytes wide.
-;; The RET will implicitely CALL the Clear_mem_array_at_6700 (that has
+;; The RET will implicitely CALL the Clear_View_Buffer (that has
 ;; been pushed on the Stack)
 .blit_sub_subroutine_1:
 	EX		AF,AF'
-	LD		C,(HL)											;; get C from 6700 buffer
+	LD		C,(HL)								;; get C from 6700 buffer
 	INC 	H
-	LD		A,(BC)											;; get the index in 6600 table from BC = table + X
+	LD		A,(BC)								;; get the index in 6600 table from BC = table + X
 	XOR 	(HL)
 	AND 	&0F
 	XOR 	(HL)
@@ -1184,11 +1232,11 @@ smc_BlitYOffset_value:
 	INC 	L
 	INC 	L
 	INC 	L
-	LD		BC,&FFFF										;; -1
+	LD		BC,&FFFF							;; -1
 	EX		DE,HL
 	ADD 	HL,BC
 	EX		DE,HL
-	LD		B,BlitBuff / 256								;; Table values at &6600 + X (X in C)
+	LD		B,BlitBuff / WORD_HIGH_BYTE			;; Table values at &6600 + X (X in C)
 	LD		A,D
 	ADD 	A,&08
 	LD		D,A
@@ -1255,7 +1303,7 @@ blit_ss_1:
 	EX		DE,HL
 	ADD 	HL,BC
 	EX		DE,HL
-	LD		B,BlitBuff / 256									;; Table values at &6600 + C
+	LD		B,BlitBuff / WORD_HIGH_BYTE				;; Table values at &6600 + C
 	LD		A,D
 	ADD 	A,&08
 	LD		D,A
@@ -1338,7 +1386,7 @@ blit_ss_2:
 	EX		DE,HL
 	ADD 	HL,BC
 	EX		DE,HL
-	LD		B,BlitBuff / 256									;; Table values at &6600 + C
+	LD		B,BlitBuff / WORD_HIGH_BYTE				;; Table values at &6600 + C
 	LD		A,D
 	ADD 	A,&08
 	LD		D,A
@@ -1437,7 +1485,7 @@ blit_ss_3:
 	EX		DE,HL
 	ADD 	HL,BC
 	EX		DE,HL
-	LD		B,BlitBuff / 256								;; Table values at &6600 + C
+	LD		B,BlitBuff / WORD_HIGH_BYTE				;; Table values at &6600 + C
 	LD		A,D
 	ADD 	A,&08
 	LD		D,A
@@ -1552,7 +1600,7 @@ blit_ss_4:
 	EX		DE,HL
 	ADD 	HL,BC
 	EX		DE,HL
-	LD		B,BlitBuff / 256									;; Table values at &6600 + C
+	LD		B,BlitBuff / WORD_HIGH_BYTE				;; Table values at &6600 + C
 	LD		A,D
 	ADD 	A,&08
 	LD		D,A
@@ -1683,14 +1731,14 @@ blit_ss_5:
 	EX		DE,HL
 	ADD 	HL,BC
 	EX		DE,HL
-	LD		B,BlitBuff / 256									;; Table values at &6600 + C
+	LD		B,BlitBuff / WORD_HIGH_BYTE				;; Table values at &6600 + C
 	LD		A,D
 	ADD 	A,&08
 	LD		D,A
 	JR		c,blit_ss_6
 	EX		AF,AF'
 	DEC 	A
-	JP		NZ,blit_sub_subroutine_6							;; loop if NZ todo_subroutine_6
+	JP		NZ,blit_sub_subroutine_6				;; loop if NZ todo_subroutine_6
 	RET
 
 blit_ss_6:
@@ -1700,13 +1748,13 @@ blit_ss_6:
 	ADC 	A,D
 	SUB 	E
 	SUB 	&40
-	LD		D,A													;; DE = DE + 50 - 4000
+	LD		D,A											;; DE = DE + 50 - 4000
 	EX		AF,AF'
 	DEC 	A
-	JP		NZ,blit_sub_subroutine_6							;; loop if NZ todo_subroutine_6
+	JP		NZ,blit_sub_subroutine_6					;; loop if NZ todo_subroutine_6
 	RET
 
-;; -----------------------------------------------------------------------------------------------------------
+;; -----------------------------------------------------------------------------------------------------------CPC
 ;; This is the CPC screen mem address calculation from the pixel we target.
 ;; Input: B = y (line),
 ;;        C = x single-pixel coordinate (in mode 1 real x is double that value).
@@ -1734,7 +1782,7 @@ SCREEN_LENGTH			EQU		&4000
 	LD		E,A
 	ADC 	A,B											;; ...does...
 	SUB 	E
-	OR		SCREEN_ADDR_START / 256
+	OR		SCREEN_ADDR_START / WORD_HIGH_BYTE
 	LD		D,A											;; ... DE = C000 + BC + A
 	RET
 
@@ -1800,7 +1848,7 @@ clr_screen:																	;; Finally clear the screen
 ;; Source in DE, dest coords in BC, size in HL (H height, L width)
 ;; Attribute "color style" in A (1 = shadow mode, 3 = color mode)
 ;; (X measured in double-pixels, centered on &80)
-;; Top of screen is Y = 0, for once.
+;; Top of screen is Y = 8, for once.
 .Draw_Sprite:
 	PUSH 	DE											;; DE has the char symbol pointer or sprite source
 	PUSH 	AF											;; A have the attribute (color style) number
@@ -1869,17 +1917,13 @@ drwspr_4:
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; String attributes
-Delimiter 						EQU		&FF
 Print_WipeScreen				EQU		&00
 Print_NewLine					EQU		&01
 Print_ClrEOL					EQU		&02
 Print_SingleSize				EQU		&03
 Print_DoubleSize				EQU		&04
 Print_ColorAttr					EQU		&05
-Print_Color_Attr_1				EQU		&81
-Print_Color_Attr_2				EQU		&82
-Print_Color_Attr_3				EQU		&83
-Print_SetPosition				EQU		&06
+Print_SetPos					EQU		&06
 Print_ColorScheme				EQU		&07
 Print_Arrow_1					EQU		&21
 Print_Arrow_2					EQU		&22
@@ -1887,80 +1931,86 @@ Print_Arrow_3					EQU		&23
 Print_Arrow_4					EQU		&24
 Print_Icon_Speed				EQU		&25
 Print_Icon_Spring				EQU		&26
-Print_Icon_Sheild				EQU		&27
-Print_StrID_Title_Instr			EQU		&99
-Print_StrID_Old_Game			EQU		&A0
-Print_StrID_Enter2Finish		EQU		&A5
-Print_StrID_SelectKeys			EQU		&A6
-Print_StrID_ShiftToFinish		EQU		&A7
-Print_StrID_ChooseNewKey		EQU		&A8
-Print_StrID_SoundMenu			EQU		&A9
-Print_StrID_SensMenu			EQU		&AA
-Print_StrID_PlayOldNew			EQU		&AB
-Print_StringID_Paused 			EQU		&AC
+Print_Icon_Shield				EQU		&27
+Print_PLAY 						EQU 	&80
+Print_Color_Attr_1				EQU		&81
+Print_Color_Attr_2				EQU		&82
+Print_Color_Attr_3				EQU		&83
+Print_THE						EQU		&84
+Print_GAME 						EQU 	&85
+Print_SELECT 					EQU		&86
+Print_KEY						EQU		&87
+Print_ANYKEY					EQU 	&88
+Print_SENSITIVITY				EQU		&89
+Print_PRESS_2					EQU		&8A
+Print_TO						EQU		&8B
+Print_RET						EQU		&8C
+Print_SHIFT						EQU		&8D
+Print_Left						EQU		&8E
+Print_Lots						EQU		&96
+Print_Title_Instr				EQU		&99
+Print_Play_Game					EQU		&9A
+Print_SelKey					EQU		&9B
+Print_AdjustSnd					EQU		&9C
+Print_CtrlSens					EQU		&9D
+Print_High						EQU		&9E
+Print_Old_Game					EQU		&A0
+Print_PRESS						EQU		&A3
+Print_Enter2Finish				EQU		&A5
+Print_SelectKeys				EQU		&A6
+Print_ShiftToFinish				EQU		&A7
+Print_ChooseNewKey				EQU		&A8
+Print_SoundMenu					EQU		&A9
+Print_SensMenu					EQU		&AA
+Print_PlayOldNew				EQU		&AB
+Print_Paused 					EQU		&AC
+Print_Spaces					EQU		&AD
+Print_Arrow_Sel_Menu			EQU		&AE
+Print_Arrow_Unsel_menu			EQU		&AF
 Print_Wipe_DblSize_pos			EQU		&B0
 Print_HUD_Counters_pos			EQU		&B1
-Print_StringID_Icons			EQU		&B8
+Print_FreedomPOS				EQU		&B6
+Print_Icons						EQU		&B8
 Print_SingleSize_at_pos			EQU		&B9
-Print_StrID_TitleBanner			EQU		&BA
-Print_StringID_Explored			EQU		&BB
-Print_StringID_RoomsScore		EQU		&BC
-Print_StringID_Liberated		EQU		&BD
-Print_StringID_Planets			EQU		&BE
-Print_Array_StrID_Rank			EQU		&BF
-Print_StringID_Emperor			EQU		&C4
-Print_StringID_Wipe_BTEmpire	EQU		&C6
-Print_StringID_Freedom			EQU		&C9
-Print_StringID_Wipe_Salute		EQU		&CA
+Print_TitleBanner				EQU		&BA
+Print_Explored					EQU		&BB
+Print_RoomsScore				EQU		&BC
+Print_Liberated					EQU		&BD
+Print_Planets					EQU		&BE
+Print_Array_Rank				EQU		&BF
+Print_Emperor					EQU		&C4
+Print_TitleScreen				EQU		&C5
+Print_Wipe_BTEmpire				EQU		&C6
+Print_BLACKTOOTH				EQU		&C7
+Print_FINISH					EQU		&C8
+Print_Freedom					EQU		&C9
+Print_Wipe_Salute				EQU		&CA
+Print_RETURN					EQU		&E0
+Print_K_ESC						EQU		&E2
+Print_JOY						EQU		&E8
+Delimiter 						EQU		&FF
+
+Color_Rainbow					EQU		0
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Some keyboard related strings
 .String_Table_Kb:
-	DEFB 	Delimiter							;; Delimiter (ID &E0)
-	DEFB 	"RETURN"     						;; String "RETURN"
-	DEFB 	Delimiter							;; Delimiter (ID &E1)
-	DEFB 	Print_Color_Attr_3					;; Pointer on String ID &83
-	DEFB 	"LOCK"								;; String "LOCK"
-	DEFB 	Delimiter							;; Delimiter (ID &E2)
-	DEFB 	Print_Color_Attr_3					;; Pointer on String ID &83
-	DEFB 	"ESC"								;; String "ESC"
-	DEFB 	Delimiter							;; Delimiter (ID &E3)
-	DEFB 	Print_Color_Attr_3					;; Pointer on String ID &83
-	DEFB 	"TAB"								;; String "TAB"
-	DEFB 	Delimiter							;; Delimiter (ID &E4)
-	DEFB 	Print_Color_Attr_3					;; Pointer on String ID &83
-	DEFB 	"DEL"								;; String "DEL"
-	DEFB 	Delimiter							;; Delimiter (ID &E5)
-	DEFB 	Print_Color_Attr_3					;; Pointer on String ID &83
-	DEFB 	"CTRL"								;; String "CTRL"
-	DEFB 	Delimiter							;; Delimiter (ID &E6)
-	DEFB 	Print_Color_Attr_3					;; Pointer on String ID &83
-	DEFB 	"COPY"								;; String "COPY"
-	DEFB 	Delimiter							;; Delimiter (ID &E7)
-	DEFB 	Print_Color_Attr_3					;; Pointer on String ID &83
-	DEFB 	"CLR"								;; String "CLR"
-	DEFB 	Delimiter							;; Delimiter (ID &E8)
-	DEFB 	Print_Color_Attr_1					;; Pointer on String ID &81
-	DEFB 	"JOY"								;; String "JOY"
-	DEFB 	Delimiter							;; Delimiter (ID &E9)
-	DEFB 	&E8									;; Pointer on String ID &E8 ("|JOY")
-	DEFB 	"F"									;; String "F"
-	DEFB 	Delimiter							;; Delimiter (ID &EA)
-	DEFB 	&E8									;; Pointer on String ID &E8 ("|JOY")
-	DEFB 	"U"									;; String "U"
-	DEFB 	Delimiter							;; Delimiter (ID &EB)
-	DEFB 	&E8									;; Pointer on String ID &E8 ("|JOY")
-	DEFB 	"D"									;; String "D"
-	DEFB 	Delimiter							;; Delimiter (ID &EC)
-	DEFB 	&E8									;; Pointer on String ID &E8 ("|JOY")
-	DEFB 	"R"									;; String "R"
-	DEFB 	Delimiter							;; Delimiter (ID &ED)
-	DEFB 	&E8									;; Pointer on String ID &E8 ("|JOY")
-	DEFB 	"L"									;; String "L"
-	DEFB 	Delimiter							;; Delimiter (ID &EE)
-	DEFB 	Print_Color_Attr_3					;; Pointer on String ID &83
-	DEFB 	"SPACE"								;; String "SPACE"
-	DEFB 	Delimiter							;; Delimiter (ID &EF)
+	DEFB 	Delimiter, "RETURN"     					;; ID &E0 : String "RETURN"
+	DEFB 	Delimiter, Print_Color_Attr_3, "LOCK"		;; ID &E1 : Pointer on String ID &83, String "LOCK"
+	DEFB 	Delimiter, Print_Color_Attr_3, "ESC"		;; ID &E2 : Pointer on String ID &83, String "ESC"
+	DEFB 	Delimiter, Print_Color_Attr_3, "TAB"		;; ID &E3 : Pointer on String ID &83, String "TAB"
+	DEFB 	Delimiter, Print_Color_Attr_3, "DEL"		;; ID &E4 : Pointer on String ID &83, String "DEL"
+	DEFB 	Delimiter, Print_Color_Attr_3, "CTRL"		;; ID &E5 : Pointer on String ID &83, String "CTRL"
+	DEFB 	Delimiter, Print_Color_Attr_3, "COPY"		;; ID &E6 : Pointer on String ID &83, String "COPY"
+	DEFB 	Delimiter, Print_Color_Attr_3, "CLR"		;; ID &E7 : Pointer on String ID &83, String "CLR"
+	DEFB 	Delimiter, Print_Color_Attr_1, "JOY"		;; ID &E8 : Pointer on String ID &81, String "JOY"
+	DEFB 	Delimiter, Print_JOY, "F"					;; ID &E9 : Pointer on String ID &E8 ("|JOY"), String "F"
+	DEFB 	Delimiter, Print_JOY, "U"					;; ID &EA : Pointer on String ID &E8 ("|JOY"), String "U"
+	DEFB 	Delimiter, Print_JOY, "D"					;; ID &EB : Pointer on String ID &E8 ("|JOY"), String "D"
+	DEFB 	Delimiter, Print_JOY, "R"					;; ID &EC : Pointer on String ID &E8 ("|JOY"), String "R"
+	DEFB 	Delimiter, Print_JOY, "L"					;; ID &ED : Pointer on String ID &E8 ("|JOY"), String "L"
+	DEFB 	Delimiter, Print_Color_Attr_3, "SPACE"		;; ID &EE : Pointer on String ID &83, String "SPACE"
+	DEFB 	Delimiter									;; End Delimiter (ID &EF)
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Reminder: ASCII table:
@@ -1988,17 +2038,25 @@ Print_StringID_Wipe_Salute		EQU		&CA
 ;; This table will be used to convert a keyboard key code to a printable char or string.
 ;; (scan line * 8) + bitnb, or can be seen as [7:3]=scan line and [2:0]=bitnb.
 ;; These are therefore listed in the keyboard scan order: line0 to line9 and bit 0 to 7
-.Char_Set:		              												;;     bit:  0    1    2   3     4   5    6    7
-	DEFB 	&5E, &60, &5F, &39, &36, &33, &8C, &2E		;; (line 0) "Up", "Right", "Down", "9", "6", "3", "|RETURN", "."
-	DEFB 	&61, &E6, &37, &38, &35, &31, &32, &30		;; (line 1) "Left", "COPY", "7", "8", "5", "1", "2", 0"
-	DEFB 	&E7, &5B, &8C, &5D, &34, &8D, &5C, &E5		;; (line 2) "CLR", "[", "|RETURN", "]", "4", "|SHIFT", "\", "CTRL"
-	DEFB 	&5E, &2D, &40, &50, &3B, &3A, &2F, &2E		;; (line 3) "^", "-", "@", "P", ";", ":", "/", ","
-	DEFB 	&30, &39, &4F, &49, &4C, &4B, &4D, &2C		;; (line 4) "0", "9", "O", "I", "L", "K", "M", "."
-	DEFB 	&38, &37, &55, &59, &48, &4A, &4E, &EE		;; (line 5) "8", "7", "U", "Y", "H", "J", "N", "SPACE"
-	DEFB 	&36, &35, &52, &54, &47, &46, &42, &56		;; (line 6) "6", "5", "R", "T", "G", "F", "B", "V"
-	DEFB 	&34, &33, &45, &57, &53, &44, &43, &58		;; (line 7) "4", "3", "E", "W", "S", "D", "C", "X"
-	DEFB 	&31, &32, &E2, &51, &E3, &41, &E1, &5A		;; (line 8) "1", "2", ESC, "Q", TAB, "A", LOCK, "Z"
-	DEFB 	&EA, &EB, &ED, &EC, &E9, &E9, &58, &E4		;; (line 9) JOYU, JOYD, JOYL, JOYR, JOYF, JOYF, (unused), DEL
+;; For instance the &E6 (line1, bit1) is related to the string ID &E6 (see &092B)
+;; whereas the &36 (line6, bit0) is the symbol for "6", and the &8C 'line0, bit6) is
+;; the String ID &8C ie Print_RET.
+.Char_Set:		              												;;   bit:  0    1    2   3     4   5    6    7
+	DEFB 	&5E, &60, &5F, &39, &36, &33, &8C, &2E		;; line 0 "Up", "Right", "Down", "9", "6", "3", "|RETURN", "."
+	DEFB 	&61, &E6, &37, &38, &35, &31, &32, &30		;; line 1 "Left", "COPY", "7", "8", "5", "1", "2", 0"
+	DEFB 	&E7, &5B, &8C, &5D, &34, &8D, &5C, &E5		;; line 2 "CLR", "[", "|RETURN", "]", "4", "|SHIFT", "\", "CTRL"
+	DEFB 	&5E, &2D, &40, &50, &3B, &3A, &2F, &2E		;; line 3 "^", "-", "@", "P", ";", ":", "/", ","
+	DEFB 	&30, &39, &4F, &49, &4C, &4B, &4D, &2C		;; line 4 "0", "9", "O", "I", "L", "K", "M", "."
+	DEFB 	&38, &37, &55, &59, &48, &4A, &4E, &EE		;; line 5 "8", "7", "U", "Y", "H", "J", "N", "SPACE"
+	DEFB 	&36, &35, &52, &54, &47, &46, &42, &56		;; line 6 "6", "5", "R", "T", "G", "F", "B", "V"
+	DEFB 	&34, &33, &45, &57, &53, &44, &43, &58		;; line 7 "4", "3", "E", "W", "S", "D", "C", "X"
+	DEFB 	&31, &32, &E2, &51, &E3, &41, &E1, &5A		;; line 8 "1", "2", ESC, "Q", TAB, "A", LOCK, "Z"
+	DEFB 	&EA, &EB, &ED, &EC, &E9, &E9, &58, &E4		;; line 9 JOYU, JOYD, JOYL, JOYR, JOYF, JOYF, (unused), DEL
+
+KEPMAP_RETURN			EQU		2 * 8 + 2		;; &12 : line=2, bitnb=2, "Enter/Return" key
+KEPMAP_4				EQU		2 * 8 + 4		;; &14 : line=1, bitnb=4, "4" key
+KEPMAP_SHIFT			EQU		2 * 8 + 5		;; &15 : line=2, bitnb=5, "Shift" key
+KEPMAP_ESC				EQU		8 * 8 + 2		;; &42 : line=8, bitnb=2, "ESC" key
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; These are the map codes for the keyboard (CPC 6128) when scanning the
@@ -2006,7 +2064,10 @@ Print_StringID_Wipe_Salute		EQU		&CA
 ;; For exemple, if, while scanning the keyboard lines, at line1, bit0,
 ;; (current offset = 1*8 + 0 = 8 (9th value)) the value returned by the
 ;; AY-3 is "FE", the matching (reg OR map) will result in "FE" (ie. non-FF)
-;; indicating that the "Left" arrow key is being pressed. (active low)
+;; indicating that the "Left" arrow key is being pressed. (active low).
+;; In other words, if (only) the Right key is pressed, since it corresponds
+;; to bit1, the line0 will return &FD (bit1=0, others are 1), hence the &FD
+;; at index 1 below, which will match that we want to do "Right" when scanning line0.
 .Array_Key_map:			;;		Lft  Rgt  Dwn  Up _ Jmp  Cry  Fir  Swp		;			Left  Rgt   Down  Up   Jump  Carry  Fire  Swop
 	DEFB 	&FF, &FD, &FB, &FE, &FF, &1F, &EF, &F7		;; line 0 : ___ , RGT , DWN , UP  , ___ , RET3., F6 ,  F9
 	DEFB 	&FE, &FF, &FF, &FF, &FD, &1F, &EF, &F3		;; line 1 : Left, ___ , ___ , ___ , Copy, F120,  F5 , F7F8
@@ -2019,6 +2080,8 @@ Print_StringID_Wipe_Salute		EQU		&CA
 	DEFB 	&FF, &FF, &FF, &FF, &FF, &FF, &FF, &FF		;; line 8 : nothing
 	DEFB 	&FB, &F7, &FD, &FE, &EF, &FF, &FF, &FF		;; line 9 : JoyL, JoyR, JoyD, JoyU, JoF2, ___ , ___ , ___
 
+KB_SCAN_LINES			EQU		10
+
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Scan the keyboard;
 ;; Output: A = 0: a key was pressed;
@@ -2028,19 +2091,19 @@ Print_StringID_Wipe_Salute		EQU		&CA
 .Scan_keyboard:
 	LD		HL,KeyScanningBuffer						;; buffer for scanned keys
 	CALL 	Keyboard_scanning_setup						;; init key board scanning
-	LD		C,&40										;; Select keyboard line scanning 0 (BC=F740)
+	LD		C,PSG_REG_READ and WORD_LOW_BYTE			;; Select keyboard line scanning 0 (BC=F640)
 scan_loop_1:
-	LD		B,&F6										;; Setup PSG (Keyboard feature) for Read reg (BC=F640)
+	LD		B,PSG_KB_LINESEL / WORD_HIGH_BYTE			;; Setup PSG (Keyboard feature) for Read reg (BC=F640)
 	OUT 	(C),C
-	LD		B,&F4										;; BC=F4xx
-	IN		A,(C)										;; ead line status (Read keyboard line 0)
+	LD		B,PSG_PORTA / WORD_HIGH_BYTE				;; BC=F4xx
+	IN		A,(C)										;; Read line status (Read keyboard line 0)
 	INC 	A
 	JR		NZ,find_key_pressed							;; if was not FF (something was pressed then find_key_pressed), else:
 	INC 	HL											;; next line
 	INC 	C											;; next key
 	LD		A,C
 	AND 	&0F
-	CP		10											;; have we reached last keyboard line?
+	CP		KB_SCAN_LINES								;; have we reached last keyboard line?
 	JR		c,scan_loop_1								;; no: scan_loop_1, else :
 	CALL 	Keyboard_scanning_ending					;; end keyboard scanning
 	INC 	A											;; Return with A != 0 : nothing pressed
@@ -2048,7 +2111,7 @@ scan_loop_1:
 
 find_key_pressed:
 	DEC 	A											;; restore real line scan value (INC A done at 0A02)
-	LD		BC,&FF7F          							;; this will produce B=0 and C=FE
+	LD		BC,&FF * WORD_HIGH_BYTE + &7F        		;; this will produce B=0 and C=FE
 fkp_1:
 	RLC 	C
 	INC 	B
@@ -2068,14 +2131,14 @@ fkp_1:
 	RET
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; Given a Char_Set key code index in B, get the printable character for it in A.
+;; From a Char_Set key code index in B, get the printable character in A.
 ;; eg. B = &26 will return A = &4D ("M", keyboard scan line 4 in B[7:3],
 ;; bitnb=6 in B[2:0], or B=(4*8)+6 = 38 = &26)
 .GetCharStrId:
 	LD		A,B
-	ADD 	A,Char_Set and &00FF						;; &52 = Char_Set & &00FF
+	ADD 	A,Char_Set and WORD_LOW_BYTE				;; &52 = Char_Set & &00FF
 	LD		L,A
-	ADC 	A,Char_Set / 256							;; &09 = (Char_Set & &FF00) >> 8 + char_offset in B
+	ADC 	A,Char_Set / WORD_HIGH_BYTE					;; &09 = (Char_Set & &FF00) >> 8 + char_offset in B
 	SUB 	L
 	LD		H,A											;; HL = Char_Set + char_offset
 	LD		A,(HL)										;; get printable code in A
@@ -2098,10 +2161,10 @@ fkp_1:
 	RET 	NZ											;; RET (with Carry=1) if nothing pressed
 	LD		A,B											;; key map index ((scanline*8)+bitnb)
 	LD		C,0											;; prepare output value C=0
-	CP		&12											;; test if line=B[7:3]=2 and bitnb=B[2:0]=2, in other words the "Enter/Return" key
+	CP		KEPMAP_RETURN								;; test if line=B[7:3]=2 and bitnb=B[2:0]=2, in other words the "Enter/Return" key
 	RET 	Z											;; if "Enter/Return" key pressed, exit with BC=xx00, Carry=0
 	INC 	C											;; output value: C=1
-	CP		&15											;; test if line=B[7:3]=2 and bitnb=B[2:0]=5, in other word the "Shift" key
+	CP		KEPMAP_SHIFT								;; test if line=B[7:3]=2 and bitnb=B[2:0]=5, in other word the "Shift" key
 	RET 	Z											;; else if "Shift" key pressed, exit with BC=xx01, Carry=0
 	INC 	C											;; output value: C=2
 	XOR 	A											;; A=0, Carry = 0
@@ -2123,13 +2186,13 @@ fkp_1:
 	CALL 	Get_Key_Map_Addr
 	LD		C,0
 lc_3:
-	LD		A,(HL)
+	LD		A,(HL)										;; get map
 	LD		B,&FF
 lc_0:
-	CP		&FF
-	JR		Z,lc_2
+	CP		&FF											;; is it FF?
+	JR		Z,lc_2										;; yes, jump lc_2
 lc_1:
-	INC 	B
+	INC 	B											;; else:
 	SCF
 	RRA
 	JR		c,lc_1
@@ -2140,14 +2203,14 @@ lc_1:
 	PUSH 	BC
 	LD		B,A
 	CALL 	GetCharStrId
-	CALL 	PrintCharAttr2									;; clear the end of line
+	CALL 	PrintCharAttr2								;; clear the end of line
 	POP 	BC
 	POP 	AF
 	POP 	HL
-	JR		lc_0
+	JR		lc_0										;; loop
 
 lc_2:
-	LD		DE,&0008
+	LD		DE,8										;; 8 keys
 	ADD 	HL,DE
 	LD		A,C
 	ADD 	A,&08
@@ -2162,15 +2225,15 @@ lc_2:
 	CALL 	Get_Key_Map_Addr
 	PUSH 	HL
 	CALL 	Wait_anykey_released
-	LD		HL,KeyScanningBuffer							;; buffer to erase
-	LD		E,&FF											;; erase value = &FF
-	LD		BC,&000A										;; 10 values
+	LD		HL,KeyScanningBuffer						;; buffer to erase
+	LD		E,&FF										;; erase value = &FF
+	LD		BC,10										;; 10 values or 10 lines???
 	CALL 	Erase_block_val_in_E
 ec_wait:
-	CALL 	Scan_keyboard 									;; (returns A=0 if a key is pressed; also BC=F740)
+	CALL 	Scan_keyboard 								;; (returns A=0 if a key is pressed; also BC=F740)
 	JR		NZ,ec_wait
 	LD		A,B
-	CP		&12
+	CP		KEPMAP_RETURN
 	JR		Z,ec_1
 ec_0:
 	LD		A,C
@@ -2179,10 +2242,10 @@ ec_0:
 	LD		(HL),A
 	JR		Z,ec_wait
 	CALL 	GetCharStrId
-	CALL 	PrintCharAttr2									;; clear end of line
+	CALL 	PrintCharAttr2								;; clear end of line
 	LD		HL,(Char_cursor_pixel_position)
 	PUSH 	HL
-	LD		A,Print_StrID_Enter2Finish						;; String_ID A5 "Press Enter to finish"
+	LD		A,Print_Enter2Finish						;; String_ID A5 "Press Enter to finish"
 	CALL 	Print_String
 	CALL 	Wait_anykey_released
 	POP 	HL
@@ -2193,9 +2256,9 @@ ec_0:
 	JR		NC,ec_wait
 ec_1:
 	EXX
-	LD		HL,KeyScanningBuffer							;; buffer
+	LD		HL,KeyScanningBuffer						;; buffer
 	LD		A,&FF
-	LD		B,10											;; 10 scan lines
+	LD		B,KB_SCAN_LINES								;; 10 scan lines
 ec_1_loop:
 	CP		(HL)
 	INC 	HL
@@ -2207,9 +2270,9 @@ ec_1_loop:
 
 ec_2:
 	POP 	HL
-	LD		BC,&0008
-	LD		A,10
-	LD		DE,KeyScanningBuffer							;; buffer
+	LD		BC,8										;; 8 keys
+	LD		A,10										;; ??? KB_SCAN_LINES
+	LD		DE,KeyScanningBuffer						;; buffer
 ec_3:
 	EX		AF,AF'
 	LD		A,(DE)
@@ -2237,7 +2300,7 @@ ec_3:
 .PrintCharAttr2:
 	PUSH 	AF											;; save printable character
 	LD		A,B											;; get key code
-	CP		&14											;; compare it with &14 (key code for "4" on keyboard scan line 2 in [7:3], bitnb 4 in [2:0])
+	CP		KEPMAP_4									;; compare it with &14 (key code for "4" on keyboard scan line 2 in [7:3], bitnb 4 in [2:0])
 	JR		Z,pca2_1									;; if keycode = &14 goto pca2_1 (use color attribute &83), else:
 	CP		&10											;; compare A >= &10 (scan lines 2 and above)
 	LD		A,Print_Color_Attr_2						;; default attribute &82
@@ -2255,14 +2318,14 @@ pca2_2:
 ;; 		bit7:Carry, Fire, Swop, Left, Right, Down, Up, bit0: Jump
 .Get_user_inputs:
 	CALL 	Keyboard_scanning_setup						;; setup "PSG" for keyboard scanning
-	LD		C,&40										;; keyboard scan line 0
+	LD		C,PSG_REG_READ and WORD_LOW_BYTE			;; keyboard scan line 0
 	LD		A,&FF										;; init map code A=FF
 	LD		HL,Array_Key_map							;; point on Array_Key_map array
 	EX		AF,AF'										;; save init map code
 gui_0:
-	LD		B,&F6										;; Set PSG for Read reg BC=F640 (to read keyboard)
+	LD		B,PSG_KB_LINESEL / WORD_HIGH_BYTE			;; Set PSG for Read reg BC=F640 (to read keyboard)
 	OUT 	(C),C
-	LD		B,&F4										;; BC=F4xx
+	LD		B,PSG_PORTA / WORD_HIGH_BYTE				;; BC=F4xx
 	IN		E,(C)										;; Read PSG reg E=key scan current line
 	LD		B,8											;; need to test each of the 8 bits in current line
 gui_1:
@@ -2278,7 +2341,7 @@ gui_1:
 	EX		AF,AF'										;; save A
 	INC 	C											;; next line
 	LD		A,C
-	CP		&40+10										;; until last line (&40 (scan line 0) + &0A (lastline+1))
+	CP		PSG_REG_READ and WORD_LOW_BYTE + KB_SCAN_LINES		;; until last line (&40 (scan line 0) + &0A (lastline+1))
 	JR		c,gui_0										;; loop next line
 	EX		AF,AF'										;; restore A : from MSb to LSb : Left, Right, Down, Up, Jump, Carry, Fire, Swop
 	RRCA                    							;; bits are not in the order we want (they are in key scan order)
@@ -2292,34 +2355,34 @@ gui_1:
 ;; Output: A = 0 if "ESC" pressed; not-0 : "ESC" is not pressed.
 .Keyboard_scanning_ESC:
 	CALL 	Keyboard_scanning_setup						;; Setup keyboard scanning
-	LD		BC,&F648									;; PortC, Read PSG reg, keyboard write, line select 8
+	LD		BC,PSG_REG_READ+8							;; PortC, Read PSG reg, keyboard write, line select 8
 	OUT 	(C),C
-	LD		B,&F4										;; PortA, Read keyboard Data
+	LD		B,PSG_PORTA / WORD_HIGH_BYTE				;; PortA, Read keyboard Data
 	IN		A,(C)										;; Read Keyboard line value
-	AND 	&04											;; test bit 2 of line 8; if A=0 : "ESC" Pressed else not pressed
+	AND 	&04											;; test bit2 of line 8; if A=0 : "ESC" Pressed else not pressed
 	JR		Keyboard_scanning_ending					;; End keyboard scanning
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; This will setup the PSG for keyboard scanning
 .Keyboard_scanning_setup:
 	DI													;; Disable Interrupt during keyboard scanning
-	LD		BC,&F40E									;; select PSG reg14 (Keyboard Reg)
+	LD		BC,PSG_PORTA + &0E							;; select PSG reg14 (Keyboard Reg)
 	OUT 	(C),C
-	LD		BC,&F600									;; prepare PSG Control (Keyboard feature)
-	LD		A,&C0										;; line 0 + &C0
+	LD		BC,PSG_KB_LINESEL							;; prepare PSG Control (Keyboard feature)
+	LD		A,PSG_REG_SEL and WORD_LOW_BYTE				;; line 0 + &C0
 	OUT 	(C),A										;; PSG control : reg select (reg value on portA = reg14)
 	OUT 	(C),C										;; Validate
-	INC 	B				 							;; Port Control BC=F700
-	LD		A,&92										;; Port A in, Port C out
+	INC 	B				 							;; Port Control BC=F700 : PSG_PORTCTRL
+	LD		A,PSG_PORTA_IN and WORD_LOW_BYTE			;; Port A in, Port C out
 	OUT 	(C),A										;; Write config to PSG
 	RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; This will end the keyboard scanning in the PSG
 .Keyboard_scanning_ending:
-	LD		BC,&F782									;; PortA (PSG DATA) as Output
+	LD		BC,PSG_PORTA_OUT							;; PortA (PSG DATA) as Output
 	OUT 	(C),C
-	LD		BC,&F600									;; PSG inactive
+	LD		BC,PSG_INACTIVE								;; PSG inactive
 	OUT 	(C),C
 	EI													;; Enable Interrupts
 	RET
@@ -2329,7 +2392,7 @@ gui_1:
 ;; The data must be placed in the AY_Registers array
 .Write_AY3_Registers:
 	LD		HL,AY_Registers
-	LD		D,0											;; reg number
+	LD		D,0											;; init reg number
 wa3r_1:
 	LD		E,(HL)										;; reg data
 	INC 	HL											;; point on next data
@@ -2344,16 +2407,16 @@ wa3r_1:
 ;; Sub function for Write_AY3_Registers (write one AY-3 reg)
 ;; Input: D = reg number, E = value
 .SubF_Write_AY3Reg:
-	LD		B,&F4										;; prepare PSG Data
+	LD		B,PSG_PORTA	/ WORD_HIGH_BYTE				;; prepare PSG Data
 	OUT 	(C),D										;; reg number in D  (F4dd)
-	LD		BC,&F600									;; prepare PSG Control
-	LD		A,&C0										;; PSG Reg select
+	LD		BC,PSG_INACTIVE								;; prepare PSG Control
+	LD		A,PSG_REG_SEL and WORD_LOW_BYTE				;; PSG Reg select
 	OUT 	(C),A										;; control byte = reg select (F6C0)
 	OUT 	(C),C										;; PSG Control (F600)
-	LD		A,&80										;; PSG reg Write
-	LD		B,&F4										;; prepare PSG Data
+	LD		A,PSG_REG_WRITE and WORD_LOW_BYTE			;; PSG reg Write
+	LD		B,PSG_PORTA / WORD_HIGH_BYTE				;; prepare PSG Data
 	OUT 	(C),E										;; data in E  (F4ee)
-	LD		B,&F6										;; prepare PSG Control
+	LD		B,PSG_PORTC / WORD_HIGH_BYTE				;; prepare PSG Control
 	OUT 	(C),A										;; control byte=reg write (F680)
 	OUT 	(C),C										;; PSG Control (F600)
 	RET
@@ -2380,7 +2443,7 @@ wa3r_1:
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Check if (Voice0) Sound is enable (bit7=0; disable if 1)
 ;; If enabled, then play Theme song.
-.Play_HoH_Tune:
+.Play_HoH_Theme:
 	LD		A,(Sound_Voice0_status)						;; Get Sound_enable value for Voice0
 	CP		%10000000									;; is sound enabled? bit7 active low
 	RET 	Z											;; No, then leave; else:
@@ -2394,9 +2457,9 @@ wa3r_1:
 	RLA													;; put bit7 in Carry (Sound_Enable)
 	RET 	NC											;; if Sound not enabled, then leave
 	CALL 	Sound_Update								;; else update sound
-	XOR 	A											;; set voice 0
+	XOR 	A											;; set init voice 0
 	LD		(Current_sound_voice_number),A				;; update current voice number
-	LD		A,&3F										;; Disable all voices in mixer
+	LD		A,&3F										;; Disable all voices in the mixer
 	LD		(AY_Registers+AY_MIXER),A					;; reg7 is AY3_Mixer_control, bits are active low
 	LD		HL,Current_sound_voice_number				;; point on Current sound voice number
 loop_play_tune:
@@ -2407,7 +2470,7 @@ loop_play_tune:
 	PUSH	 HL											;; put data pointer...
 	POP 	IX											;; ... in IX = Voice data array (19 bytes)
 	BIT 	5,(HL)										;; test bit5 SND_FLAGS
-	JR		NZ,play_tune_voice_skip						;; if bit5 not set, then skip (play_tune_voice_skip)
+	JR		NZ,play_tune_voice_skip						;; if bit5 not set, then skip
 	LD		IY,AY_Registers								;; IY points on AY_Registers
 	LD		E,A											;; DE = current voice number (0, 1 or 2)
 	LD		D,0
@@ -2440,18 +2503,18 @@ loop_play_tune:
 lpt_1:
 	LD		(HL),A										;; write new value of volume into AYregister Channel_A_Volume, B or C depending on voice number
 	LD		A,(Current_sound_voice_number)				;; get Current sound voice number
-only_this_voice_bitmask:
+only_this_voice_bitmask:													;; create an active low bitmask, the 0 at bitN indicates VoiceN
 	LD		B,A
-	INC 	B											;; B now is the bit number corresponding to the current voice number (B=&01 means 1st bit therefore bit0)
+	INC 	B											;; B now is the bit number corresponding to the current voice number (if B was 1 for voice 1, now B is 2 means 2nd bit therefore bit1 for voice 1)
 	LD		A,&FF										;; set the init mask
-	AND 	A											;; this clears the Carry
+	AND 	A											;; this clears the Carry to push a 0 in with the RLA
 otvb_loop:
-	RLA													;; this will move a 0 bit at the location depending on the value in B (B=&01:A=&FE (bit 0 reset); B=&02:A=&FD (bit1 reset), etc.)
-	DJNZ 	otvb_loop									;; loop B times
+	RLA													;; this will move a 0 bit at the location depending on the value in B (in the end if B=2 for "2nd bit" (ie bit1), A will be out of the loop &FD=%11111101 : Voice 1)
+	DJNZ 	otvb_loop									;; loop B times to get the 0 at bit pos B
 activate_current_voice:														;; mask in A enable (active low) the current channel in the mixer
 	LD		HL,AY_Registers+AY_MIXER					;; reg7 is AY3_Mixer_control
-	AND 	(HL)										;; Notes are active_low, so read and activate current voice (mask in A)
-	LD		(HL),A										;; and update mixer reg7 value
+	AND 	(HL)										;; Voice enable are active-low: activate the current voice in the Mixer (using the mask in A)
+	LD		(HL),A										;; update mixer reg7 value
 .play_tune_voice_skip:
 	LD		HL,Current_sound_voice_number				;; point on Current sound voice number
 	LD		A,&02
@@ -2682,7 +2745,7 @@ dsb_loop:
 ;; -----------------------------------------------------------------------------------------------------------
 .Play_Sound:																;; B contains the sound Id to play.
 	LD		A,B											;; now A hold the Sound ID
-	AND 	&3F											;; Mask off 0x3F, and if value is 0x3F, (re)make it 0xFF.
+	AND 	&3F											;; Mask off 0x3F, and if resulting value is 0x3F, (re)make it 0xFF.
 	CP		&3F											;; 0x0?, 0x4?, 0x8? and 0xC? became 0x00 to 0x08
 	JR		NZ,play_sound_1								;; if sound ID [5:0] = &3F then make ID=&FF else goto play_Sound_1
 	LD		A,&FF
@@ -2788,7 +2851,7 @@ psid_3_loop:
 	LD		(HL),A
 	;; Load &80 into the 3 elements of the IntSnd array.
 	LD		HL,Sound_Voice0_status						;; point on Sound_enable (Sound_Interrupt_data table)
-	LD		BC,&0380									;; write 3 times &80 from 1050 (Sound_Interrupt_data)
+	LD		BC,&03 * WORD_HIGH_BYTE + &80				;; write 3 times &80 (3<<8 + &80) from 1050 (Sound_Interrupt_data)
 	LD		A,B
 psid_31:
 	LD		(HL),C
@@ -2839,7 +2902,7 @@ psid_32:
 ;; The 2nd byte is (???TODO???) the volume/tone-enveloppe: [7:4][3:0]
 .Parse_voice_data_begining:
 	CALL 	Get_sound_data_pointer_in_IX				;; IX points on current voice data
-	LD		BC,&0203									;; B = 2 right shift ; C=03 mask
+	LD		BC,&02 * WORD_HIGH_BYTE + &03				;; B = 2 right shift ; C=03 mask
 	CALL 	Read_IX_data_and_split						;; read first byte and split at bit 2 (eg: &93=100100_11 gets D=&24 ; E=&03)
 	LD		(IY+SND_REF_NOTE),D							;; reference Note number (eg. &24 = num 36 = Do octave 3)
 	LD		(IY+SND_VOL_LEVEL),E						;; (main volume level)
@@ -2889,7 +2952,7 @@ snd_parse_vol_envp:
 	INC 	A											;; test A=FF
 	JP		Z,snd_parse_FF								;; if A was FF jump snd_parse_FF, else:
 	;; get 3rd byte note offset (from ref) and duration
-	LD		BC,&0307									;; B=3 right shifts; &07=mask for bits [2:0] : split at bit 3
+	LD		BC,&03 * WORD_HIGH_BYTE + &07				;; B=3 right shifts; &07=mask for bits [2:0] : split at bit 3
 	CALL 	Read_IX_data_and_split						;; get data and split in 2 (at bit 3)
 	LD		C,D											;; C = D = note offset from ref note; E = note_duration_index
 	LD		HL,Note_duration_array
@@ -2915,7 +2978,7 @@ snd_parse_vol_envp:
 	LD		HL,Voice_channel_0_data 					;; points on a 3*19-byte array for channels data pointers
 	AND 	A											;; test A
 	RET 	Z											;; if A=0 then HL=Voice_channel_0_data and RET, else, A > 0:
-	LD		DE,&0013									;; DE = &13 = 19, size of sound data array
+	LD		DE,SOUND_OBJECT_LENGTH						;; DE = &13 = 19, size of sound data array
 	LD		B,A											;; B = voice number 1 or 2
 gvd_loop:
 	ADD 	HL,DE										;; update HL pointer on next channel data
@@ -2925,14 +2988,14 @@ gvd_loop:
 ;; -----------------------------------------------------------------------------------------------------------
 ;; From the reference note in SND_REF_NOTE and the offset in C
 ;; calculate the current desired note.
-;; eg. ref note C oct4 (&24) + offset=6 gives F# oct4 (&2A)
+;; eg. ref note C (do) oct4 (&24) + offset=6 gives F# (fa#) oct4 (&2A)
 ;; so DE=&0151 (period of Fa# oct4) and also in A+C we have &013E
 ;; (period of G4, Sol oct4, the periode for the next chromatic note)
 .Calc_Note_Ref_plus_Offset:
 	RES 	5,(IY+SND_FLAGS)							;; reset status flag bit 5 ("got note"??)
 	LD		A,(IY+SND_REF_NOTE)							;; get ref Note
 	ADD 	A,C											;; refNote in A + noteOffset in C --> A=note ???????
-	LD		BC,&FF0C									;; B will be 0; C=12 because 12 notes in the chromatic scale (one full octave)
+	LD		BC,&FF * WORD_HIGH_BYTE + &0C				;; B will be 0; C=12 because 12 notes in the chromatic scale (one full octave)
 ;; from the note number, get in B the octave number and the note number in
 ;; that octave. eg. &2A = 42 ; B=int(42/12)=3 (ie. octave 4) ; A=(42%12)=6
 f0eab_1:
@@ -2983,8 +3046,9 @@ f0eab_3:																	;; else it was a sound note
 f0eab_4:
 	BIT 	7,(IY+SND_FLAGS)							;; test status flag bit7
 	JR		Z,f0eab_5									;; if it was 0 (snd disabled??), jump f0eab_5, else:
-	;; would that be to cut the note duration in pieces to apply a
+	;; would that be to cut the note duration in pieces to apply an
 	;; enveloppe or volume modification across the full note duration
+	;; ie. Software enveloppes
 	EX		DE,HL										;; HL = current note
 	AND 	A											;; clear Carry
 	SBC 	HL,BC										;; get the difference between the current_note period and its following one in the scale
@@ -3071,7 +3135,7 @@ f0eab_11:
 ;; Input: D = byte value to split											; ex:		DE=&6A
 ;; Output: D = high nibble value; E = low nibble value						; ex:		D=&06 ; E=&0A
 .Get_nibbles_from_D_to_D_and_E:
-	LD		BC,&040F									;; B = 4 right shift, C = &0F mask
+	LD		BC,&04 * WORD_HIGH_BYTE + &0F				;; B = 4 right shift, C = &0F mask
 	JR		rnsplt_1									;; will RET
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -3099,7 +3163,7 @@ rnsplt_loop:																;; need to shift right so that the lsb bit od D is a
 ;; IX : points on Data: Voice_data_C?_V?
 ;; IY : points on channel sound object : Voice_channel_?_data
 .Slice_VolumeEnvp_Effects:
-	LD		BC,&040F									;; B = 4 right shifts; C = &0F mask which means split in two 4-bit nibbles
+	LD		BC,&04 * WORD_HIGH_BYTE + &0F				;; B = 4 right shifts; C = &0F mask which means split in two 4-bit nibbles
 	CALL	Read_IX_data_and_split						;; Read (IX) and split : D = high nibble, E = low nibble
 	LD		A,&02
 	AND		(IY+SND_FLAGS)								;; turn off bit7 (enable?) and keep bit1 from...
@@ -3262,7 +3326,7 @@ Sound_channels_enable:
 ;;	    DEFB (hex)       01 02 04 06 08 0C 10 20
 ;;
 ;; Exemple:
-;;	 D0 0E 6E 96 6E 56 FF 01 34 36 FF 0E 7C 6C 54 6E			; ID &41 = Market
+;;	 D0 0E 6E 96 6E 56 FF 01 34 36 FF 0E 7C 6C 54 6E			; ID &41 = Market ("Combien pour ce chien dans la vitrine?" tune)
 ;;	 47 FF FF
 ;;
 ;;	 55555555666666666666
@@ -3314,6 +3378,8 @@ SND_DELTA_COARSE		EQU		&0F			;; Sound delta pitch (fine and coarse) for bend/vib
 SND_TODO				EQU		&10			;; ???? TODO ???
 NOISE_DELTA_FINE		EQU		&11
 NOISE_DELTA_COARSE		EQU		&12			;; Noise delta pitch (fine and coarse) for bend/vibrato effects
+
+SOUND_OBJECT_LENGTH		EQU		&13
 
 ;; -----------------------------------------------------------------------------------------------------------
 .Voice_channel_0_data:
@@ -3384,7 +3450,7 @@ AY_C_VOL				EQU 	&0A			;; Channel C volume        4-bit (0-15)
 
 ;; -----------------------------------------------------------------------------------------------------------
 .Voice_data_10AD:
-	DEFB 	&81, &42, &48												;; this is 3 pairs of nibbles 8;1 4;2 4;8
+	DEFB 	&81, &42, &48										;; this is 3 pairs of nibbles 8;1 4;2 4;8
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Notes duration:
@@ -3398,6 +3464,7 @@ AY_C_VOL				EQU 	&0A			;; Channel C volume        4-bit (0-15)
 ;; 110 : 16	Blanche (2 noires)
 ;; ___ : 24	Blanche pointée (3 noires) NOT USED!
 ;; 111 : 32	Ronde (4 noires)
+;; Comment: This duration will most likely be split in several parts to produce the software enveloppes
 .Note_duration_array:
 	DEFB 	&01, &02, &04, &06, &08, &0C, &10, &20						;; note_durations
 
@@ -3683,7 +3750,7 @@ Sound_ID_Teleport_Down		EQU 	&C8 		;; Teleport down
 	INC HL
 	INC DE
 	LD A,C
-	ADD A,&06
+	ADD A,6
 	LD C,A
 	INC HL
 	INC DE
@@ -3725,7 +3792,7 @@ Sound_ID_Teleport_Down		EQU 	&C8 		;; Teleport down
 	INC HL
 	INC DE
 	LD A,C
-	ADD A,&05
+	ADD A,5
 	LD C,A
 	INC HL
 	INC DE
@@ -3780,7 +3847,7 @@ Sound_ID_Teleport_Down		EQU 	&C8 		;; Teleport down
 	INC HL
 	INC DE
 	LD A,C
-	ADD A,&04
+	ADD A,4
 	LD C,A
 	EXX
 	DJNZ BlitMask3of3
@@ -3803,7 +3870,7 @@ Sound_ID_Teleport_Down		EQU 	&C8 		;; Teleport down
 	INC HL
 	INC DE
 	LD A,C
-	ADD A,&06
+	ADD A,6
 	LD C,A
 	INC HL
 	INC DE
@@ -3847,7 +3914,7 @@ Sound_ID_Teleport_Down		EQU 	&C8 		;; Teleport down
 	INC HL
 	INC DE
 	LD A,C
-	ADD A,&05
+	ADD A,5
 	LD C,A
 	INC HL
 	INC DE
@@ -3904,7 +3971,7 @@ Sound_ID_Teleport_Down		EQU 	&C8 		;; Teleport down
 	INC HL
 	INC DE
 	LD A,C
-	ADD A,&04
+	ADD A,4
 	LD C,A
 	INC HL
 	INC DE
@@ -3997,7 +4064,7 @@ Sound_ID_Teleport_Down		EQU 	&C8 		;; Teleport down
 	INC HL
 	INC DE
 	LD A,C
-	ADD A,&06
+	ADD A,6
 	LD C,A
 	INC HL
 	INC DE
@@ -4043,7 +4110,7 @@ Sound_ID_Teleport_Down		EQU 	&C8 		;; Teleport down
 	INC HL
 	INC DE
 	LD A,C
-	ADD A,&05
+	ADD A,5
 	LD C,A
 	INC HL
 	INC DE
@@ -4102,7 +4169,7 @@ Sound_ID_Teleport_Down		EQU 	&C8 		;; Teleport down
 	INC HL
 	INC DE
 	LD A,C
-	ADD A,&04
+	ADD A,4
 	LD C,A
 	INC HL
 	INC DE
@@ -4334,7 +4401,7 @@ drawPillarTop:
 	AND 	&3E											;; Clear lowest bit to get 2x double column index...
 	EXX
 	LD		L,A
-	LD		H,BackgrdBuff / 256							;; &6A = BackgrdBuff >> 8 ; BackgrdBuff is page-aligned. 6Aaa
+	LD		H,BackgrdBuff / WORD_HIGH_BYTE				;; &6A = BackgrdBuff >> 8 ; BackgrdBuff is page-aligned. 6Aaa
 	EXX													;; Set HL' to column info
 	;; Calculate width to draw, in bytes
 	LD		A,L
@@ -4377,13 +4444,13 @@ dbg_2:
 	LD		HL,BlitFloorL
 	LD		(smc_blitfloor_fnptr+1),HL					;; value at &1849 ; self mod code of JP
 	EXX
-	JR		DrawBkgndCol2
+	JR		DrawBkgndCol2								;; will RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; ???TODO??? Performs register-saving and incrementing HL'/E. Not needed
 ;; for the last call from DrawBkgnd.
 .DrawBkgndCol:
-	LD		(smc_blitfloor_fnptr+1),HL						;; value at &1849 ; self mod code of JP
+	LD		(smc_blitfloor_fnptr+1),HL					;; value at &1849 ; self mod code of JP
 	PUSH	DE
 	PUSH	AF
 	EXX
@@ -4703,10 +4770,9 @@ DBEdge_Left:
 ;; to include a part of the floor pattern.
 .TweakEdges:
 	LD		HL,(FloorAddr)
-	;; ZX-spectrum has this here : "LD (RoomOrigin),BC"
-	LD		BC,&000A									;; 2*5
+	LD		BC,2*5
 	ADD		HL,BC										;; Move 5 rows into the tile
-	LD		C,&10										;; 2*8
+	LD		C,2*8
 	LD		A,(Has_Door)
 	RRA
 	PUSH 	HL											;; Push this address.
@@ -4977,7 +5043,7 @@ clr2_1:
 	EXX													;; The floor sprite ID is now pointed by HL'
 	LD		C,0											;; not flipped : C offset = 0
 	JR		Z,bf_1
-	LD		C,&10										;; Flipped : C offset = 2*8 : this will realign the right part of the floor tiles
+	LD		C,2*8										;; Flipped : C offset = 2*8 : this will realign the right part of the floor tiles
 bf_1:
 	CALL 	GetFloorAddr								;; BC will point on floor tile data
 	;; Construct offset in HL from original D. Double it as tile is 2 wide.
@@ -5029,7 +5095,7 @@ bf_2:
 	EXX
 	LD		C,&01
 	JR		Z,bfl_1
-	LD		C,&11										;; 2*8+1
+	LD		C,2*8 + 1
 	JR		bfl_1
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -5046,7 +5112,7 @@ bf_2:
 	EXX
 	LD		C,&00
 	JR		Z,bfl_1
-	LD		C,&10											;; 2*8
+	LD		C,2*8
 	;; Get the address (using HL' for wall sprite id)
 bfl_1:
 	CALL 	GetFloorAddr
@@ -5072,7 +5138,7 @@ bfl_2:
 	LD		A,L
 	ADD 	A,2
 	AND 	&1F
-	LD		L,A												;; Add 1 row to source offset pointer, mod 32
+	LD		L,A											;; Add 1 row to source offset pointer, mod 32
 	EXX
 	DJNZ 	bfl_2
 	RET
@@ -5149,7 +5215,7 @@ tcbl_1:
 	LD		B,SHORT_WALL								;; &38
 .FlipPillar:
 	PUSH 	DE
-	LD		D,RevTable / 256							;; &69 = RevTable >> 8
+	LD		D,RevTable / WORD_HIGH_BYTE					;; &69 = RevTable >> 8
 	PUSH 	HL
 fcol_1:
 	LD		(smc_dest_addr2+1),HL						;; self mod code at 1AB8, value of LD (...),A
@@ -5243,7 +5309,7 @@ btrot_0
 	;; Time to rotate the sprite.
 	LD		A,(SpriteRowCount)							;; get SpriteRowCount
 	PUSH 	DE
-	LD		DE,&6FC0									;; Buffer
+	LD		DE,BlitRot_Buffer							;; Buffer 6FC0
 	LD		B,&00										;; Blank space in the filler.
 	DI
 smc_btrot_1:
@@ -5259,7 +5325,7 @@ smc_btrot_1:
 smc_btrot_2:
 	CALL 	&0000										;; default "CALL 0000" ; addr updated at line 1AF5 (self modifying code)
 	;;1B11 DEFW 00 00														; modified at 1AF5
-	LD		HL,&6FC0									;; buffer
+	LD		HL,BlitRot_Buffer							;; buffer 6FC0
 	POP 	DE
 	EI
 	POP 	AF
@@ -5268,7 +5334,7 @@ smc_btrot_2:
 	RET
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; pointers on the BlitRot* function to use
+;; pointers on the BlitRot<*> function to use
 BlitRot3s:
 	DEFW 	BlitRot2on3					;; BlitRot2on3 1B2A
 	DEFW 	BlitRot4on3					;; BlitRot4on3 1BE0
@@ -5290,9 +5356,9 @@ Save_Stack_ptr:
 ;; Returns next space after destination write in HL
 .BlitRot2on3:
 	LD		(Save_Stack_ptr),SP
-	LD		C,&3E											;; C = &3E = "LD A,vv" ; vv (filler) in B
-	LD		(smc_br23_1),BC									;; self mod the filler value in B in the instruction at 1B49
-	LD		(smc_br23_2),BC									;; self mod the filler value in B in the instruction at 1B63
+	LD		C,LDAvv_OPCODE								;; C = &3E = "LD A,vv" ; vv (filler) in B
+	LD		(smc_br23_1),BC								;; self mod the filler value in B in the instruction at 1B49
+	LD		(smc_br23_2),BC								;; self mod the filler value in B in the instruction at 1B63
 	LD		SP,HL
 	EX		DE,HL
 	SRL 	A
@@ -5309,7 +5375,7 @@ br23_1:
 	POP 	DE
 	POP		BC
 smc_br23_1:
-	LD		A,&00											;; the value (contained in B) will be modified at 1B30; self mod code
+	LD		A,&00										;; the value (contained in B) will be modified at 1B30; self mod code
 	RRCA
 	RR		E
 	RR		D
@@ -5330,7 +5396,7 @@ smc_br23_1:
 br23_2:
 	POP 	DE
 smc_br23_2:
-	LD		A,&00											;; the value (contained in B) will be modified at 1B34 ; self mod code
+	LD		A,&00										;; the value (contained in B) will be modified at 1B34 ; self mod code
 	RRCA
 	RR		B
 	RR		E
@@ -5361,9 +5427,9 @@ smc_br23_2:
 ;; Returns next space after destination write in HL
 .BlitRot6on3:
 	LD		(Save_Stack_ptr),SP
-	LD		C,&3E											;; C = &3E = "LD A,vv" ; vv (filler) in B
-	LD		(smc_br63_1),BC									;; self mod the filler value in B in the instruction at 1BA4
-	LD		(smc_br63_2),BC									;; self mod the filler value in B in the instruction at 1BBE
+	LD		C,LDAvv_OPCODE								;; C = &3E = "LD A,vv" ; vv (filler) in B
+	LD		(smc_br63_1),BC								;; self mod the filler value in B in the instruction at 1BA4
+	LD		(smc_br63_2),BC								;; self mod the filler value in B in the instruction at 1BBE
 	LD		SP,HL
 	EX		DE,HL
 	SRL 	A
@@ -5380,7 +5446,7 @@ br63_1:
 	POP 	DE
 	POP 	BC
 smc_br63_1:
-	LD		A,&00											;; the value (contained in B) will be modified at 1B8B ; self mod code
+	LD		A,&00										;; the value (contained in B) will be modified at 1B8B ; self mod code
 	RLCA
 	RL		C
 	RL		D
@@ -5401,7 +5467,7 @@ smc_br63_1:
 br63_2:
 	POP 	DE
 smc_br63_2:
-	LD		A,&00											;; the value (contained in B) will be modified at 1B8F ; self mod code
+	LD		A,&00										;; the value (contained in B) will be modified at 1B8F ; self mod code
 	RLCA
 	RL		D
 	RL		E
@@ -5466,7 +5532,7 @@ br43_2:
 ;; Returns next space after destination write in HL
 .BlitRot2on4:
 	LD		(Save_Stack_ptr),SP
-	LD		C,&3E										;; C = &3E = "LD A,vv" ; vv (filler) in B
+	LD		C,LDAvv_OPCODE								;; C = &3E = "LD A,vv" ; vv (filler) in B
 	LD		(smc_bt24_1),BC								;; self mod the filler value in B in the instruction at 1C12
 	LD		SP,HL
 	EX		DE,HL
@@ -5510,7 +5576,7 @@ smc_bt24_1:
 ;; Returns next space after destination write in HL
 .BlitRot6on4:
 	LD		(Save_Stack_ptr),SP
-	LD		C,&3E										;; C = &3E = "LD A,vv" ; vv (filler) in B
+	LD		C,LDAvv_OPCODE								;; C = &3E = "LD A,vv" ; vv (filler) in B
 	LD		(smc_br64_1),BC								;; self mod the filler value in B in the instruction at 1C49
 	LD		SP,HL
 	EX		DE,HL
@@ -5560,7 +5626,7 @@ smc_br64_1:
 	LD		C,&FF
 	PUSH 	DE
 brot44_1:
-	LDI													;; do once : LD (DE),(HL); DE++, HL++, BC--
+	LDI													;; do 4x : LD (DE),(HL); DE++, HL++, BC--
 	LDI
 	LDI
 	LDI
@@ -5589,17 +5655,17 @@ brot44_2:
 ;; X extent is in screen units (2 pixels per unit).
 ;; Units increase down and to the right.
 ViewXExtent:
-	DEFW	&6066
+	DEFW	&60 * WORD_HIGH_BYTE + &66
 ViewYExtent:
-	DEFW	&5070
+	DEFW	&50 * WORD_HIGH_BYTE + &70
 SpriteXStart:
 	DEFB	&00
 SpriteRowCount:
 	DEFB	&00
 ObjXExtent:
-	DEFW	&0000
+	DEFW	&00 * WORD_HIGH_BYTE + &00
 ObjYExtent:
-	DEFW	&0000
+	DEFW	&00 * WORD_HIGH_BYTE + &00
 SpriteFlags:
 	DEFB	&00
 
@@ -5663,7 +5729,8 @@ unext_3:
 	CALL 	PutXExtent
 	JR		Draw_small_start
 
-;; If the end's before Y_START, give up. Otherwise bump the start down
+;; -----------------------------------------------------------------------------------------------------------
+;; If the end is before Y_START, give up. Otherwise bump the start down
 ;; and continue.
 .BumpYMinAndDraw:
 	LD		A,Y_START
@@ -5672,14 +5739,13 @@ unext_3:
 	LD		D,Y_START
 	JR		DrawCore
 
-.UnionAndDraw:
-	CALL 	UnionExtents
-
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Draw a given range of the screen, drawing into ViewBuff and then
 ;; blitting to the screen. This entry point sanity-checks the extents
 ;; first.
 ;; X extent in HL, Y extent in DE
+.UnionAndDraw:
+	CALL 	UnionExtents
 .Draw_View:
 	CALL 	PutXExtent
 	;; Check the Y extent - give up if it's too far down.
@@ -5723,7 +5789,7 @@ unext_3:
 	CP		D
 	JR		c,drwc_2
 	;; Draw the next room in the V direction.
-	LD		HL,ObjectLists + 4									;; ObjectLists + 1*4
+	LD		HL,ObjList_NextRoomV_Far2Near
 	PUSH 	DE
 	CALL 	Blit_Objects
 	POP 	DE
@@ -5749,14 +5815,15 @@ drwc_2:
 	CP		D
 	JR		c,drwc_1
 	;; Draw the next room in U direction.
-	LD		HL,ObjectLists + 8									;; ObjectLists + 2*4
+	LD		HL,ObjList_NextRoomU_Far2Near
 	CALL 	Blit_Objects
 drwc_1:
-	LD		HL,ObjectLists + 12									;; ObjectLists + 3*4 = Far
+	;; Draw from far to Near, the Back, the mid, the front
+	LD		HL,ObjList_Far_Far2Near
 	CALL 	Blit_Objects
-	LD		HL,ObjectLists										;; Main object list
+	LD		HL,ObjList_Regular_Far2Near						;; Main object list
 	CALL 	Blit_Objects
-	LD		HL,ObjectLists + 16  								;; ObjectLists + 4*4 = Near
+	LD		HL,ObjList_Near_Far2Near
 	CALL 	Blit_Objects
 	JP		Blit_screen
 
@@ -5767,15 +5834,15 @@ drwc_1:
 .Blit_Objects:
 	LD		A,(HL)
 	INC 	HL
-	LD		H,(HL)												;; get new HL from curr HL
+	LD		H,(HL)											;; get new HL from curr HL
 	LD		L,A
-	OR		H													;; if new HL=0
-	RET 	Z													;; then leave, else:
-	LD		(smc_CurrObject2+1),HL								;; self modify the value of LD HL,... at 1D70 (smc_CurrObject2+1)
+	OR		H												;; if new HL=0
+	RET 	Z												;; then leave, else:
+	LD		(smc_CurrObject2+1),HL							;; self modify the value of LD HL,... at 1D70 (smc_CurrObject2+1)
 	CALL 	Sub_BlitObject
 smc_CurrObject2:
-	LD		HL,&0000											;; get next object in list ; addr at 1D71 is written above at 1D6A
-	;;1D71 DEFW 00 00																; Self-modifying code
+	LD		HL,&0000										;; get next object in list ; addr at 1D71 is written above at 1D6A
+	;;1D71 DEFW 00 00															; Self-modifying code
 	JR		Blit_Objects
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -5784,8 +5851,8 @@ smc_CurrObject2:
 ;;  Y adjustments in HL,  Y overlap in A
 .Sub_BlitObject:
 	CALL 	IntersectObj
-	RET 	NC													;; No intersection? Return
-	LD		(SpriteRowCount),A									;; update SpriteRowCount
+	RET 	NC												;; No intersection? Return
+	LD		(SpriteRowCount),A								;; update SpriteRowCount
 	LD		A,H
 	;; Find sprite blit destination:
     ;; &ViewBuff[Y-low * 6 + X-low / 4]
@@ -5798,16 +5865,16 @@ smc_CurrObject2:
 	SRL 	H
 	ADD 	A,H
 	LD		E,A
-	LD		D,ViewBuff / 256									;; &67 = ViewBuff >> 8   ; &6700 + offset
-	PUSH 	DE													;; Push destination.
-	PUSH 	HL													;; Push X adjustments
+	LD		D,ViewBuff / WORD_HIGH_BYTE						;; &67 = ViewBuff >> 8   ; DE = &6700 + offset
+	PUSH 	DE												;; Push destination.
+	PUSH 	HL												;; Push X adjustments
 	EXX
 	;; A = SpriteWidth & 4 ? -L * 4 : -L * 3
     ;; (Where L is the Y-adjustment for the sprite)
 	LD		A,L
 	NEG
 	LD		B,A
-	LD		A,(Sprite_Width)									;; get Sprite_Width
+	LD		A,(Sprite_Width)								;; get Sprite_Width
 	AND 	&04
 	LD		A,B
 	JR		NZ,btobj_0
@@ -5815,8 +5882,8 @@ smc_CurrObject2:
 	ADD		A,B
 	JR		btobj_1
 btobj_0:
-	ADD 	A,A													;; *2
-	ADD 	A,A													;; *4
+	ADD 	A,A												;; *2
+	ADD 	A,A												;; *4
 btobj_1:
 	PUSH 	AF
 	;; Image and mask addressed loaded, and then adjusted by A.
@@ -5842,7 +5909,7 @@ btobj_1:
 	;; and apply to image and mask.
 	AND 	&07
 	LD		C,A
-	LD		B,0													;; BC = A
+	LD		B,0												;; BC = A
 	ADD 	HL,BC
 	EX		DE,HL
 	ADD 	HL,BC
@@ -5851,7 +5918,7 @@ btobj_1:
 	EXX
 	;; Load DE with an index from the blit functions table. This selects
     ;; the subtable based on the sprite width.
-	LD		A,(Sprite_Width)									;; get Sprite_Width
+	LD		A,(Sprite_Width)								;; get Sprite_Width
 	SUB 	3
 	ADD 	A,A
 	LD		E,A
@@ -5879,9 +5946,9 @@ btobj_1:
 	LD		L,A
 	;; Call the blit function with number of rows in B, destination in
     ;; BC', source in DE', mask in HL'
-	LD		A,(SpriteRowCount)									;; get SpriteRowCount
+	LD		A,(SpriteRowCount)								;; get SpriteRowCount
 	LD		B,A
-	JP		(HL)					 							;; Tail call (ie. will RET) to blitter...
+	JP		(HL)					 						;; Tail call (ie. will RET) to blitter...
 
 ;; -----------------------------------------------------------------------------------------------------------
 .BlitMaskFns:
@@ -5908,7 +5975,7 @@ btobj_1:
 ;; Given an object, calculate the intersections with
 ;; ViewXExtent and ViewYExtent. Also saves the X start in SpriteXStart.
 ;;
-;; Parameters: HL contains object+2
+;; Parameters: HL contains object+2 (O_FAR2NEAR_LST)
 ;; Returns:
 ;;  Set carry flag if there's overlap
 ;;  X adjustments in HL', X overlap in A'
@@ -5936,52 +6003,52 @@ btobj_1:
 ;; (12 Y units) apart. I expect bit 5 reset means it's a 3x32 object,
 ;; so we include the other 16 height.
 ;;
-;; Parameters: Object+2 in HL
+;; Parameters: Object+2 (O_FAR2NEAR_LST) in HL
 ;; Returns: X extent in BC, Y extent in HL
 .GetObjExtents:
 	INC 	HL
 	INC 	HL
 	LD		A,(HL)
-	BIT 	3,A												;; Tall bit set?
-	JR		Z,gsobjext_1										;; Tail call out if not tall.
-	CALL 	gsobjext_1										;; Otherwise, call and return
+	BIT 	3,A											;; Tall bit set?
+	JR		Z,gsobjext_1								;; Tail call out if not tall.
+	CALL 	gsobjext_1									;; Otherwise, call and return
 	LD		A,(SpriteFlags)
-	BIT 	5,A												;; Chained object bit set?
-	LD		A,&F0											;; -16 ; Bit not set - add 16 to height.
+	BIT 	5,A											;; Chained object bit set?
+	LD		A,&F0										;; -16 ; Bit not set - add 16 to height.
 	JR		Z,goex_1
-	LD		A,&F4											;; -12 ; Bit set - add 12 to height.
+	LD		A,&F4										;; -12 ; Bit set - add 12 to height.
 goex_1:
 	ADD 	A,H
-	LD		H,A												;; Bring min Y up.
+	LD		H,A											;; Bring min Y up.
 	RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Sets SpriteFlags and generates extents for the object.
-;; Parameters: Object+2 in HL
+;; Parameters: Object+2 (O_FAR2NEAR_LST) in HL
 ;; Returns: X extent in BC, Y extent in HL
 .GetShortObjExt:
 	INC 	HL
-	INC 	HL												;; now HL points on O_FLAGS
-	LD		A,(HL)											;; get flags
+	INC 	HL											;; now HL points on O_FLAGS
+	LD		A,(HL)										;; get flags
 	;; Put a flip flag in A if the "switched" bit is set on the object.
     ;; A = (object[4] & 0x10) ? 0x80 : 0x00
 gsobjext_1:
-	BIT 	4,A												;; test bit4
+	BIT 	4,A											;; test bit4
 	LD		A,&00
 	JR		Z,gsobjext_2
 	LD		A,&80
 gsobjext_2:
 	EX		AF,AF'
 	INC 	HL
-	CALL 	UVZtoXY				 							;; Called with HL pointing on O_U
+	CALL 	UVZtoXY				 						;; Called with HL pointing on O_U
 	INC 	HL
-	INC 	HL												;; Now at object O_SPRFLAGS
+	INC 	HL											;; Now at object O_SPRFLAGS
 	LD		A,(HL)
 	LD		(SpriteFlags),A
-	DEC 	HL												;; O_SPRITE
+	DEC 	HL											;; O_SPRITE
 	EX		AF,AF'
-	XOR 	(HL)											;; Add extra horizontal flip to the sprite.
-	JP		GetSprExtents									;; will RET
+	XOR 	(HL)										;; Add extra horizontal flip to the sprite.
+	JP		GetSprExtents								;; will RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Calculate parameters to do with overlapping extents
@@ -5997,15 +6064,15 @@ gsobjext_2:
     ;; Check overlap and return NC if there is none.
 	LD		A,D
 	SUB 	C
-	RET 	NC												;; C <= D, return
+	RET 	NC											;; C <= D, return with NotCarry
 	LD		A,B
 	SUB 	E
-	RET 	NC												;; E <= B, return
+	RET 	NC											;; E <= B, return with NC
 	;; There's overlap. Calculate it.
 	NEG
-	LD		L,A												;; L = E - B
+	LD		L,A											;; L = E - B
 	LD		A,B
-	SUB 	D												;; A = B - D
+	SUB 	D											;; A = B - D
 	JR		c,subIntersectExtent
 	;; B >= D case
 	LD		H,A
@@ -6013,7 +6080,7 @@ gsobjext_2:
 	SUB 	B
 	LD		C,L
 	LD		L,0
-	CP		C												;; Return A = min(C - B, E - B)
+	CP		C											;; Return A = min(C - B, E - B)
 	RET 	c
 	LD		A,C
 	SCF
@@ -6028,7 +6095,7 @@ gsobjext_2:
 	SUB		D
 	CP		C
 	LD		H,0
-	RET 	c					 							;; Return A = min(E - D, C - D)
+	RET 	c					 						;; Return A = min(E - D, C - D)
 	LD		A,C
 	SCF
 	RET
@@ -6036,7 +6103,7 @@ gsobjext_2:
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Given HP pointing to an Object + 5 (O_U)
 ;; Return X coordinate in C, Y coordinate in B.
-;; Return: Increments HL by 2 (O_Z)
+;; (Return: Increments HL by 2 (points on O_Z))
 ;; 		.----------> X
 ;; 		|  V   U							eg. U,V,Z = &24, &0C, &C0
 ;; 		|   \ /									BC = &CF98
@@ -6077,9 +6144,9 @@ BaseFlags:																	;; object flags when builing a room
 	DEFB 	&00
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; Offset 0&1: O_???? 'B' list next item pointer
-;; Offset 2&3: O_???? 'A' list next item pointer
-;; Offset 4: O_FLAGS : Some flags:
+;; Offset 0&1: O_NEAR2FAR_LST 'A' list next item pointer
+;; Offset 2&3: O_FAR2NEAR_LST 'B' list next item pointer
+;; Offset 4: O_FLAGS : Object flags:
 ;;           	Bits 0-2: Object Dimensions - see GetUVZExtents
 ;;           	Bit3: Tall (extra 6 height)
 ;;           	Bit4: Holds switch status for a switch (from function 3rd byte bit7), the roller direction for rollers.
@@ -6090,7 +6157,7 @@ BaseFlags:																	;; object flags when builing a room
 ;; Offset 5: O_U : U coordinate
 ;; Offset 6: O_V : V coordinate
 ;; Offset 7: O_Z : Z coordinate, C0 = ground
-;; Offset 8: O_SPRITE : Sprite code
+;; Offset 8: O_SPRITE : Sprite code, bit7: flipped
 ;; Offset 9: O_SPRFLAGS : Sprite flags:
 ;;           	Bit 0 - is it a playable character or an object/enemy?
 ;;           	Bit 1 - 1 if the 2nd part of a double height/sprite object
@@ -6105,6 +6172,7 @@ BaseFlags:																	;; object flags when builing a room
 ;;			 	Lower 6 bits are object function.
 ;; Offset B: O_IMPACT
 ;;				Bottom 4 bits are roller direction... last move dir for updated things.
+;;              The value in there will impact the direction of what on this object.
 ;; Offset C: O_????
 ;;				bits3:0 : LRDU direction bitmask? how we're being pushed?
 ;;				bit4 :
@@ -6118,8 +6186,10 @@ BaseFlags:																	;; object flags when builing a room
 ;; Offset 11: O_SPECIAL : This may be several things depending on context:
 ;;				Z limits for helipad (bit3 = 1:Ascent/0:Descent direction (note that, for instance, if set to 0, but already on the ground, it'll immediatly reverse direction), bit2:0 = low limit, bit7:4 = high limit)
 ;;				On/Off state for switch
-;;				special indexd for specials items.
+;;				special index for specials items.
 ;; -----------------------------------------------------------------------------------------------------------
+O_NEAR2FAR_LST			EQU		&00
+O_FAR2NEAR_LST			EQU		&02
 O_FLAGS					EQU 	&04
 O_U						EQU 	&05
 O_V						EQU 	&06
@@ -6129,15 +6199,15 @@ O_SPRFLAGS				EQU 	&09
 O_FUNC					EQU 	&0A
 O_IMPACT				EQU		&0B
 ;; ????					EQU		&0C
-O_OBJUNDER				EQU		&0D				;; D and E = object under pointer
+O_OBJUNDER				EQU		&0D				;; D and E = "object under" pointer
 O_ANIM					EQU 	&0F
 O_DIRECTION				EQU 	&10
 O_SPECIAL				EQU 	&11
 
-;; Buffer for an object used during unpacking
+;; Temp Object used during unpacking room data
 .TmpObj_variables:								;; 18 bytes
-	DEFW 	&0000			;;	0&1 :
-	DEFW 	&0000			;;	2&3 :
+	DEFW 	&0000			;;	0&1 : O_NEAR2FAR_LST (A list)
+	DEFW 	&0000			;;	2&3 : O_FAR2NEAR_LST (B list)
 	DEFB 	&00				;;	4 : O_FLAGS
 	DEFB 	&00				;;	5 : O_U coordinate
 	DEFB 	&00				;;	6 : O_V coordinate
@@ -6147,8 +6217,7 @@ O_SPECIAL				EQU 	&11
 	DEFB 	&00				;;	A : O_FUNC
 	DEFB 	&FF				;;	B : O_IMPACT
 	DEFB 	&FF				;;	C :
-	DEFB 	&00				;;	D : O_OBJUNDER
-	DEFB 	&00				;;	E : O_OBJUNDER+1
+	DEFW 	&0000			;;	D&E : O_OBJUNDER
 	DEFB 	&00				;;	F : O_ANIM
 	DEFB 	&00				;;	10 : O_DIRECTION (dir code (0 to 7 or FF))
 	DEFB 	&00				;;	11 : O_SPECIAL
@@ -6194,7 +6263,7 @@ RoomDimensionsIdxTmp:
 FloorCode:
 	DEFB 	&00							;; The index of the floor pattern to use.
 FloorAboveFlag:
-	DEFB 	&00     					;; Set if the room above has a floor.
+	DEFB 	&00     					;; if the room above has a floor, then bit0 is set.
 SkipObj:
 	DEFB 	&00     					;; 0: draw objects: not0: don't AddObject (used when restoring room state in BuildRoom*)
 color_scheme:
@@ -6212,23 +6281,26 @@ Has_Door:
 	DEFB 	&00
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; IY is pointed to MinU, and values are loaded in (based on RoomDimensions),
-;; with IY incrementing to point after MaxV when loading is complete.
+;; Table is filled in based on RoomDimensions
 .Max_min_UV_Table:
+MinU:
 	DEFB 	&3A							;; MinU Max_min_UV_Table+0 (don't care about these default values)
+MinV:
 	DEFB 	&8A							;; MinV Max_min_UV_Table+1 (don't care about these default values)
+MaxU:
 	DEFB 	&40							;; MaxU Max_min_UV_Table+2 (don't care about these default values)
+MaxV
 	DEFB 	&32							;; MaxV Max_min_UV_Table+3 (don't care about these default values)
 
 ;; AltLimits[12] are also used as IY for drawing extra rooms.
 AltLimits1:
-	DEFB 	&85, &40, &47, &C9			;; (these are supposed to be 00)
+	DEFB 	&85, &40, &47, &C9			;; (don't care about these default values)
 AltLimits2:
-	DEFB 	&F5, &11, &2C, &41			;; (these are supposed to be 00)
+	DEFB 	&F5, &11, &2C, &41			;; (don't care about these default values)
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; Array of room Dimensions: Min U, Min V, Max U, Max V
-;; Index into array is the RoomDimensionsIdx(Tmp)
+;; Room Dimensions Array: Min U, Min V, Max U, Max V
+;; Index = Room type RoomDimensionsIdx
 .RoomDimensions:
 	DEFB 	&08, &08, &48, &48					;; Room type 0 : Min U, Min V, Max U, Max V
 	DEFB 	&08, &10, &48, &40
@@ -6255,24 +6327,24 @@ GROUND_LEVEL			EQU 	&C0
 
 ;; The height of the highest door present.
 .HighestDoor:
-	DEFB 	GROUND_LEVEL							;; The height of the highest door present. reset value = GROUND_LEVEL
+	DEFB 	GROUND_LEVEL						;; The height of the highest door present. reset value = GROUND_LEVEL
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; 2 Functions:
 ;; * BuildRoom : reset room, read room data and rebuild evreything (including objects).
-;; * BuildRoomNoObj : Like BuildRoom, but we skip calling AddObject on the
-;; main room. ; Used when restoring previously-stashed room state.
-;; SkipObj will be reset by BuildRoom soon afterwards
+;; * BuildRoomNoObj : Like BuildRoom, but we skip calling AddObject on the main room.
+;; Used when restoring previously-stashed room state.
+;; SkipObj will be reset by BuildRoom.
 .BuildRoomNoObj:
 	LD		A,&FF
 	LD		(SkipObj),A									;; SkipObj=-1 : Skip buildin Objects (already in memory)
 .BuildRoom:
-	LD		IY,Max_min_UV_Table							;; points on MinU
-	LD		HL,&30D0									;; ViewXExtent full screen X
+	LD		IY,Max_min_UV_Table							;; points on Min/Max U/V Table
+	LD		HL,&30 * WORD_HIGH_BYTE + &D0				;; ViewXExtent full screen X
 	LD		(ViewXExtent),HL
-	LD		HL,&00FF									;; ViewXExtent full screen Y
+	LD		HL,&00 * WORD_HIGH_BYTE + &FF				;; ViewXExtent full screen Y
 	LD		(ViewYExtent),HL
-	LD		HL,GROUND_LEVEL * 256 + GROUND_LEVEL		;; reset values for doors height; &C0 is GROUND_LEVEL
+	LD		HL,GROUND_LEVEL * WORD_HIGH_BYTE + GROUND_LEVEL		;; reset values for doors height; &C0 is GROUND_LEVEL
 	LD		(DoorHeightsTmp),HL							;; nw ne doors; init value
 	LD		(DoorHeightsTmp+2),HL						;; se sw doors; init value
 	LD		HL,&0000									;; UV origin (0,0) for ReadRoom
@@ -6287,7 +6359,7 @@ GROUND_LEVEL			EQU 	&C0
 	LD		(RoomDimensionsIdx),A						;; into RoomDimensionsIdx
 	LD		DE,DoorHeights								;; copy 4 doors heights from ...
 	LD		HL,DoorHeightsTmp							;; ... tmp to object array
-	LD		BC,&0004									;; ... (nw ne se sw)
+	LD		BC,4										;; ... (4 doors : nw ne se sw)
 	LDIR												;; repeat LD (DE),(HL); DE++, HL++, BC-- until BC=0
 	LD		HL,BackgrdBuff								;; BackgrdBuff buffer
 	LD		BC,&0040									;; BackgrdBuff Len ; erase &0040 (64) bytes from &6A00
@@ -6314,7 +6386,7 @@ test_if_wall_far_V:
 	AND 	&0F											;; ignore the carry that could have impacted U (get back real U and roll over V if needed)
 	XOR 	B
 	LD		B,A											;; BC = id of the next room Nw side
-	LD		A,(Max_min_UV_Table+3)						;; MaxV
+	LD		A,(MaxV)
 	LD		H,A
 	LD		L,&00										;; Set HL to MaxV value (UV origin)
 	CALL 	ReadRoom									;; Read that other room; ; IY pointing to AltLimits1.
@@ -6336,7 +6408,7 @@ test_if_wall_far_U:
 	AND 	&F0											;; make sure V has not been touched, rool over U if needed
 	XOR 	B
 	LD		B,A											;; BC = next room Ne side
-	LD		A,(Max_min_UV_Table+2)						;; MaxU
+	LD		A,(MaxU)
 	LD		L,A
 	LD		H,0											;; Set HL offset to MaxU (UV origin)
 	CALL 	ReadRoom									;; Read that room IY pointing to AltLimits2.
@@ -6370,12 +6442,12 @@ bldroom_2:																	;; now do Doors
 	LD		(RoomDimensionsIdxTmp),A					;; 3 first bits are "Room dimensions"
 	ADD 	A,A											;; *2
 	ADD 	A,A											;; *4  (4 bytes min u,v max u,v)
-	ADD 	A,RoomDimensions and &00FF					;; &CE = (RoomDimensions & &00FF) + (room index offset * 4)
+	ADD 	A,RoomDimensions and WORD_LOW_BYTE			;; &CE = (RoomDimensions & &00FF) + (room index offset * 4)
 	LD		L,A
-	ADC 	A,RoomDimensions / 256						;; &1E = (RoomDimensions & &FF00) >> 8
+	ADC 	A,RoomDimensions / WORD_HIGH_BYTE			;; &1E = (RoomDimensions & &FF00) >> 8
 	SUB 	L
 	LD		H,A											;; HL = RoomDimensions + (4*RoomDimensionsIdxTmp)
-	LD		B,&02										;; U, then V
+	LD		B,2											;; U, then V
 	LD		IX,DecodeOrgStack							;; Origin: IX:U, IX+1:V, IX+2:Z ; Load U, then V room Dimensions and origin.
 rdroom_1:
 	LD		C,(HL)										;; read min dimension
@@ -6399,7 +6471,7 @@ rdroom_jump:
 	INC 	IX											;; next orig coord value
 	INC 	IY											;; next coord byte in result
 	DJNZ 	rdroom_1									;; loop a 2nd time for V
-	LD		B,&02
+	LD		B,2
 rdroom_2:																	;; Take previous origin, multiply by 8 and add max U/V.
 	LD		A,(IX-2)									;; IX-2 (recently updated orig U, then V at 2nd loop)
 	ADD 	A,A
@@ -6461,7 +6533,7 @@ add3b_1:
 	LD		C,A
 	INC 	HL
 	POP 	AF
-	SUB 	&07
+	SUB 	7
 	ADD 	A,(HL)										;; Adjust Z value (slightly different)
 	INC 	HL
 	LD		(DecodeOrgPtr),HL							;; Write out origin values, update pointer
@@ -6491,13 +6563,16 @@ rpent_loop:
 	;; flow into ProcEntry
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Process one entry in the room description array. Returns carry when done.
+ROOM_DATA_BREAK			EQU		&FF
+ROOM_DATA_MACRO			EQU		&C0
+
 .ProcEntry:
 	LD		B,8											;; number of bit to fetch from CurrData
 	CALL 	FetchData									;; Get object ID, or Macro Id or FF
-	CP		&FF											;; is it FF
+	CP		ROOM_DATA_BREAK								;; is it FF
 	SCF													;; Carry = 1
 	RET 	Z											;; if was FF leave with Z and Carry=1, else:
-	CP		&C0											;; Code >= &C0 means Macro (recurse).
+	CP		ROOM_DATA_MACRO								;; Code >= &C0 means Macro (recurse).
 	JR		NC,RecProcEntry								;; if fetched byte was >= &C0 go Recurse RecProcEntry (macro), else:
 	PUSH 	IY											;; save the room size pointer in IY
 	LD		IY,TmpObj_variables							;; IY points on 18-byte temp variable
@@ -6556,8 +6631,8 @@ pent_one_obj:
 	RET
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; Initialise the doors. IY is pointing a byte after Max_min_UV_Table (IY = Max_min_UV_Table+4)
-;; and will be accessed with negative offsets.
+;; Initialise the doors. IY is pointing a byte after Max_min_UV_Table
+;; (ie. IY = Max_min_UV_Table+4) and will be accessed with negative offsets.
 .DoWallsnDoors:
 	LD		B,3											;; number of bit to fetch from CurrData
 	CALL 	FetchData									;; A = DoorId (theorically 0 to 7, but only 0 to 3 is used)
@@ -6570,22 +6645,22 @@ pent_one_obj:
 	LD		IX,Door_Obj_Flags
 	LD		HL,DoorHeightsTmp							;; nw door ; 1EF2+0 ; Door heights are stored in DoorHeightsTmp.
 	EXX
-	LD		A,(IY-1)									;; nw door ; IY-1 = Max_min_UV_Table+3 ; MaxV
+	LD		A,(IY-1)									;; MaxV ; nw door ; IY-1 = Max_min_UV_Table+3
 	ADD 	A,4											;; tmp obj V = MaxV + 4
 	CALL 	DoWallnDoorU								;; calc tmp obj U and place Door sprites
 	LD		HL,DoorHeightsTmp+1  						;; ne door ; 1EF2+1
 	EXX
-	LD		A,(IY-2)									;; ne door ; IY-2 = Max_min_UV_Table+2 ; MaxU
+	LD		A,(IY-2)									;; MaxU ; ne door ; IY-2 = Max_min_UV_Table+2
 	ADD 	A,4											;; tmp obj U = MaxU + 4
 	CALL 	DoWallnDoorV								;; calc tmp obj V and place Door sprites
 	LD		HL,DoorHeightsTmp+2							;; se door ; 1EF2+2
 	EXX
-	LD		A,(IY-3)									;; se door ; IY-3 = Max_min_UV_Table+1 ; MinV
+	LD		A,(IY-3)									;; MinV ; se door ; IY-3 = Max_min_UV_Table+1
 	SUB 	4											;; tmp obj V = MinV - 4
 	CALL 	DoWallnDoorU								;; calc tmp obj U and place Door sprites
 	LD		HL,DoorHeightsTmp+3							;; sw door ; 1EF2+3
 	EXX
-	LD		A,(IY-4)									;; sw door ; IY-4 = Max_min_UV_Table+0 ; MinU
+	LD		A,(IY-4)									;; MinU ; sw door ; IY-4 = Max_min_UV_Table+0
 	SUB 	4											;; tmp obj U = MinU - 4
 	JP		DoWallnDoorV								;; calc tmp obj V and place Door sprites
 
@@ -6669,7 +6744,7 @@ FetchedNoDoor:																;; No door case:
 	ADD 	A,A											;; *4
 	ADD 	A,A											;; *8 => grid to pix
 	PUSH 	AF
-	ADD 	A,&24										;; &24 in the coordinate offset of the left part of the door sprite
+	ADD 	A,DOOR_LOW									;; &24 in the coordinate offset of the left part of the door sprite
 	LD		(HL),A										;; TmpObj_var coord
 	PUSH 	HL
 	;; Get the door Z coordinate set up, return if no object to add.
@@ -6690,7 +6765,7 @@ FetchedNoDoor:																;; No door case:
 	LD		(TmpObj_variables+O_SPRITE),A				;; update tmp obj sprite
 	POP 	HL
 	POP 	AF
-	ADD 	A,&2C										;; need to add a coord offset of &2C for the right part of the door; note that to create the 3D effect, that sprite overlaps the left part by a third
+	ADD 	A,DOOR_HIGH									;; need to add a coord offset of &2C for the right part of the door; note that to create the 3D effect, that sprite overlaps the left part by a third
 	LD		(HL),A										;; Update coord
 .AddHalfDoorObj:
 	;; Adds the current object in TmpObj_variables
@@ -6702,7 +6777,7 @@ FetchedNoDoor:																;; No door case:
 	RET 	PO											;; if both bits 5 and 4 are different (01 or 10 = far walls side) leave (no need for a door step), else if equal (00 or 11 = near walls side):
 	;; If the door is at ground level, then can leave.
 	AND 	&10											;; keep only bit4
-	OR		&01											;; set bit0 (A can be &01 or &11)
+	OR		&01											;; set bit0 (A can be &01 or &11) ; Ledge???
 	LD		(TmpObj_variables+O_FLAGS),A				;; update flags
 	LD		A,(TmpObj_variables+O_Z)					;; get height
 	CP		GROUND_LEVEL								;; compare with ground level
@@ -6792,7 +6867,7 @@ check_floorid_above:
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Find room data if room exist.
-;; Input: Takes room id in BC.
+;; Input: Takes room Id in BC.
 ;; Return: First data byte in A, and room bit mask & location (in RoomMask_buffer) in C' and HL'.
 ;; Return: Carry set=not found or Carry reset=found)
 ;; If found, DataPtr and CurrData are updated, and pointing on the
@@ -6867,6 +6942,7 @@ frin_b_matched:																;; B was a match so now check C
 	JP		FetchData									;; will point on low nibble of id low byte ; will RET
 
 ;; -----------------------------------------------------------------------------------------------------------
+;; When unpacking Room data, will set the flags of the object processed.
 .SetTmpObjFlags:
 	LD		A,(UnpackFlags)								;; get orientation 3b flag value
 	RRA
@@ -7039,14 +7115,15 @@ dcwll_2:
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Initialization of a new game
+;; Note that it build Heels room, save it and switch to Head
 .Init_new_game:
 	XOR 	A											;; A=0
 	LD		(saved_World_Mask),A						;; reset saved_World_Mask
 	LD		(access_new_room_code),A					;; init access_new_room_code to 0 ("stay same room" Code)
 	LD		(Save_point_value),A						;; Initialize the save point value to 0
-	LD		A,&18										;; Init Heels' anim sprite
+	LD		A,SPR_HEELS1								;; Init Heels' anim sprite
 	LD		(Heels_variables+O_SPRITE),A
-	LD		A,&1F										;; Init Head's anim sprite
+	LD		A,SPR_HEAD2									;; Init Head's anim sprite
 	LD		(Head_variables+O_SPRITE),A
 	CALL 	Erase_visited_room							;; Erase "visited room" bits from mem &4261 length 012D (301 bytes (for 301 rooms) : in fact only 38 are used!)
 	CALL 	Reinitialise								;; Reinitialise with:
@@ -7054,8 +7131,8 @@ dcwll_2:
 	CALL 	ResetSpecials								;; reset the "picked up" bit for the special items
 	LD		HL,RoomID_Heels_1st							;; This is Heels initial room id (&8940)
 	LD		(current_Room_ID),HL						;; update current_Room_ID
-	LD		A,%00000001									;; init selected character
-	CALL 	InitOtherChar								;; this will first load Heels room, build it, and create Heels and Objects; then we'll switch the Head (1st room we see when starting the game), so that if we Swop, the other character (Heels) is already defined.
+	LD		A,HEELS_SELECTED							;; init selected character to be Heels
+	CALL 	InitOtherChar								;; but this will first load Heels room, build it, and create Heels and Objects; then we'll switch the Head (1st room we see when starting the game), so that if we Swop, the other character (Heels) is already defined.
 	LD		HL,RoomID_Head_1st							;; This is Head initial room id (&8A40)
 	LD		(current_Room_ID),HL						;; update current_Room_ID
 	XOR 	A											;; A=0
@@ -7082,7 +7159,7 @@ initth_sub:
 	AND 	A											;; test A
 	JR		NZ,initth_loop								;; if not 0 jump loop, else:
 	POP 	AF
-	XOR 	%00000011									;; switch bits 1 and 0 (change selected character)
+	XOR 	FLIP_SELECTED								;; switch bits 1 and 0 (change selected character)
 	LD		(selected_characters),A						;; update selected_characters
 	CALL 	CharThing3									;; init bit2 of SwopChara_Pressed
 	JP		Save_array									;; save other character
@@ -7091,7 +7168,7 @@ initth_sub:
 .Init_Continue_game:
 	CALL 	Reinitialise								;; Reinitialise with:
 	DEFW 	StatusReinit								;; Argument StatusReinit 2471 (counters)
-	LD		A,8											;; "All Black" color scheme
+	LD		A,COLOR_SCHEME_ALLBLACK						;; "All Black" color scheme
 	CALL 	Set_colors									;; set color scheme
 	JP		DoContinue									;; continue at DoContinue
 
@@ -7115,6 +7192,8 @@ WorldIdSnd:
 	DEFB 	&00											;; Sound ID of the current World (&40 to &46)
 
 ;; -----------------------------------------------------------------------------------------------------------
+;; enter the room, build it in black before setting the color scheme
+;; and also play World music and refresh HUD
 .Do_Enter_Room:
 	CALL 	EnterRoom
 	LD		A,(Sound_menu_data)							;; get Sound_menu_data
@@ -7130,7 +7209,7 @@ br_2383
 	LD		B,A											;; &40 + WorldId = World music
 	CALL 	Play_Sound									;; Play world music
 br_238C
-	CALL 	DrawBlacked
+	CALL 	DrawBlacked									;; build the room in black (hide the building process)
 	CALL 	CharThing15
 .Update_Screen_Periph:
 	LD		A,(color_scheme)							;; get color_scheme
@@ -7145,32 +7224,33 @@ br_238C
 	CALL 	Reinitialise								;; Reinitialise with:
 	DEFW 	ReinitThing									;; Argument ReinitThing 248A
 	LD		A,(selected_characters)						;; get selected_characters
-	CP		&03
-	JR		NZ,br_23BB
-	LD		HL,Other_Character_state + MOVE_OFFSET
+	CP		BOTH_SELECTED								;; test both selected
+	JR		NZ,br_onechar								;; not both, jump br_onechar
+	LD		HL,Other_Character_state + MOVE_OFFSET		;; else both selected
 	SET 	0,(HL)
 	CALL 	BuildRoom
 	LD		A,&01
 	JR		br_23F3
 
-br_23BB
-	CALL 	Do_We_Share_Room
-	JR		NZ,br_23EF
+br_onechar:
+	CALL 	Do_We_Share_Room							;; Same room? Zero set if they are
+	JR		NZ,br_diffrooms								;; not same room then jump br_diffrooms
+br_sameroom:																;; else they are in the same room
 	CALL 	Restore_array
 	CALL 	BuildRoomNoObj
 	LD		HL,Heels_variables
-	CALL 	GetUVZExtents_Blst
+	CALL 	GetUVZExtents_Near2Far
 	EXX
 	LD		HL,Head_variables
-	CALL 	GetUVZExtents_Blst
+	CALL 	GetUVZExtents_Near2Far
 	CALL 	CheckOverlap
 	JR		NC,br_23EB
 	LD		A,(selected_characters)						;; get selected_characters
-	RRA
-	JR		c,br_23DF
-	EXX
+	RRA													;; Heels bit (bit0) in Carry
+	JR		c,br_23DF									;; if Heels, jump br_23DF
+	EXX													;; if Head, echange BC,DE,HL with their prime regs
 br_23DF
-	LD		A,B
+	LD		A,B											;; height?
 	ADD 	A,&05
 	EXX
 	CP		B
@@ -7181,7 +7261,7 @@ br_23EB
 	LD		A,&01
 	JR		br_23F3
 
-br_23EF
+br_diffrooms
 	CALL 	BuildRoom
 	XOR 	A
 br_23F3
@@ -7190,7 +7270,7 @@ br_23F3
 
 ;; -----------------------------------------------------------------------------------------------------------
 .GetScreenEdges:
-	LD		HL,(Max_min_UV_Table)						;; MinU; MinU in L, MinV in H.
+	LD		HL,(Max_min_UV_Table)						;; MinU in L, MinV in H.
 	LD		A,(Has_Door)								;; Has_Door
 	PUSH	AF
 	BIT		1,A
@@ -7326,17 +7406,17 @@ ScanL:
 ;; The Reinitialise call with 2471 as argument will copy the 9 bytes of
 ;; StatusReinit_reset_data into the Inventory (247B) & after
 StatusReinit:
-	DEFB 	9             			;; Number of bytes (length) to reinit with
+	DEFB 	9             			;; Number of bytes (length) of the reset data
 StatusReinit_reset_data:
-	DEFB 	&00						;; Inventory reset value; Indicates what objects we have; a &FF here gives us all the objects!
+	DEFB 	%00000000				;; Inventory reset value; Indicates what objects we have; POKE a &07 (or &FF!) here gives us all the objects!
 	DEFB 	0             			;; CNT_SPEED : Speed reset value
-	DEFB 	0             			;; CNT_SPRING : Springs reset value
-	DEFB 	0             			;; CNT_HEELS_INVULN : Heels invulnerable reset value
-	DEFB 	0             			;; CNT_HEAD_INVULN : Head invulnerable reset value
-	DEFB 	8             			;; CNT_HEELS_LIVES : Heels lives reset value
-	DEFB 	8             			;; CNT_HEAD_LIVES : Head lives reset value
-	DEFB 	0             			;; CNT_DONUTS : Donuts reset value
-	DEFB 	0             			;; Heels Gravity
+	DEFB 	0             			;; CNT_SPRING : Spring reset value
+	DEFB 	0             			;; CNT_HEELS_INVULN : Heels_invulnerability reset value
+	DEFB 	0             			;; CNT_HEAD_INVULN : Head_s_invulnerability reset value
+	DEFB 	8             			;; CNT_HEELS_LIVES : Heels lives (Characters_lives) reset value
+	DEFB 	8             			;; CNT_HEAD_LIVES : Head lives (Characters_lives+1) reset value
+	DEFB 	0             			;; CNT_DONUTS : nb_donuts reset value
+	DEFB 	0             			;; Heels Gravity, to reset Heels_Gravity
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; This will indicate the available character inventory.
@@ -7367,8 +7447,13 @@ Heels_Gravity:
 	DEFB 	0             				;; Heels' Gravity : Value (0 or 7), only applied to Heels (without Head) after a jump when falling back down; it'll fall straight below (saw-tooth shape), whereas Head can gently fly to the ground (triangle shaped).
 
 ;; -----------------------------------------------------------------------------------------------------------
+HEELS_SELECTED			EQU		%00000001					;; Heels is bit0 of selected_characters
+HEAD_SELECTED			EQU		%00000010					;; Head is bit1 of selected_characters
+BOTH_SELECTED			EQU		%00000011					;; Both can be selected : Head over Heels!
+FLIP_SELECTED			EQU		%00000011					;; used with a XOR to flip bit0 and bit1 thus changing the selected character.
+
 selected_characters:
-	DEFB 	3 	    					;; Note: both can be selected! ; bit0=Heels, Bit1=Head; Bit2=Next character to swop to (0 Heels, 1 Head)
+	DEFB 	3 	    					;; Note: both can be selected! ; bit0=Heels, bit1=Head; bit2=Next character to swop to (0 Heels, 1 Head)
 both_in_same_room:
 	DEFB 	1							;; True/False
 
@@ -7388,7 +7473,7 @@ both_in_same_room:
 ;; ReinitThing_reset_data into the ???TODO_248e & after
 ReinitThing:
 ReinitThing_length:
-	DEFB 	3             				;; Three bytes to reinit with:
+	DEFB 	3             				;; length of ReinitThing_reset_data:
 ReinitThing_reset_data:
 	DEFB 	&00, &00, &FF				;; reset value for TODO_248e, Jump_Height, IsStill
 
@@ -7398,7 +7483,7 @@ TODO_248e:
 Jump_Height:
 	DEFB 	&00							;; Jump Height, when jumping it can be either 10, 8 or 4 depending on character, Spring stool, Bunny Spring Bonus.
 .IsStill:
-	DEFB 	&FF     					;; Boolean IsStill; &00 if moving, &FF if still
+	DEFB 	&FF     					;; Boolean IsStill; &00 = moving, &FF = still
 
 ;; -----------------------------------------------------------------------------------------------------------
 .TickTock:
@@ -7406,33 +7491,33 @@ Jump_Height:
 
 ;; -----------------------------------------------------------------------------------------------------------
 .SaveRestore_Block3:										;; Save/Restore Block 3 : &19 (25 bytes)
-TODO_2492:
-	DEFB 	&00							;; ??? a stored value of room access code (0=Stay,1=Down,2=Right,3=Up,4=Left,5=Below,6=Above,7=Teleport)
-.EntryPosn:
-	DEFB 	&00, &00, &00				;; Where we entered the room (for when we die).
-TODO_2496:
-	DEFB 	&03  					    ;; ???
-
-Carrying:
+.Restored_if_death_block:									;; 5 values in buffer BB31 will be restored here when dying
+saved_room_access_code:
+	DEFB 	&00							;; a stored value of room access code (0=Stay,1=Down,2=Right,3=Up,4=Left,5=Below,6=Above,7=Teleport)
+.EntryPosition_uvz:
+	DEFB 	&00, &00, &00				;; UVZ Where we entered the room (for when we die).
+saved_selected_chars:
+	DEFB 	&03  					    ;; a saved version of selected_character
+Restored_if_death_block_end:
+Carried_Object:
 	DEFW 	&0000  		           		;; Pointer to carried object.
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Fired Donut Object
 FiredObj_variables:  										;; &12 = 18
-	DEFW	&0000						;;	0&1 :
-	DEFW	&0000						;;	2&3 :
+	DEFW	&0000						;;	0&1 : O_NEAR2FAR_LST
+	DEFW	&0000						;;	2&3 : O_FAR2NEAR_LST
 	DEFB	&20							;;	4 : O_FLAGS
 	DEFB	&28							;;	5 : O_U coordinate
 	DEFB	&0B							;;	6 : O_V coordinate
 	DEFB	GROUND_LEVEL				;;	7 : O_Z coordinate
-	DEFB	&24							;;	8 : O_SPRITE
+	DEFB	SPR_VAPE1					;;	8 : O_SPRITE
 	DEFB	&08							;;	9 : Sprite flags (bit5: set = double size)
 	DEFB	&12							;;	A : O_FUNC
 	DEFB	&FF							;;	B : O_IMPACT
 	DEFB	&FF							;;	C :
-	DEFB	&00							;;	D : O_OBJUNDER
-	DEFB	&00							;;	E : O_OBJUNDER+1
-	DEFB	&08							;;	F : O_ANIM
+	DEFW	&0000						;;	D&E: O_OBJUNDER
+	DEFB	ANIM_VAPE1_code				;;	F : O_ANIM
 	DEFB	&00							;;	10 : O_DIRECTION (dir code 0 to 7 or FF)
 	DEFB	&00							;;	11 : O_SPECIAL
 .SaveRestore_Block3_end
@@ -7452,38 +7537,36 @@ Movement:
 Head_offset 			EQU 	OBJECT_LENGTH
 
 Heels_variables:											;; &12 = 18
-	DEFW 	&0000						;;	0&1 :
-	DEFW 	&0000						;;	2&3 :
+	DEFW 	&0000						;;	0&1 : O_NEAR2FAR_LST
+	DEFW 	&0000						;;	2&3 : O_FAR2NEAR_LST
 	DEFB 	&08							;;	4 : O_FLAGS
 	DEFB 	&28							;;	5 : O_U coordinate
 	DEFB 	&0B							;;	6 : O_V coordinate
 	DEFB 	GROUND_LEVEL				;;	7 : O_Z coordinate
-	DEFB 	&18							;;	8 : O_SPRITE
+	DEFB 	SPR_HEELS1					;;	8 : O_SPRITE
 	DEFB 	&21							;;	9 : Sprite flags (bit5: set = double size)
 	DEFB 	&00							;;	A : O_FUNC
 	DEFB 	&FF							;;	B : O_IMPACT
 	DEFB 	&FF							;;	C :
-	DEFB 	&00							;;	D : O_OBJUNDER
-	DEFB 	&00							;;	E : O_OBJUNDER+1
+	DEFW 	&0000						;;	D&E: O_OBJUNDER
 	DEFB 	&00							;;	F : O_ANIM
 	DEFB 	&00							;;	10 : O_DIRECTION (dir code 0 to 7 or FF)
 	DEFB 	&00							;;	11 : O_SPECIAL
 
 ;; Head_variables addr = Heels_variables + Head_offset
 Head_variables:												;; &12 = 18
-	DEFW	&0000						;;	0&1 :
-	DEFW	&0000						;;	2&3 :
+	DEFW	&0000						;;	0&1 : O_NEAR2FAR_LST
+	DEFW	&0000						;;	2&3 : O_FAR2NEAR_LST
 	DEFB	&08							;;	4 : O_FLAGS
 	DEFB	&28							;;	5 : O_U coordinate
 	DEFB	&0B							;;	6 : O_V coordinate
 	DEFB	GROUND_LEVEL				;;	7 : O_Z coordinate
-	DEFB	&1F							;;	8 : O_SPRITE
+	DEFB	SPR_HEAD2					;;	8 : O_SPRITE
 	DEFB	&25							;;	9 : Sprite flags (bit5: set = double size)
 	DEFB	&00							;;	A : O_FUNC
 	DEFB	&FF							;;	B : O_IMPACT
 	DEFB	&FF							;;	C : (displacement when trying to merge (when swop to both))
-	DEFB	&00							;;	D : O_OBJUNDER
-	DEFB	&00							;;	E : O_OBJUNDER+1
+	DEFB	&0000						;;	D&E : O_OBJUNDER
 	DEFB	&00							;;	F : O_ANIM
 	DEFB	&00							;;	10 : O_DIRECTION (dir code 0 to 7 or FF)
 	DEFB	&00							;;	11 : O_SPECIAL
@@ -7496,7 +7579,7 @@ Head_variables:												;; &12 = 18
 ;; the current sprite in the anim). The list is 0-terminated.
 ;; If the bit7 of the sprite code is set, the sprite is mirrored.
 .HeelsLoop:
-	DEFB 	&00, SPR_HEELS1, SPR_HEELS2, SPR_HEELS1, SPR_HEELS3, &00					;; Frame_index, sprite list, end
+	DEFB 	&00, SPR_HEELS1, SPR_HEELS2, SPR_HEELS1, SPR_HEELS3, &00			;; Frame_index, sprite list, end
 .HeelsBLoop:
 	DEFB 	&00, SPR_HEELSB1, SPR_HEELSB2, SPR_HEELSB1, SPR_HEELSB3, &00
 .HeadLoop:
@@ -7504,8 +7587,8 @@ Head_variables:												;; &12 = 18
 .HeadBLoop:
 	DEFB 	&00, SPR_HEADB1, SPR_HEADB2, SPR_HEADB1, SPR_HEADB3, &00
 .Vapeloop1:
-	DEFB 	&00, SPR_VAPE1, SPR_FLIP or SPR_VAPE1, SPR_FLIP or SPR_VAPE2				;; Frame_index, sprite list, end
-	DEFB	SPR_VAPE2, SPR_FLIP or SPR_VAPE2, SPR_FLIP or SPR_VAPE3						;; note : set bit7 to flip the sprite (mirror)
+	DEFB 	&00, SPR_VAPE1, SPR_FLIP or SPR_VAPE1, SPR_FLIP or SPR_VAPE2		;; Frame_index, sprite list, end
+	DEFB	SPR_VAPE2, SPR_FLIP or SPR_VAPE2, SPR_FLIP or SPR_VAPE3				;; note : set bit7 to flip the sprite (mirror)
 	DEFB 	SPR_VAPE3, SPR_VAPE3, SPR_FLIP or SPR_VAPE3
 	DEFB 	SPR_FLIP or SPR_VAPE3, SPR_VAPE3, SPR_VAPE3, &00
 .VapeLoop2:
@@ -7520,13 +7603,14 @@ Head_variables:												;; &12 = 18
 .BlinkEyesCounter:															;; (for BlinkEyes)
 	DEFB 	&40
 
-Eyes_Offset				EQU		&0D											;; Head's eyes offset in the sprite
+Eyes_Offset				EQU		&0D											;; Head's eyes offset in Head's sprite
+Blink_toggle_b7			EQU		%10000000
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Blinks Head eyes if facing us
 .BlinkEyes:
 	LD		HL,BlinkEyesState							;; point on BlinkEyesState
-	LD		A,&80
+	LD		A,Blink_toggle_b7
 	XOR 	(HL)										;; read, toggle bit7 and....
 	LD		(HL),A										;; ...update BlinkEyesState
 	LD		A,(SpriteFlips_buffer + 3 + MOVE_OFFSET) 	;; check if the sprite is flipped or not
@@ -7565,7 +7649,7 @@ wgxor_2:
 ;; Xor table to invert chosen bits and blink Head's eyes;
 ;; One set is used if Head is facing left, the other for facing right.
 ;; For exemple, if facing right, the xoring result on the image SPR_HEAD2 (&8FC0) is this:
-;; (the effect is more obvious in game!)
+;; (the effect is more obvious in game! Blink your eyes to see it ;-) )
 ;;         ........................                               ........................
 ;;         .........@@@@@..........        Xor:                   .........@@@@@..........
 ;;         .......@@@@@@@@@........		  03 00 1B 80 38 00       .......@@@@@@@@@........
@@ -7657,7 +7741,7 @@ ct_tp
 	OR		H
 	OR		L											;; A=3 if both in same room, A=2 if Head only, A=1 if Heels only
 	RRA													;; Heels value in carry (in the rooom=1, not in=0)
-	PUSH AF												;; save
+	PUSH	AF											;; save
 decr_heels_invuln:
 	LD		A,CNT_HEELS_INVULN
 	CALL 	c,Decrement_counter_and_display				;; if Heels in the room, decr invul counter
@@ -7688,80 +7772,81 @@ br_25B6
 	CALL 	CharThing4
 
 br_25B9:
-	CALL Get_curr_Char_variables						;; HL = pointer on current selected character's variables
-	PUSH HL
-	POP IY
-	LD A,(IY+O_Z)
-	CP &84
-	JR NC,CheckFired
-	XOR A
-	LD (Jump_Height),A
-	LD A,(FloorAboveFlag)
-	AND A
-	JR NZ,CheckFired
-	LD A,&06											;; code 6 = "go room Above"
-	LD (access_new_room_code),A							;; update access_new_room_code (0=Stay,1=Down,2=Right,3=Up,4=Left,5=Below,6=Above,7=Teleport)
+	CALL	Get_curr_Char_variables						;; HL = pointer on current selected character's variables
+	PUSH	HL
+	POP		IY
+	LD		A,(IY+O_Z)
+	CP		GROUND_LEVEL - 60							;; 10 char height unit above ground level
+	JR		NC,CheckFired
+	XOR		A
+	LD		(Jump_Height),A
+	LD		A,(FloorAboveFlag)
+	AND		A
+	JR		NZ,CheckFired
+	LD		A,&06										;; code 6 = "go room Above"
+	LD		(access_new_room_code),A					;; update access_new_room_code (0=Stay,1=Down,2=Right,3=Up,4=Left,5=Below,6=Above,7=Teleport)
 .CheckFired:
 	;; Check for Fire being pressed
-	LD A,(FireDonuts_Pressed)							;; get FireDonuts_Pressed
+	LD		A,(FireDonuts_Pressed)						;; get FireDonuts_Pressed
 	RRA													;; get bit0 in Carry
-	JR NC,CheckDying									;; Carry reset so not pressed, jump to CheckDying, else:
-	LD A,(selected_characters)							;; get selected_characters
-	OR &FD												;; ~&02 test for Head
-	INC A												;; if bit1 was 1, then A is now 0
-	LD HL,Saved_Objects_List_index						;; point on Saved_Objects_List_index
-	OR (HL)
-	JR NZ,CantFireDonut 								;; Skips if not Head (alone)
-	LD A,(Inventory)									;; get inventory
-	OR &F9												;; ~&06 test bits 2 (Donuts) and 1 (Hooter)
-	INC A												;; A is now 0 if we have both Hotter and donuts
-	JR NZ,CantFireDonut 								;; Skips to CantFireDonut if don't have donuts and a hooter, else:
-	LD A,(FiredObj_variables+O_ANIM)					;; [7:3] = anim code, [2:0] = frame
-	CP &08												;; anim code 1; frame 0
-	JR NZ,CantFireDonut									;; if there is an Anim loop jump CantFireDonut, else:
-	LD HL,Head_variables+O_U							;; Head U
-	LD DE,FiredObj_variables+O_U						;; FiredObj U
-	LD BC,&0003											;; U,V and Z
+	JR		NC,CheckDying								;; Carry reset so not pressed, jump to CheckDying, else:
+	LD		A,(selected_characters)						;; get selected_characters
+	OR		&FD											;; ~&02 test for Head
+	INC		A											;; if bit1 was 1, then A is now 0
+	LD		HL,Saved_Objects_List_index					;; point on Saved_Objects_List_index
+	OR		(HL)
+	JR		NZ,CantFireDonut 							;; Skips if not Head (alone)
+	LD		A,(Inventory)								;; get inventory
+	OR		&F9											;; ~&06 test bits 2 (Donuts) and 1 (Hooter)
+	INC		A											;; A is now 0 if we have both Hotter and donuts
+	JR		NZ,CantFireDonut 							;; Skips to CantFireDonut if don't have donuts and a hooter, else:
+	LD		A,(FiredObj_variables+O_ANIM)				;; [7:3] = anim code, [2:0] = frame
+	CP		ANIM_VAPE1_code								;; anim code 1 (ANIM_VAPE1); frame 0
+	JR		NZ,CantFireDonut							;; if there is an Anim loop jump CantFireDonut, else:
+	LD		HL,Head_variables+O_U						;; Head U
+	LD		DE,FiredObj_variables+O_U					;; FiredObj U
+	LD		BC,3										;; 3 : U,V and Z
 	LDIR												;; Copies X/Y/Z coordinate from Head to fired donut. repeat LD (DE),(HL); DE++, HL++, BC-- until BC=0
-	LD HL,FiredObj_variables
-	PUSH HL
-	POP IY												;; Sets IY to FiredObj_variables
-	LD A,(Do_Objects_Phase)								;; get Do_Objects_Phase
-	OR OBJFN_FIRE
-	LD (FiredObj_variables+O_FUNC),A
-	LD (IY+O_FLAGS),0									;; Init fire obj flags ;
-	LD A,(character_direction)							;; get LRDU character_direction
-	LD (FiredObj_variables+O_IMPACT),A
-	LD (IY+&0C),&FF										;; fire obj ????
-	LD (IY+O_ANIM),&20									;; anim code in [7:3] = &04 (index3 in AminTable = ANIM_VAPE2) and frame = 0
-	CALL EnlistAux
-	;; Use up a donut
-	LD A,CNT_DONUTS
-	CALL Decrement_counter_and_display
-	LD B,Sound_ID_Donut_Firing							;; Sound ID &48 = Donut use
-	CALL Play_Sound
-	LD A,(nb_donuts)
-	AND A												;; To test if A==0
-	JR NZ,CheckDying									;; if A > 0 then can shoot Donut  ; if we put a &18 0D (JR CheckDying) then we have infinite Shoots
-	LD HL,Inventory										;; point on inventory
-	RES 2,(HL)
-	CALL Draw_Screen_Periphery
-	JR CheckDying
+	LD		HL,FiredObj_variables
+	PUSH	HL
+	POP		IY											;; Sets IY to FiredObj_variables
+	LD		A,(Do_Objects_Phase)						;; get Do_Objects_Phase
+	OR		OBJFN_FIRE
+	LD		(FiredObj_variables+O_FUNC),A				;; fire function + phase set
+	LD		(IY+O_FLAGS),0								;; Init fire obj flags ;
+	LD		A,(character_direction)						;; get LRDU character_direction
+	LD		(FiredObj_variables+O_IMPACT),A
+	LD		(IY+&0C),&FF								;; fire obj reset ????
+	LD		(IY+O_ANIM),ANIM_VAPE2_code					;; anim code in [7:3] = &04 (index3 in AnimTable = ANIM_VAPE2) and frame = 0
+	CALL	EnlistAux
+	;; Use a Donut
+	LD		A,CNT_DONUTS
+	CALL	Decrement_counter_and_display				;; used a Donut, so decrement counter
+	LD		B,Sound_ID_Donut_Firing						;; Sound ID &48 = Donut use
+	CALL	Play_Sound
+	LD		A,(nb_donuts)
+	AND		A											;; To test if A==0 (donut available?)
+	JR		NZ,CheckDying								;; if A > 0 then can shoot Donut  ; if we put a &18 0D (JR CheckDying) then we have infinite Shoots
+	LD		HL,Inventory								;; else no more donuts remaining, point on inventory
+	RES		2,(HL)										;; remove Donut tray from inventory
+	CALL	Draw_Screen_Periphery						;; update HUD
+	JR		CheckDying
 
 .CantFireDonut:
-	CALL Play_Sound_NoCanDo
-.CheckDying:
-	LD HL,access_new_room_code							;; point on access_new_room_code
-	LD A,(HL)											;; get access_new_room_code (0=Stay,1=Down,2=Right,3=Up,4=Left,5=Below,6=Above,7=Teleport)
-	AND &7F												;; ignore bit7
-	RET Z												;; if (&80 () or &00 (staying in same room)) leave, else (change room):
-	LD A,(DyingAnimFrameIndex)							;; get DyingAnimFrameIndex
-	AND A												;; test
-	JR Z,FinishedDying									;; if 0 (finished dying) continue at FinishedDying, else (Dying):
-	LD (HL),0											;; indicate we stay in the room, we can't change room when dying
+	CALL	Play_Sound_NoCanDo							;; reached here if cannont fire a donut
+.CheckDying:																;; then check is character dying
+	LD		HL,access_new_room_code						;; point on access_new_room_code
+	LD		A,(HL)										;; get access_new_room_code (0=Stay,1=Down,2=Right,3=Up,4=Left,5=Below,6=Above,7=Teleport)
+	AND		&7F											;; ignore bit7
+	RET		Z											;; if (&80 () or &00 (staying in same room)) leave, else (change room):
+	LD		A,(DyingAnimFrameIndex)						;; get DyingAnimFrameIndex
+	AND		A											;; test
+	JR		Z,FinishedDying								;; if 0 (finished dying) continue at FinishedDying, else (Dying):
+	LD		(HL),0										;; indicate we stay in the room, we can't change room when dying
 	RET
 
 ;; -----------------------------------------------------------------------------------------------------------
+;; Death anim finished playing
 FinishedDying:
 	LD		A,(both_in_same_room)						;; get both_in_same_room
 	AND		A											;; test
@@ -7770,20 +7855,20 @@ FinishedDying:
 	PUSH	HL
 	POP		IY											;; IY = current character
 	CALL	Unlink
-	LD		A,(selected_characters)						;; get selected_characters (
-	CP		&03
-	JR		Z,nfc_end
-	LD		HL,TODO_2496								;; TODO???
+	LD		A,(selected_characters)						;; get selected_characters (bit0:Heels, bit1:Head, bit2:next)
+	CP		BOTH_SELECTED
+	JR		Z,nfc_end									;; both selected, jump nfc_end
+	LD		HL,saved_selected_chars						;; else: point on saved_selected_chars
 	CP		(HL)
 	JR		Z,br_2672
-	XOR		&03
+	XOR		FLIP_SELECTED								;; flip selected
 	LD		(HL),A
 	JR		br_267D
 
 br_2672
-	LD		HL,&BB31									;; copy the 5 bytes in the buffer in the 3 variables from 2492
-	LD		DE,&2492
-	LD		BC,&0005
+	LD		HL,OCS_Saved + MOVE_OFFSET					;; copy the 5 bytes from the buffer in the 3 variables starting at 2492
+	LD		DE,Restored_if_death_block
+	LD		BC,5										;; restore 5 bytes: saved_room_access_code, EntryPosition_uvz and saved_selected_chars
 	LDIR												;; Copy: repeat LD (DE),(HL); DE++, HL++, BC-- until BC=0
 
 br_267D
@@ -7792,8 +7877,8 @@ br_267D
 	LD		(Head_variables+O_OBJUNDER),HL				;; reset Head (not standing on an object)
 	CALL	Save_array									;; SaveStuff
 nfc_end:
-	LD		HL,&0000									;; reset Carrying pointer
-	LD		(Carrying),HL
+	LD		HL,&0000									;; reset Carried_Object pointer
+	LD		(Carried_Object),HL
 	JP		Go_to_room									;; Change room
 
 teleport_down_playing:
@@ -7815,10 +7900,10 @@ teleport_up_playing:
 	JP		NZ,CharThing20								;; in the process of dying go CharThing20, else dead:
 end_of_death:
 	LD		HL,&0000
-	LD		(Carrying),HL								;; reset Carrying pointer
+	LD		(Carried_Object),HL							;; reset Carried_Object pointer
 	LD		HL,Characters_lives							;; point on Characters_lives
 	LD		BC,(Dying)
-	LD		B,&02
+	LD		B,2											;; check both characters
 	LD		D,&FF
 hded_loop:
 	RR		C
@@ -7842,57 +7927,56 @@ br_26CA
 	;; No lives lost, then skip to the end.
 	LD		A,D
 	AND		A
-	JR		NZ,HD_8
+	JR		NZ,HD_2711
 	LD		HL,Characters_lives							;; point on Characters_lives
 	LD		A,(both_in_same_room)						;; get both_in_same_room
 	AND		A											;; test A
-	JR		Z,HD_6										;; if 0 (not in same room) jump HD_6, else (same room):
-	LD		A,(TODO_2496)
-	CP		&03											;; TODO is this to share a life when one has 0, borrow 1 life to the other char.
-	JR		NZ,hddth_1
-	LD		A,(HL)
-	AND		A
-	LD		A,&01
-	JR		NZ,br_26EF
+	JR		Z,HD_26ff									;; if 0 (not in same room) jump HD_26ff, else (same room):
+	LD		A,(saved_selected_chars)					;; else are same room
+	CP		BOTH_SELECTED								;; were both characters selected?
+	JR		NZ,hddth_1									;; no, jump to hddth_1
+	LD		A,(HL)										;; else read Heels lives
+	AND		A											;; test
+	LD		A,&01										;; prepare A=1
+	JR		NZ,br_26EF									;; if
 	INC		A
 br_26EF
-	LD		(TODO_2496),A
-	JR		HD_8
+	LD		(saved_selected_chars),A
+	JR		HD_2711
 
-hddth_1:
-	RRA
-	JR		c,hddth_skip_inc
-	INC		HL
+hddth_1:																	;; one character was selected
+	RRA													;; Heels' selected status in Carry
+	JR		c,hddth_skip_inc							;; if Heels selected, jump hddth_skip_inc
+	INC		HL											;; else point on Head's lives
 hddth_skip_inc:
-	LD		A,(HL)
-	AND		A
-	JR		NZ,br_270E
-	LD		(both_in_same_room),A						;; update both_in_same_room; InSameRoom
+	LD		A,(HL)										;; read lives for currently selected character
+	AND		A											;; test if 0
+	JR		NZ,br_270E									;; not 0, jump br_270E
+	LD		(both_in_same_room),A						;; else, A=0 (curr char no more lives); reset both_in_same_room
 
-HD_6:
-	;; Current character has no more lives, switch to other character"
-	CALL	Switch_Character
+HD_26ff:																	;; no more lives left so...
+	CALL	Switch_Character							;; ...switch to other character
 	LD		HL,&0000
 	LD		(DyingAnimFrameIndex),HL					;; reset DyingAnimFrameIndex and Dying
-HD_7:
+HD_2708:
 	LD		HL,Other_Character_state + MOVE_OFFSET
 	SET		0,(HL)
 	RET
 
-br_270E
-	CALL	HD_7
-HD_8
-	LD		A,(TODO_2496)
-	LD		(selected_characters),A						;; update selected_characters
+br_270E																		;; one character with at least one life remaining
+	CALL	HD_2708
+HD_2711
+	LD		A,(saved_selected_chars)
+	LD		(selected_characters),A						;; recover selected_characters
 	CALL	CharThing3
 	CALL	Get_curr_Char_variables						;; HL = pointer on current selected character's variables
-	LD		DE,&0005									;; object link list is 5 bytes per element
-	ADD		HL,DE										;; update pointer
-	EX		DE,HL
-	LD		HL,EntryPosn
-	LD		BC,&0003
-	LDIR												;; repeat LD (DE),(HL); DE++, HL++, BC-- until BC=0
-	LD		A,(TODO_2492)
+	LD		DE,O_U
+	ADD		HL,DE										;; update pointer to char O_U
+	EX		DE,HL										;; in DE
+	LD		HL,EntryPosition_uvz						;; HL points on the stored UVZ when we entered the room
+	LD		BC,3										;; U, V and Z
+	LDIR												;; Copy EntryPosition_uvz into character's UVZ: repeat LD (DE),(HL); DE++, HL++, BC-- until BC=0
+	LD		A,(saved_room_access_code)					;; restored stored access code
 	LD		(access_new_room_code),A					;; update access_new_room_code (0=Stay,1=Down,2=Right,3=Up,4=Left,5=Below,6=Above,7=Teleport)
 	JP		Long_move_to_new_room
 
@@ -7934,7 +8018,7 @@ br_2762
 	JP		UnionAndDraw
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; Put bit 0 of A into bit 2 (next char to swop to) of SwopPressed
+;; Put bit0 of A into bit2 (next char to swop to) of SwopPressed
 CharThing3:
 	AND 	&01											;; keep bit0 (Carry=0)
 	RLCA
@@ -7991,9 +8075,9 @@ br_27D3
 	DEC		(IY+O_Z)
 br_27DE
 	LD		A,(selected_characters)						;; get selected_characters
-	AND		&02
-	JR		NZ,br_27EB
-br_27E5
+	AND		HEAD_SELECTED								;; test if Head
+	JR		NZ,br_27EB									;; if Head, jump br_27EB
+br_27E5																		;; else Heels
 	LD		A,(character_direction)						;; get LRDU character_direction
 	JP		HandleMove
 
@@ -8041,13 +8125,14 @@ EPIC_40:
 	RES		4,(IY+O_IMPACT)
 br_284B
 	XOR		A
-	LD		(TODO_248e),A								;; reset TODO_248e value
+	LD		(TODO_248e),A								;; reset TODO_248e value to 0
 	CALL	DoCarry
 	CALL	DoJump
 br_2855
 	LD		A,(Current_User_Inputs)						;; get Current_User_Inputs CFSLRDUJ
 	RRA													;; get LRDU in bits [3:0] = LRDU dir
-.HandleMove:																;; Do the movement with LRDU direction in A.
+;; Do the movement with LRDU direction in A.
+.HandleMove:
 	CALL	MoveChar
 	CALL	Orient
 	EX		AF,AF'
@@ -8070,10 +8155,10 @@ br_2874
 br_287E
 	;; If Head is facing towards us, do blink. Set BC appropriately.
 	EX		AF,AF'
-	LD		BC,SPR_HEELSB1 * 256 + SPR_HEADB1			;; BC,SPR_HEELSB1 << 8 | SPR_HEADB1
+	LD		BC,SPR_HEELSB1 * WORD_HIGH_BYTE + SPR_HEADB1	;; BC,SPR_HEELSB1 << 8 | SPR_HEADB1
 	JR		c,br_28BC
 	CALL	DoBlinkHeadEyes
-	LD		BC,SPR_HEELS1 * 256 + SPR_HEAD2				;; BC,SPR_HEELS1 << 8 | SPR_HEAD2
+	LD		BC,SPR_HEELS1 * WORD_HIGH_BYTE + SPR_HEAD2		;; BC,SPR_HEELS1 << 8 | SPR_HEAD2
 	JR		br_28BC
 
 br_288C
@@ -8096,8 +8181,8 @@ br_28A8
 	POP		HL
 	;; Update Head sprite (Head_variables+O_SPRITE) if Character contains Head.
 	LD		A,(selected_characters)						;; get selected_characters
-	AND		&02
-	JR		Z,br_28B6
+	AND		HEAD_SELECTED								;; test if Head
+	JR		Z,br_28B6									;; if not Head jump
 	CALL	Read_Loop_byte
 	LD		(Head_variables+O_SPRITE),A
 br_28B6
@@ -8105,8 +8190,8 @@ br_28B6
 	JR		UpdateChar
 br_28BC
 	SET		5,(IY+O_IMPACT)
-	;; Update the character animation frames to values in BC, and then
-	;; call UpdateChar.
+;; Update the character animation frames to values in BC, and then
+;; call UpdateChar.
 .UpdateCharFrame:
 	LD		A,(selected_characters)						;; get selected_characters
 	RRA
@@ -8115,8 +8200,8 @@ br_28BC
 	LD		(IY+O_SPRITE),B
 br_28C9
 	LD		A,(selected_characters)						;; get selected_characters
-	AND		&02
-	JR		Z,UpdateChar
+	AND		HEAD_SELECTED								;; test if Head
+	JR		Z,UpdateChar								;; if not Head, jump
 	;; Head case.
 	LD		A,C
 	LD		(Head_variables+O_SPRITE),A
@@ -8154,24 +8239,24 @@ do_blink:
 CharThing22:
 	LD HL,TODO_248e
 	LD A,(HL)											;; get TODO_248e value
-	AND A												;; test
+	AND A												;; test (can be 0 or FF)
 	LD (HL),&FF											;; and update value to FF
 	JR Z,CharThing24									;; if was Zero, skip to CharThing24 with A=0
-	CALL DoCarry										;; else
+	CALL DoCarry										;; else, was FF
 	CALL DoJump
 	XOR A
 	JR CharThing24										;; skip to CharThing24 with A=0
 
 CharThing23:
-	XOR A
-	LD (TODO_248e),A									;; reset TODO_248e value to 0
+	XOR A												;; A=0
+	LD (TODO_248e),A									;; TODO_248e value = 0
 	INC A												;; A=1
 CharThing24:
 	LD C,A												;; C can be either 0 (coming from CharThing22) or 1 (coming from CharThing23)
 	CALL ResetTickTock
 	RES 5,(IY+O_IMPACT)
 	LD A,(selected_characters)							;; get selected_characters
-	AND %00000010										;; test if Head (or Head-over-Heels)
+	AND HEAD_SELECTED									;; test if Head (or Head-over-Heels)
 	JR NZ,br_292E										;; NZ = Head, skip to br_292E
 	DEC C												;; else (Heels only), C=0 or -1
 	JR NZ,br_2946
@@ -8201,16 +8286,16 @@ br_2952
 	CALL MoveChar
 br_2955
 	CALL Orient
-	LD BC,SPR_HEELSB1 * 256 + SPR_HEADB1				;; SPR_HEELSB1 << 8 | SPR_HEADB1
+	LD BC,SPR_HEELSB1 * WORD_HIGH_BYTE + SPR_HEADB1			;; SPR_HEELSB1 << 8 | SPR_HEADB1
 	JP c,UpdateCharFrame
-	LD BC,SPR_HEELS1 * 256 + SPR_HEAD_FLYING			;; SPR_HEELS1 << 8 | SPR_HEAD_FLYING
+	LD BC,SPR_HEELS1 * WORD_HIGH_BYTE + SPR_HEAD_FLYING		;; SPR_HEELS1 << 8 | SPR_HEAD_FLYING
 	JP UpdateCharFrame
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Sprite orientation (flip/no-flip and Front/Back)
 ;; Reset bit4 of O_FLAGS if bit1 is set (U)
 ;; set bit4 of O_FLAGS if bit1 is reset (V) (sprite needs flip)
-;; returns with carry set if facing away or Carry reset if rearward.
+;; Returns with carry set if facing away or Carry reset if rearward.
 .Orient:
 	LD		A,(character_direction)						;; get LRDU character_direction
 	CALL 	DirCode_from_LRDU							;; get dir code (0 to 7 or FF), from LRDU
@@ -8255,7 +8340,7 @@ br_2998
 	LD		A,(IY+O_IMPACT)
 	OR		&F0
 	INC		A
-	LD		A,Sound_ID_Menu_Blip						;; TODO: Menu blip
+	LD		A,Sound_ID_Menu_Blip						;; Menu blip
 	CALL	NZ,SetOtherSound
 br_29B6
 	POP		AF
@@ -8285,7 +8370,7 @@ br_29B6
 .Slide:
 	LD		HL,Speed
 	LD		A,(selected_characters)						;; get selected_characters
-	AND		&01
+	AND		HEELS_SELECTED								;; test Heels
 	OR		(HL)
 	RET		Z
 	LD		HL,SpeedModulo
@@ -8368,7 +8453,7 @@ onSpringStool																;; on a Spring stool, add extra force
 	INC 	C											;; if on a SPRING stool (sprung or not), incr C
 br_testheelsjpbonus
 	LD		A,(selected_characters)						;; get selected_characters
-	AND		%00000010									;; test if Head
+	AND		HEAD_SELECTED								;; test if Head
 	JR		NZ,br_bigjump								;; if Head (or Head over Heels) skip, else (Heels only)
 	PUSH	BC											;; Heels, try to use a spring
 	LD		A,CNT_SPRING								;; Spring index
@@ -8401,13 +8486,16 @@ br_2A7C
 
 ;; -----------------------------------------------------------------------------------------------------------
 OnTeleport:
-	LD		HL,&080C									;; Teleport_up_anim_length and Teleport_down_anim_length
+	LD		HL,&08 * WORD_HIGH_BYTE + &0C				;; Teleport_up_anim_length and Teleport_down_anim_length
 	LD		(Teleport_up_anim_length),HL				;; init 2 lengths of the teleport vape anim, beaming up and down
 	LD		B,Sound_ID_Teleport_Up						;; Sound_ID &C7 ; Teleporter beam up noise
 	JP		Play_Sound	 								;; will RET
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; This will handle the pick-up (by Heels with the Purse) of an object in the room
+;; This will handle the pick-up (by Heels with the Purse) of an object
+;; in the room, and drawing it on the HUD if carried.
+CARRIED_OBJ_HUD_POS		EQU		&D8 * WORD_HIGH_BYTE + &B0					;; y = 216, x = 176
+
 .DoCarry:
 	LD		A,(CarryObject_Pressed)						;; get CarryObject_Pressed
 	RRA													;; Carry key pressed?
@@ -8417,12 +8505,12 @@ OnTeleport:
 purseNope:
 	JP		NC,Play_Sound_NoCanDo						;; no then leave to Play_Sound_NoCanDo, else:
 	LD		A,(selected_characters)						;; get selected_characters
-	AND		%00000001									;; Heels?
+	AND		HEELS_SELECTED								;; Heels?
 	JR		Z,purseNope									;; No, then jump back to purseNope (Play Nope sound and leave)
 purseYop:																	;; else do have the Purse
 	LD		A,Sound_ID_Sweep_Tri						;; else: Sound ID Sweep down and up
 	CALL	SetOtherSound
-	LD		A,(Carrying+1)								;; carried object pointer high byte
+	LD		A,(Carried_Object+1)						;; carried object pointer high byte
 	AND		A											;; test (if 0, Purse empty)
 	JR		NZ,DropCarried								;; If holding something, drop it
 pursePickup:
@@ -8431,8 +8519,8 @@ pursePickup:
 	JR		NC,purseNope								;; nothing below, can't pick up
 	LD		A,(IX+O_SPRITE)								;; else, Load sprite of thing carried
 	PUSH	HL
-	LD		(Carrying),HL								;; store carried object pointer
-	LD		BC,&D8B0									;; CARRY_POSN = 216 << 8 | 176; carried object sprite y,x coord on HUD????
+	LD		(Carried_Object),HL							;; store carried object pointer
+	LD		BC,CARRIED_OBJ_HUD_POS						;; carried object sprite y,x coord on HUD
 	PUSH	AF
 	CALL	Draw_sprite_3x24							;; Draw the item now carried
 	POP		AF
@@ -8456,13 +8544,13 @@ carryLoop:
 	DEC		(IY+O_Z)
 	DEC		(IY+O_Z)
 	DJNZ	carryLoop
-	LD		HL,(Carrying)
+	LD		HL,(Carried_Object)
 	PUSH	HL
-	LD		DE,&0007
+	LD		DE,O_Z
 	ADD		HL,DE
 	PUSH	HL
 	CALL	Get_curr_Char_variables						;; HL = pointer on current selected character's variables
-	LD		DE,&0006									;; curr Char variables+6 = V coord
+	LD		DE,O_V										;; curr Char variables+6 = V coord
 	ADD		HL,DE
 	EX		DE,HL										;; CharObj + 6 (V) in DE
 	POP		HL											;; Object + 7 in HL
@@ -8474,8 +8562,8 @@ carryLoop:
 	POP		HL
 	CALL	InsertObject								;; add object to the room
 	LD		HL,&0000
-	LD		(Carrying),HL								;; reset the "Carrying" var
-	LD		BC,&D8B0									;; ARRY_POSN = 216 << 8 | 176
+	LD		(Carried_Object),HL							;; reset the "Carried_Object" var
+	LD		BC,CARRIED_OBJ_HUD_POS						;; Carried object position in the HUD : need to clear it
 	CALL	Clear_3x24									;; Clear out the what's-carried display
 	CALL	Get_curr_Char_variables						;; HL = pointer on current selected character's variables
 	CALL	DoorContact
@@ -8486,6 +8574,7 @@ carryLoop:
 	LD		(IY+O_Z),C									;; Restore old value
 	JP		Play_Sound_NoCanDo							;; will RET
 
+;; -----------------------------------------------------------------------------------------------------------
 .SetSound:
 	LD		HL,Sound_ID									;; pointer on Sound_ID
 	JR		BumpUp
@@ -8513,14 +8602,14 @@ carryLoop:
 	JP		Play_Sound									;; will RET
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; Get a pointer in HL on the selected character's variables
+;; Get a pointer in HL on the selected character's variables (object instance)
 ;; ie. if Heels selected HL = Heels_variables else Head_variables
 .Get_curr_Char_variables:
 	LD		HL,selected_characters						;; points on selected_characters
 	BIT 	0,(HL)										;; is Heels selected?
 	LD		HL,Heels_variables							;; prepare return HL = Heels var
 	RET 	NZ											;; if Heels selected then return pointer on Heels_variables
-	LD		 HL,Head_variables
+	LD		HL,Head_variables
 	RET													;; else return pointer on Head_variables
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -8529,18 +8618,18 @@ CharThing15:
 	LD		(Vapeloop1),A								;; set anim index of "Vapeloop1" to 0
 	LD		(Teleport_up_anim_length),A					;; set Teleport_up_anim_length to 0
 	LD		(VapeLoop2),A								;; set anim index of "Vapeloop2" to 0
-	LD		A,&08
+	LD		A,ANIM_VAPE1_code
 	LD		(FiredObj_variables+O_ANIM),A				;; reset Fired_Obj anim
 	CALL	Set_Character_Flags
 	LD		A,(selected_characters)						;; get selected_characters
-	LD		(TODO_2496),A								;; update
+	LD		(saved_selected_chars),A					;; save it
 	CALL	Get_curr_Char_variables						;; HL = pointer on current selected character's variables
 	PUSH	HL
+	PUSH	HL											;; push curr char twice
 	PUSH	HL
-	PUSH	HL
-	POP		IY
+	POP		IY											;; IY = curr character
 	LD		A,(access_new_room_code)					;; get access_new_room_code (0=Stay,1=Down,2=Right,3=Up,4=Left,5=Below,6=Above,7=Teleport)
-	LD		(TODO_2492),A								;; store ???
+	LD		(saved_room_access_code),A					;; store access_new_room_code value
 	PUSH	AF
 	SUB		1											;; at this point the value in A is (0=Down,1=Right,2=Up,3=Left,4=Below,5=Above,6=Teleport)
 	PUSH	AF
@@ -8560,9 +8649,9 @@ CharThing15:
 	LD		(IY+O_Z),C
 EPIC_86:
 	CALL	Get_curr_Char_variables						;; HL = pointer on current selected character's variables
-	LD		DE,&0005
+	LD		DE,O_U										;; DE=5
 	ADD		HL,DE										;; Curr Char Variable+5 (U coord)
-	EX		DE,HL										;; in DE
+	EX		DE,HL										;; in DE = character U coord
 	POP		AF
 	JR		c,EPIC_93
 	CP		&06
@@ -8570,97 +8659,98 @@ EPIC_86:
 	JR		NC,EPIC_92
 	CP		&04
 	JR		NC,EPIC_88
-	LD		HL,Max_min_UV_Table							;; pointer on MinU
+	LD		HL,Max_min_UV_Table							;; points on MinU
 	LD		C,&FD
 	RRA
 	JR		NC,EPIC_87
 	INC		DE
-	INC		HL
+	INC		HL											;; MinV value
 EPIC_87:
 	RRA
 	JR		c,EPIC_95
 	LD		C,&03
 	INC		HL
-	INC		HL
+	INC		HL											;; MaxU or MaxV value depending on ???
 	JR		EPIC_95
 
-EPIC_88:
-	INC DE
-	INC DE
+EPIC_88:																	;; this seems to be the height we fall from when falling from a room above or the height we end up when comming from a room below (heli or jump)
+	INC		DE
+	INC		DE
 	RRA
-	LD A,&84
-	JR NC,EPIC_89
-	LD A,(TODO_236e)
-	AND A
-	LD A,&BA
-	JR Z,EPIC_89
-	LD A,&B4
+	LD		A,GROUND_LEVEL - 60							;; &C0 (ground level) minus 60 (10 character height unit above)
+	JR		NC,EPIC_89
+	LD		A,(TODO_236e)
+	AND		A
+	LD		A,GROUND_LEVEL - 6							;; &C0 (ground level) minus 6 (1 character height unit above)
+	JR		Z,EPIC_89
+	LD		A,GROUND_LEVEL - 12							;; &C0 (ground level) minus 12 (2 character height unit above)
 EPIC_89:
-	LD (DE),A
-	POP AF
-	JR EPIC_97
+	LD		(DE),A										;; O_Z
+	POP		AF
+	JR		EPIC_97
 
 EPIC_90:
-	INC DE
-	INC DE
-	LD A,(TODO_236e)
-	AND A
-	JR Z,EPIC_91
-	LD A,(DE)
-	SUB 6												;; if teleport index 0 in Facing_Entering_new_Room_tab???
-	LD (DE),A
+	INC		DE
+	INC		DE
+	LD		A,(TODO_236e)
+	AND		A
+	JR		Z,EPIC_91
+	LD		A,(DE)
+	SUB		6											;; if teleport index 0 in Facing_in_new_Room_tab
+	LD		(DE),A
 EPIC_91:
-	LD B,Sound_ID_Teleport_Down							;; Sound_ID &C8 ; Teleport beam down noise
-	CALL Play_Sound
-	JR EPIC_96
+	LD		B,Sound_ID_Teleport_Down					;; Sound_ID &C8 ; Teleport beam down noise
+	CALL	Play_Sound
+	JR		EPIC_96
 
 EPIC_92:
-	LD HL,UVZ_coord_Set_UVZ
-	JR EPIC_94
+	LD		HL,UVZ_coord_Set_UVZ
+	JR		EPIC_94
 
 EPIC_93:
-	LD HL,TODO_2c54_uvz_reset_values					;; TODO_2c54 ; uvz
+	LD		HL,TODO_2c54_uvz_reset_values				;; TODO_2c54 ; uvz
 EPIC_94:
 	LDI													;; copy U ; do : LD (DE),(HL); DE++, HL++, BC--
 	LDI													;; copy V
 	LDI													;; copy Z
-	JR EPIC_96											;; HL now points on Facing_Entering_new_Room_tab
+	JR		EPIC_96										;; HL now points on Facing_in_new_Room_tab
 
 EPIC_95:
-	LD A,(HL)
-	ADD A,C
-	LD (DE),A
+	LD		A,(HL)
+	ADD		A,C
+	LD		(DE),A
 EPIC_96:
-	POP AF												;; A has the room access code-1 (0==Down,1=Right,2=Up,3=Left,4=Below,5=Above,6=Teleport)
-	ADD A,Facing_Entering_new_Room_tab and &00FF		;; &57 = Facing_Entering_new_Room_tab & &00FF + offset
-	LD L,A
-	ADC A,Facing_Entering_new_Room_tab / 256			;; &2C = (Facing_Entering_new_Room_tab & &FF00 ) >> 8
-	SUB L
-	LD H,A												;; HL = Facing_Entering_new_Room_tab + A
-	LD A,(HL)
-	LD (character_direction),A							;; update LRDU character_direction when entering the new room (LRDU format)
+	POP		AF											;; A has the room access code-1 (0==Down,1=Right,2=Up,3=Left,4=Below,5=Above,6=Teleport)
+	ADD		A,Facing_in_new_Room_tab and WORD_LOW_BYTE	;; &57 = Facing_in_new_Room_tab & &00FF + offset
+	LD		L,A
+	ADC		A,Facing_in_new_Room_tab / WORD_HIGH_BYTE	;; &2C = (Facing_in_new_Room_tab & &FF00 ) >> 8
+	SUB		L
+	LD		H,A											;; HL = Facing_in_new_Room_tab + A
+	LD		A,(HL)
+	LD		(character_direction),A						;; update LRDU character_direction when entering the new room (LRDU format)
 EPIC_97:
-	LD A,&80
-	LD (access_new_room_code),A							;; update access_new_room_code
-	POP HL
-	LD DE,&0005
-	ADD HL,DE
-	LD DE,EntryPosn
-	LD BC,&0003
-	LDIR												;; repeat LD (DE),(HL); DE++, HL++, BC-- until BC=0
-	LD (IY+O_OBJUNDER),&00
-	LD (IY+O_OBJUNDER+1),&00							;; reset O_OBJUNDER pointer
-	LD (IY+O_IMPACT),&FF
-	LD (IY+&0C),&FF
-	POP HL
-	CALL Enlist
-	CALL SaveObjListIdx
-	XOR A												;; A=0
-	LD (DyingAnimFrameIndex),A							;; reset DyingAnimFrameIndex
-	LD (Dying),A										;; reset Dying
-	LD (TODO_236e),A									;; reset 236E ???
-	JP SetObjList										;; Switch to default object list
+	LD		A,&80
+	LD		(access_new_room_code),A					;; update access_new_room_code
+	POP		HL
+	LD		DE,O_U
+	ADD		HL,DE
+	LD		DE,EntryPosition_uvz
+	LD		BC,3										;; U, V and Z
+	LDIR												;; Copy : repeat LD (DE),(HL); DE++, HL++, BC-- until BC=0
+	LD		(IY+O_OBJUNDER),&00
+	LD		(IY+O_OBJUNDER+1),&00						;; reset O_OBJUNDER pointer
+	LD		(IY+O_IMPACT),&FF
+	LD		(IY+&0C),&FF
+	POP		HL
+	CALL	Enlist
+	CALL	SaveObjListIdx
+	XOR		A											;; A=0
+	LD		(DyingAnimFrameIndex),A						;; reset DyingAnimFrameIndex
+	LD		(Dying),A									;; reset Dying
+	LD		(TODO_236e),A								;; reset 236E ???
+	JP		SetObjList									;; Switch to default object list
 
+;; -----------------------------------------------------------------------------------------------------------
 .SaveObjListIdx:
 	LD		A,(ObjListIdx)
 	LD		(Saved_Objects_List_index),A				;; update Saved_Objects_List_index
@@ -8676,14 +8766,14 @@ EPIC_97:
 	OR		(HL)										;; adds the bool "both in same room"
 	RRA													;; put Head | "both in same room" in Carry
 	RET 	NC											;; Return with NC if low bit not set (Not Head and not In Same Room)
-	LD		HL,(Carrying)								;; else Heels is selected
+	LD		HL,(Carried_Object)							;; else Heels is selected, get Carried_Object
 	INC 	H
 	DEC 	H											;; test if H is 0 (nothing carried)
 	RET 	Z											;; Return if high byte zero...
-	LD		DE,&0008									;; else something carried in Purse, points on object O_SPRITE
+	LD		DE,O_SPRITE									;; else something carried in Purse, points on object O_SPRITE
 	ADD		HL,DE
 	LD		A,(HL)										;; Get O_SPRITE sprite from object pointed to...
-	LD		BC,&D8B0									;; sprite position : CARRY_POSN = 216 << 8 | 176
+	LD		BC,CARRIED_OBJ_HUD_POS						;; sprite position : 216,176
 	JP		Draw_sprite_3x24							;; Draw object sprite on HUD above the Purse
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -8696,17 +8786,20 @@ TODO_2c54_uvz_reset_values:											;; UVZ for ???
 ;;		 0 : Teleport then facing Down (south-West side of the screen)
 ;;  1 to 4 : Down, Right, Up, Left then resp. facing Down, Right, Up, Left
 ;; 5 and 6 : Below,Above then resp. facing Down, Down
-Facing_Entering_new_Room_tab:
-	DEFB 	&FD, &FD, &FB, &FE, &F7, &FD, &FD
+Facing_in_new_Room_tab:
+	DEFB 	FACING_DOWN												;; TP
+	DEFB	FACING_DOWN, FACING_RIGHT, FACING_UP, FACING_LEFT		;; Down Right Up Left
+	DEFB	FACING_DOWN, FACING_DOWN								;; Below Above
 
 WallSideBitmap: 									;; index 0 = 8 = bit3, index 1 = 4 = bit2 etc.
 	DEFB	&08, &04, &02, &01
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; Takes object (character?) in IY ; can be "FF ??" if contact, of "xxxx" a object pointer, or 0 ???TODO???
+;; Takes object (character?) in IY. Pointer to an object contacting the character.
 .ObjContact:
 	DEFW 	&0000
 
+;; -----------------------------------------------------------------------------------------------------------
 .DoorContact:
 	CALL	GetDoorHeight
 	LD		A,(IY+O_Z)
@@ -8716,28 +8809,27 @@ WallSideBitmap: 									;; index 0 = 8 = bit3, index 1 = 4 = bit2 etc.
 
 ;; Takes object in IY, returns height of relevant door.
 .GetDoorHeight:
-    ;; Return &C0 if SavedObjListIdx == 0.
-	LD		C,&C0
+	LD		C,GROUND_LEVEL								;; Return &C0 if SavedObjListIdx == 0.
 	LD		A,(Saved_Objects_List_index)				;; get Saved_Objects_List_index
 	AND		A											;; test
 	RET		Z											;; if index = 0 leave, else:
 	LD		IX,DoorHeights
-	LD		C,(IX+0) 									;; return IX+&00 if near MaxV
-	LD		A,(Max_min_UV_Table+3)						;; MaxV
+	LD		C,(IX+0) 									;; return IX+&00 (DoorHeights+0) if near MaxV
+	LD		A,(MaxV)
 	SUB		&03
 	CP		(IY+O_V)
 	RET		c
-	LD		C,(IX+2)									;; return IX+&02 if near MinV
-	LD		A,(Max_min_UV_Table+1)						;; MinV
+	LD		C,(IX+2)									;; return IX+&02 (DoorHeights+2) if near MinV
+	LD		A,(MinV)
 	ADD		A,&02
 	CP		(IY+O_V)
 	RET		NC
-	LD		C,(IX+1)									;; Return IX+&01 if near MaxU
-	LD		A,(Max_min_UV_Table+2)						;; MaxU
+	LD		C,(IX+1)									;; Return IX+&01 (DoorHeights+1) if near MaxU
+	LD		A,(MaxU)
 	SUB		&03
 	CP		(IY+O_U)
 	RET		c
-	LD		C,(IX+3)									;; Otherwise, return IX+&03
+	LD		C,(IX+3)									;; Otherwise, return IX+&03 (DoorHeights+3)
 	RET
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -8807,69 +8899,69 @@ HF_1:
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Object (character?) in IY.
 .DoContact2:
-	LD A,(IY+O_Z)										;; Z - ground level
-	SUB GROUND_LEVEL									;; A has the difference between the height and the ground level
+	LD		A,(IY+O_Z)									;; Z - ground level
+	SUB		GROUND_LEVEL
+;; A has the difference between the height and the ground level
 .DoContact:
 	;; Clear what's on character so far.
-	LD BC,&0000
-	LD (ObjContact),BC
-	JR Z,HitFloor										;; if A = 0 it means we hit the floor
-	INC A												;; if we were 1 above, we still considere we are on the ground
-	JR Z,NearHitFloor									;; inc A will have A=0 if nearly on the ground
+	LD		BC,&0000
+	LD		(ObjContact),BC
+	JR		Z,HitFloor									;; if A = 0 it means we hit the floor
+	INC		A											;; if we were 1 above, we still considere we are on the ground
+	JR		Z,NearHitFloor								;; inc A will have A=0 if nearly on the ground
 	;; Set C to high-Z plus one (i.e. what we're resting on)
-	CALL GetUVZExtents_AdjustLowZ						;; else not on the ground
-	LD C,B
-	INC C
+	CALL GetUVZExtents_AdjustLowZ						;; else not on the ground ; GetUVZExtents_Near2Far plus Z adjust
+	LD		C,B
+	INC		C
 	;; Looks like we use what we were on previously as our current
     ;; "on" object - avoid recomputation and keeps the object
     ;; consistent?
     ;;
     ;; Load the object character's on into IX. Go to ChkSitOn if null.
 	EXX
-	LD A,(IY+O_OBJUNDER+1)
-	AND A												;; test O_OBJUNDER high byte
-	JR Z,ChkSitOn										;; if 0 check if we are just on contact with something
-	LD H,A												;; else not 0 so already have an object pointer for O_OBJUNDER
-	LD L,(IY+O_OBJUNDER)
-	PUSH HL
-	POP IX												;; ... and put the pointer in IX
+	LD		A,(IY+O_OBJUNDER+1)
+	AND		A											;; test O_OBJUNDER high byte
+	JR		Z,ChkSitOn									;; if 0 check if we are just on contact with something
+	LD		H,A											;; else not 0 so already have an object pointer for O_OBJUNDER
+	LD		L,(IY+O_OBJUNDER)
+	PUSH	HL
+	POP		IX											;; ... and put the pointer in IX
 	;; Various other tests where we switch over to ChkSitOn.
-	BIT 7,(IX+O_FLAGS)									;; test if object should be ignored
-	JR NZ,ChkSitOn
+	BIT		7,(IX+O_FLAGS)								;; test if object should be ignored
+	JR		NZ,ChkSitOn
 	;; Check we're still on it.
-	LD A,(IX+O_Z)										;; get its Z
-	SUB 6												;; now has the value for one character height unit above (sub = going up in Z)
+	LD		A,(IX+O_Z)									;; get its Z
+	SUB		6											;; now has the value for one character height unit above (sub = going up in Z)
 	EXX
-	CP B
+	CP		B
 	EXX
-	JR NZ,ChkSitOn
-	CALL CheckWeOverlap
-	JR NC,ChkSitOn
+	JR		NZ,ChkSitOn
+	CALL	CheckWeOverlap
+	JR		NC,ChkSitOn
 ;; We're still standing on the object
 ;; Deal with contact between a character and a thing.
 ;; IY is the character, IX is what it's resting on.
 .DoObjContact:
-	BIT 1,(IX+O_SPRFLAGS)								;; check if tis is the 2nd part of a double sprite object
-	JR Z,DOC_1											;; single or main part, jump DOC_1
-	RES 5,(IX-OBJECT_LENGTH+&0C)						;; else double sprite, 2nd one : reset bit5 of the main object (IX-06 = IX-&12+&0C)
-	LD A,(IX-OBJECT_LENGTH+O_IMPACT)					;; read main object impact (IX-07 = IX-&12+&0B)
-	JR DOC_2
-
+	BIT		1,(IX+O_SPRFLAGS)							;; check if tis is the 2nd part of a double sprite object
+	JR		Z,DOC_1										;; single or main part, jump DOC_1
+	RES		5,(IX-OBJECT_LENGTH+&0C)					;; else double sprite, 2nd one : reset bit5 of the main object (IX-06 = IX-&12+&0C)
+	LD		A,(IX-OBJECT_LENGTH+O_IMPACT)				;; read main object impact (IX-07 = IX-&12+&0B)
+	JR		DOC_2
 
 DOC_1:																		;; Otherwise, do the same, but directly on the main object
-	RES 5,(IX+&0C)										;; reset bit5 of &0C
-	LD A,(IX+O_IMPACT)									;; read main object impact
+	RES		5,(IX+&0C)									;; reset bit5 of &0C
+	LD		A,(IX+O_IMPACT)								;; read main object impact
 ;; Mask Offset C of IY with top 3 bits of Offset C of stood-on object.
 DOC_2:
-	OR &E0
-	LD C,A
-	LD A,(IY+&0C)
-	AND C
-	LD (IY+&0C),A
+	OR		&E0
+	LD		C,A
+	LD		A,(IY+&0C)
+	AND		C
+	LD		(IY+&0C),A
 .DoAltContact:
-	XOR A
+	XOR		A
 	SCF
-	JP ProcContact
+	JP		ProcContact
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Run through all the objects in the main object list and check their
@@ -8878,60 +8970,60 @@ DOC_2:
 ;;
 ;; Object extents should be in primed registers.
 .ChkSitOn:
-	LD		HL,ObjectLists + 2								;; list pointer
+	LD		HL,ObjList_Regular_Near2Far					;; list pointer
 CSIT_nextobject:
 	LD		A,(HL)
 	INC		HL
 	LD		H,(HL)
-	LD		L,A												;; HL = item in the list
-	OR		H												;; HL = 0, end of list
-	JR		Z,CSIT_4										;; If end of list, jump CSIT_4
+	LD		L,A											;; HL = item in the list
+	OR		H											;; HL = 0, end of list
+	JR		Z,CSIT_4									;; If end of list, jump CSIT_4
 	PUSH	HL
-	POP		IX												;; else IX = current object
-	BIT		7,(IX+O_FLAGS)									;; test bit7 of object flags
-	JR		NZ,CSIT_nextobject								;; Bit set? Skip this item and look at next object
-	LD		A,(IX+O_Z)										;; Check Z coord of top of obj against bottom of IY
-	SUB		6												;; Object Z - 6 (one char unit) = one height unit above
+	POP		IX											;; else IX = current object
+	BIT		7,(IX+O_FLAGS)								;; test bit7 of object flags
+	JR		NZ,CSIT_nextobject							;; Bit set? Skip this item and look at next object
+	LD		A,(IX+O_Z)									;; Check Z coord of top of obj against bottom of IY
+	SUB		6											;; Object Z - 6 (one char unit) = one height unit above
 	EXX
 	CP		B
-	JR		NZ,CSIT_3										;; Go to differing height case.
+	JR		NZ,CSIT_3									;; Go to differing height case.
 	EXX
 	PUSH	HL
-	CALL	CheckWeOverlap									;; overlap in U V?
+	CALL	CheckWeOverlap								;; overlap in U V?
 	POP		HL
-	JR		NC,CSIT_nextobject								;; no overlap, look at next object in the list
-CSIT_2:																			;; else
-	LD		(IY+O_OBJUNDER),L								;; Record pointer of what we're sitting on in the character IY+O_OBJUNDER
+	JR		NC,CSIT_nextobject							;; no overlap, look at next object in the list
+CSIT_2:																		;; else
+	LD		(IY+O_OBJUNDER),L							;; Record pointer of what we're sitting on in the character IY+O_OBJUNDER
 	LD		(IY+O_OBJUNDER+1),H
-	JR		DoObjContact 									;; Hit!
+	JR		DoObjContact 								;; Hit!
 
 CSIT_3:
 	CP		C
 	EXX
-	JR		NZ,CSIT_nextobject								;; Differs other way? Continue.
+	JR		NZ,CSIT_nextobject							;; Differs other way? Continue.
 	;; Same height instead.
 	LD		A,(ObjContact+1)
 	AND 	A
-	JR		NZ,CSIT_nextobject								;; Some test makes us skip...
+	JR		NZ,CSIT_nextobject							;; Some test makes us skip...
 	PUSH 	HL
 	CALL 	CheckWeOverlap
 	POP 	HL
-	JR		NC,CSIT_nextobject								;; If we don't overlap, skip
-	LD		(ObjContact),HL									;; Store the object we're touching, carry on.
+	JR		NC,CSIT_nextobject							;; If we don't overlap, skip
+	LD		(ObjContact),HL								;; Store the object we're touching, carry on.
 	JR		CSIT_nextobject
 
 	;; Completed object list traversal
 CSIT_4:
-	LD		A,(Saved_Objects_List_index)					;; get Saved_Objects_List_index
+	LD		A,(Saved_Objects_List_index)				;; get Saved_Objects_List_index
 	AND 	A
 	JR		Z,CSIT_7
 	CALL 	GetCharObjIX
 	;; Get Z coord of top of the character into A.
-	LD		A,(selected_characters)							;; get selected_characters
-	CP		&03
-	LD		A,&F4											;; -12
+	LD		A,(selected_characters)						;; get selected_characters
+	CP		BOTH_SELECTED
+	LD		A,&F4										;; -12
 	JR		Z,CSIT_5
-	LD		A,&FA											;; -6
+	LD		A,&FA										;; -6
 CSIT_5:
 	ADD		A,(IX+O_Z)
 	EXX
@@ -8953,11 +9045,11 @@ CSIT_6:
 	;; Same height, making it pushable.
 	LD		A,(ObjContact+1)
 	AND		A
-	JR		NZ,CSIT_7										;; Give up if already in contact.
+	JR		NZ,CSIT_7									;; Give up if already in contact.
 	CALL	GetCharObjIX
 	CALL	CheckWeOverlap
 	JR		NC,CSIT_7
-	LD		(IY+O_OBJUNDER),0								;; reset object under pointer
+	LD		(IY+O_OBJUNDER),0							;; reset object under pointer
 	LD		(IY+O_OBJUNDER+1),0
 	JR		CSIT_11
 
@@ -8991,7 +9083,7 @@ CSIT_11:
 ;; Loop through all items, finding ones which match maxZ+6 ot +7 (below)
 ;; Then call CheckWeOverlap to see if ok candidate. Return it in HL if it is.
 .CheckStoodUponNPickable:
-	CALL 	GetUVZExtents_AdjustLowZ					;; Perhaps getting height as a filter?
+	CALL 	GetUVZExtents_AdjustLowZ					;; GetUVZExtents_Near2Far with Z adjust
 	LD		A,B											;; IY B = bottom (high Z), C = top (low Z) point
 	ADD 	A,6											;; going down by one height unit
 	LD		B,A											;; B = bottom + 6 (6 under bottom)
@@ -8999,7 +9091,7 @@ CSIT_11:
 	LD		C,A											;; C = 7 under bottom
 	EXX
 	;; Traverse list of objects in main object list
-	LD		HL,ObjectLists + 2							;; list pointer
+	LD		HL,ObjList_Regular_Near2Far					;; list pointer
 gsu_1:
 	LD		A,(HL)
 	INC		HL
@@ -9030,13 +9122,13 @@ gsu_2:
 ;; Very similar to ChkSitOn. Checks to see if stuff is on us.
 .ChkSatOn:
     ;; Put top of object in B'
-	CALL	GetUVZExtents_AdjustLowZ					;; IY B = bottom (high Z), C = top (low Z) point
+	CALL	GetUVZExtents_AdjustLowZ					;; IY B = bottom (high Z), C = top (low Z) point ; GetUVZExtents_Near2Far with Z adjust
 	LD		B,C											;; top
 	DEC 	B											;; B = 1 above top (DEC = upward for Z)
 	EXX
 	XOR		A
 	LD		(ObjContact),A								;; reset ObjContact
-	LD		HL,ObjectLists + 2							;; list pointer
+	LD		HL,ObjList_Regular_Near2Far					;; list pointer
 CSAT_nextobj:
 	LD		A,(HL)
 	INC		HL
@@ -9057,7 +9149,7 @@ CSAT_nextobj:
 	CALL	CheckWeOverlap								;; test if U/V also match (with margin)
 	POP		HL
 	JR		NC,CSAT_nextobj								;; no, then next object
-CSAT_2:																		;; yes, IY has an object on top
+CSAT_2:																		;; yes, IY has an object on top : Copy our movement over to the block on top.
 	LD		A,(IY+O_IMPACT)								;; get IY direction
 	OR		&E0
 	AND		&EF											;; C = &E0 + A[3:0]
@@ -9215,9 +9307,12 @@ CSAT_8:
 ;; -----------------------------------------------------------------------------------------------------------
 MENU_CURR_SEL 			EQU		&00							;; Which_selected in menu ; 0 = first
 MENU_NB_ITEMS			EQU		&01							;; Number of items
-MENU_INIT_COL			EQU		&02							;; Initial column
-MENU_INIT_ROW			EQU		&03							;; Initial row
+MENU_INIT_COL			EQU		&02							;; Initial column (x)
+MENU_INIT_ROW			EQU		&03							;; Initial row (y)
 MENU_SEL_STRINGID		EQU		&04							;; Selected item; default: String ID STR_PLAY_THE_GAME
+
+MENU_PRINTDOUBLE_SIZE	EQU		&00							;; if bit7 of MENU_INIT_ROW is reset, then double size the selected row
+MENU_PRINTSINGLE_SIZE	EQU		&80							;; if bit7 of MENU_INIT_ROW is set, then single size the selected row
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Menu global variables (cursor position)
@@ -9230,16 +9325,16 @@ MenuCursor:
 ;;  * The Emperor proclamation page (all 4, (Head, Heels and 2 crowns) are used).
 .EmperorPageSpriteList:
 .MainMenuSpriteList:
-	DEFB 	&1E, &60, &60		     	;; Sprite_Head_1; pos x,y &60,&60
-	DEFB 	&98, &8C, &60				;; Sprite_Heels_1 | Sprite_Flipped; pos x,y
-	DEFB 	&2F, &60, &48				;; Sprite_Crown; pos x,y
-	DEFB 	&AF, &8C, &48				;; Sprite_Crown | Sprite_Flipped; pos x,y
+	DEFB 	SPR_HEAD1,				&60, &60			;; Sprite_Head_1; pos x,y &60,&60
+	DEFB 	SPR_HEELS1 or SPR_FLIP, &8C, &60			;; Sprite_Heels_1 (&18) | Sprite_Flipped (&80); pos x,y
+	DEFB 	SPR_CROWN,				&60, &48			;; Sprite_Crown; pos x,y
+	DEFB 	SPR_CROWN or SPR_FLIP, 	&8C, &48			;; Sprite_Crown (&2F) | Sprite_Flipped (&80); pos x,y
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; This is the Main Menu
 ;; Return with Carry set if new game or with Carry reset for "Continue"
 .Main_Screen:
-	LD		A,Print_StrID_Title_Instr					;; String ID &99 is the Wipe+Title+Instructions (press any key to....)
+	LD		A,Print_Title_Instr							;; String ID &99 is the Wipe+Title+Instructions (press any key to....)
 	CALL 	Print_String
 	LD		IX,Main_menu_data							;; IX points on first data in Main_menu_data
 	LD		(IX+MENU_CURR_SEL),0						;; Current selected item in menu : the first one
@@ -9273,16 +9368,16 @@ fms_2:
 ;; Data for the Menu "Main"
 ;; This is the "Play/Controls/sound/Sensitivity" menu
 .Main_menu_data:
-	DEFB 	0     				;; MENU_CURR_SEL : Which_selected in menu ; 0 = first
-	DEFB 	4  					;; MENU_NB_ITEMS : Number of items
-	DEFB 	&05    				;; MENU_INIT_COL : Initial column
-	DEFB 	&89    				;; MENU_INIT_ROW : Initial row
-	DEFB 	&9A					;; MENU_SEL_STRINGID : Selected item; default: String ID STR_PLAY_THE_GAME
+	DEFB 	0     								;; MENU_CURR_SEL : Which_selected in menu ; 0 = first
+	DEFB 	4  									;; MENU_NB_ITEMS : Number of items
+	DEFB 	&05    								;; MENU_INIT_COL : Initial column
+	DEFB 	&09 or MENU_PRINTSINGLE_SIZE  		;; MENU_INIT_ROW : Initial row, single size the selected row
+	DEFB 	Print_Play_Game						;; MENU_SEL_STRINGID : Selected item; default: String ID STR_PLAY_THE_GAME
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; This handle the Sound Menu
 .Sound_Menu:
-	LD		A,Print_StrID_SoundMenu						;; String ID &A9 is the Sound Menu
+	LD		A,Print_SoundMenu							;; String ID &A9 is the Sound Menu
 	CALL 	Print_String
 	LD		IX,Sound_menu_data							;; IX points on Sound_menu_data
 	CALL 	Draw_Menu
@@ -9300,16 +9395,16 @@ smstp_1:
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Data for the Menu "Sound"
 .Sound_menu_data:
-	DEFB	0     				;; MENU_CURR_SEL : Which_selected_in_menu ; 0 = first
-	DEFB	3 	   				;; MENU_NB_ITEMS : Number of items
-	DEFB	&07    				;; MENU_INIT_COL : Initial column
-	DEFB	&08    				;; MENU_INIT_ROW : Initial row
-	DEFB	&96					;; MENU_SEL_STRINGID : Current Selected item; default String ID STR_LOTS
+	DEFB	0     								;; MENU_CURR_SEL : Which_selected_in_menu ; 0 = first
+	DEFB	3 	   								;; MENU_NB_ITEMS : Number of items
+	DEFB	&07    								;; MENU_INIT_COL : Initial column
+	DEFB	&08 or MENU_PRINTDOUBLE_SIZE		;; MENU_INIT_ROW : Initial row, double size selected
+	DEFB	Print_Lots							;; MENU_SEL_STRINGID : Current Selected item; default String ID STR_LOTS
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Handle the Controls Menu
 .Control_menu:
-	LD		A,Print_StrID_SelectKeys					;; String for Title (wipe+) "select keys"
+	LD		A,Print_SelectKeys							;; String for Title (wipe+) "select keys"
 	CALL 	Print_String
 	LD		IX,Control_menu_data						;; IX points on Control_menu_data
 	CALL 	Draw_Menu
@@ -9330,7 +9425,7 @@ cmloop:
 	CALL 	Menu_step_Control_Edit
 	JR		c,cmloop									;; Wait that a control is selected
 	RET 	NZ
-	LD		A,Print_StrID_ChooseNewKey					;; String ID &A8
+	LD		A,Print_ChooseNewKey						;; String ID &A8
 	CALL	Print_String
 	LD		A,(IX+MENU_CURR_SEL)						;; get selected item
 	ADD 	A,(IX+MENU_SEL_STRINGID)					;; update the String ID with the Base value
@@ -9341,23 +9436,23 @@ cmloop:
 	CALL 	PrepCtrlEdit
 	LD		A,(IX+MENU_CURR_SEL)						;; get selected item
 	CALL 	Edit_control
-	LD		A,Print_StrID_ShiftToFinish					;; String ID &A7 "PRESS SHIFT TO FINISH"
+	LD		A,Print_ShiftToFinish						;; String ID &A7 "PRESS SHIFT TO FINISH"
 	CALL 	Print_String
 	JR		cmloop
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Data for the Menu "Controls"
 .Control_menu_data:
-	DEFB	0     					;; MENU_CURR_SEL : Which_selected in menu ; 0 = first
-	DEFB	8	    				;; MENU_NB_ITEMS : Number of items
-	DEFB	&00    					;; MENU_INIT_COL : Initial column
-	DEFB	&85    					;; MENU_INIT_ROW : Initial row (05|80)
-	DEFB	&8E						;; MENU_SEL_STRINGID : Selected item String ID
+	DEFB	0     								;; MENU_CURR_SEL : Which_selected in menu ; 0 = first
+	DEFB	8	    							;; MENU_NB_ITEMS : Number of items
+	DEFB	&00    								;; MENU_INIT_COL : Initial column
+	DEFB	&05 or MENU_PRINTSINGLE_SIZE		;; MENU_INIT_ROW : Initial row, single size the selected row
+	DEFB	Print_Left							;; MENU_SEL_STRINGID : Selected item String ID
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Handle the Sensitivity Menu
 .Sensitivity_Menu:
-	LD		A,Print_StrID_SensMenu						;; String ID &AA of first selected item
+	LD		A,Print_SensMenu							;; String ID &AA of first selected item
 	CALL 	Print_String
 	LD		IX,Sensitivity_menu_data					;; IX points on Sensitivity_menu_data
 	CALL 	Draw_Menu
@@ -9370,23 +9465,23 @@ sensmenu_1
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Data for the Menu "Sensitivity"
 .Sensitivity_menu_data:
-	DEFB	1     					;; MENU_CURR_SEL : Which_selected in menu ; 0 = first
-	DEFB	2 	   					;; MENU_NB_ITEMS : Number of items
-	DEFB	&05    					;; MENU_INIT_COL : Initial column
-	DEFB	&09    					;; MENU_INIT_ROW : Initial row
-	DEFB	&9E						;; MENU_SEL_STRINGID : Selected item String ID
+	DEFB	1     								;; MENU_CURR_SEL : Which_selected in menu ; 0 = first
+	DEFB	2 	   								;; MENU_NB_ITEMS : Number of items
+	DEFB	&05    								;; MENU_INIT_COL : Initial column
+	DEFB	&09 or MENU_PRINTDOUBLE_SIZE		;; MENU_INIT_ROW : Initial row, double size the selcted row
+	DEFB	Print_High							;; MENU_SEL_STRINGID : Selected item String ID
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Menu "Old game/New game/Main menu"; only available if we consumed
 ;; a living fish in a previous game. (RET if Save_point_value = 0)
-;; Output: Z reset: No saved game (go to new Game)
-;;         Z set and C reset : Play Old game (saved game)
-;;         Z set and C set : Play New game (even though a save exists)
+;; Output: Zero reset: No saved game (go to new Game)
+;;         Zero set and Carry reset : Play Old game (saved game)
+;;         Zero set and Carry set : Play New game (even though a save exists)
 .Play_Game_menu:
 	LD		A,(Save_point_value)						;; Get the "Fish" value (current Save point)
 	CP		&01											;; compare with 1
 	RET 	c											;; If A=0, then we do not have an old game to reload, hence no need to display this menu, can go straight to a new game, RET Carry and NZ
-	LD		A,Print_StrID_PlayOldNew					;; else draw menu, String ID &AB is the PLAY saved point game menu
+	LD		A,Print_PlayOldNew							;; else draw menu, String ID &AB is the PLAY saved point game menu
 	CALL 	Print_String
 	LD		IX,Play_Game_menu_data						;; IX = pointer on Play_Game_menu_data
 	LD		(IX+MENU_CURR_SEL),0						;; set current selected item to the first
@@ -9403,35 +9498,35 @@ pgmen_1:
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Data for the Menu "Play" (only shown if a previous game has been saved = "Fish")
 .Play_Game_menu_data:
-	DEFB	0     					;; MENU_CURR_SEL : Which_selected in menu ; 0 = first
-	DEFB	3 	   					;; MENU_NB_ITEMS : Number of items
-	DEFB	&09    					;; MENU_INIT_COL : Initial column
-	DEFB	&09    					;; MENU_INIT_ROW : Initial row
-	DEFB	Print_StrID_Old_Game	;; MENU_SEL_STRINGID : Selected item ; default String ID (&A0 = "OLD GAME")
+	DEFB	0     								;; MENU_CURR_SEL : Which_selected in menu ; 0 = first
+	DEFB	3 	   								;; MENU_NB_ITEMS : Number of items
+	DEFB	&09    								;; MENU_INIT_COL : Initial column
+	DEFB	&09 or MENU_PRINTDOUBLE_SIZE		;; MENU_INIT_ROW : Initial row, double size the selected row
+	DEFB	Print_Old_Game						;; MENU_SEL_STRINGID : Selected item ; default String ID (&A0 = "OLD GAME")
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Game over Screen
 ;; Note on the score: After GetScore it is saved in HL as a BCD value without the
 ;; rightmost 0 (ie. score/10):
-;;   value:    0 to  999 = Dummy, index 0 (score 0 to 9990)
-;;   value: 1000 to 2999 = Novice, index 1 (score 10000 to 29990)
-;;   value: 3000 to 4999 = Spy, index 2 (score 30000 to 49990)
-;;   value: 5000 to 6999 = Master Spy, index 3 (score 50000 to 69990)
-;;   value: 7000 to 8999 = Hero, index 4 (score 70000 to 89990)
-;;   value: 9000 and above = Emperor, index 5 (score 90000 and above)
+;;   value:    0 to  999 = Dummy, index 0 (displayed score 0 to 9990)
+;;   value: 1000 to 2999 = Novice, index 1 (displayed score 10000 to 29990)
+;;   value: 3000 to 4999 = Spy, index 2 (displayed score 30000 to 49990)
+;;   value: 5000 to 6999 = Master Spy, index 3 (displayed score 50000 to 69990)
+;;   value: 7000 to 8999 = Hero, index 4 (displayed score 70000 to 89990)
+;;   value: 9000 and above = Emperor, index 5 (displayed score 90000 and above, 99980 max)
 ;; Independently of the score, we are Emperor if all 5 crowns have been picked up.
 .Game_over_screen:
-	CALL 	Play_HoH_Tune								;; Play main tune
+	CALL 	Play_HoH_Theme								;; Play main tune
 	CALL 	Draw_wipe_and_Clear_Screen					;; do the Wipe effect to clear the screen
-	LD		A,Print_StrID_TitleBanner					;; Draw the Title
+	LD		A,Print_TitleBanner							;; Draw the Title
 	CALL 	Print_String
 	CALL 	Blit_Head_Heels_on_menu						;; Draw Head and Heels sprites
 	CALL 	GetScore									;; get the score (in HL BCD value, without the last 0 (score/10))
 	PUSH 	HL											;; save score on stack
 	LD		A,(saved_World_Mask)						;; get saved_World_Mask
-	OR		&E0											;; force higher bits of ~&1F
+	OR		&E0											;; force higher bits of ~&1F to test the lower bits
 	INC 	A											;; if all 5 world are saved, this would make A=0
-	LD		A,Print_StringID_Emperor					;; prepare string STR_EMPEROR
+	LD		A,Print_Emperor								;; prepare string STR_EMPEROR
 	JR		Z,goverscr_2								;; if Z set then all worlds saved, jump goverscr_2
 	LD		A,H											;; get high byte of score ; A = int(score / 256)
 	ADD 	A,&10										;; Add 16 (ou Add BCD 10)
@@ -9442,26 +9537,26 @@ goverscr_1:
 	RLCA												;; ...convert the score high byte
 	RLCA												;; ...to a index value 0 to 5
 	AND 	&07											;; 0:Dummy, 1:Novice, 2:Spy, 3:Master, 4:Hero or 5:Emperor
-	ADD 	A,Print_Array_StrID_Rank					;; Get String for the rank
+	ADD 	A,Print_Array_Rank							;; Get String for the rank
 goverscr_2:
 	CALL 	Print_String								;; print rank, double size, rainbow mode
-	LD		A,Print_StringID_Explored					;; String "EXPLORED"
+	LD		A,Print_Explored							;; String "EXPLORED"
 	CALL 	Print_String
 	CALL 	RoomCount									;; get number of visited rooms
 	CALL 	Print_4Digits_LeftAligned					;; and (value in DE) print it
-	LD		A,Print_StringID_RoomsScore					;; String "ROOMS" and "SCORE"
+	LD		A,Print_RoomsScore							;; String "ROOMS" and "SCORE"
 	CALL 	Print_String
 	POP 	DE											;; get back score from stack
 	CALL 	Print_4Digits_LeftAligned					;; print BCD score value in DE (in fact score/10 ; the final 0 will be hard coded in the string below)
-	LD		A,Print_StringID_Liberated					;; String "0|LIBERATED"
+	LD		A,Print_Liberated							;; String "0|LIBERATED"
 	CALL 	Print_String
 	CALL 	SavedWorldCount								;; count number of saved worlds
 	LD		A,E											;; get number from E
 	CALL 	Print_2Digits_LeftAligned					;; print value in A (left aligned)
-	LD		A,Print_StringID_Planets					;; String "PLANETS
+	LD		A,Print_Planets								;; String "PLANETS
 	CALL 	Print_String
 goverscr_3
-	CALL 	Play_HoH_Tune								;; Play main Theme
+	CALL 	Play_HoH_Theme								;; Play main Theme
 	CALL 	Test_Enter_Shift_keys						;; wait key press : Carry=1 (no key pressed), else Carry=0
 	JR		c,goverscr_3								;; when a key was pressed:
 	LD		B,Sound_ID_Silence							;; Sound ID &C0 Silence
@@ -9473,7 +9568,7 @@ goverscr_3
 .PrepCtrlEdit:
 	ADD 	A,A
 	ADD 	A,(IX+MENU_INIT_ROW)
-	AND 	&7F
+	AND 	&7F											;; hide the single/double bit (bit7) to only get the row
 	LD		B,A
 	LD		C,&0B
 	PUSH 	BC
@@ -9494,396 +9589,250 @@ goverscr_3
 	RET
 
 ;; -----------------------------------------------------------------------------------------------------------
+;; Step_Menu : Step thru the menu items and loop over if needs be.
+;; Draw_Menu : Draw the menu pointed by IX
 .Step_Menu:
-	CALL Test_Enter_Shift_keys							;; output : Carry=1 : no key pressed, else Carry=0 and C=0:Enter, C=1:Shift, C=2:other
-	RET c
-	LD A,C
+	CALL	Test_Enter_Shift_keys						;; output : Carry=1 : no key pressed, else Carry=0 and C=0:Enter, C=1:Shift, C=2:other
+	RET		c
+	LD		A,C
 .MenuStepCore:
-	AND A
-	RET Z
-	LD A,(IX+MENU_CURR_SEL)
-	INC A
-	CP (IX+MENU_NB_ITEMS)								;; if reached last then
-	JR c,mstepc_1
-	XOR A												;; loop over
+	AND		A
+	RET		Z
+	LD		A,(IX+MENU_CURR_SEL)
+	INC		A
+	CP		(IX+MENU_NB_ITEMS)							;; if reached last then
+	JR		c,mstepc_1
+	XOR		A											;; loop over
 mstepc_1
-	LD (IX+MENU_CURR_SEL),A
-	PUSH IX
-	LD B,Sound_ID_Menu_Blip								;; &88 Menu blip
-	CALL Play_Sound
-	POP IX
+	LD		(IX+MENU_CURR_SEL),A
+	PUSH 	IX
+	LD		B,Sound_ID_Menu_Blip						;; &88 Menu blip
+	CALL	Play_Sound
+	POP		IX
 .Draw_Menu:
-	LD B,(IX+MENU_INIT_ROW)								;; B = row number
-	RES 7,B												;; make sure bit 7 is 0
-	LD C,(IX+MENU_INIT_COL)								;; C = col number
-	LD (MenuCursor),BC									;; store current cursor position
-	CALL Set_Cursor_position
-	LD B,(IX+MENU_NB_ITEMS)								;; number of menu items
-	LD C,(IX+MENU_CURR_SEL)								;; currently selected item
-	INC C
+	LD		B,(IX+MENU_INIT_ROW)						;; B = row number
+	RES		7,B											;; make sure bit 7 is 0 to get the row num
+	LD		C,(IX+MENU_INIT_COL)						;; C = col number
+	LD		(MenuCursor),BC								;; store current cursor position
+	CALL	Set_Cursor_position
+	LD		B,(IX+MENU_NB_ITEMS)						;; number of menu items
+	LD		C,(IX+MENU_CURR_SEL)						;; currently selected item
+	INC		C
 drwmen_loop:
-	LD A,&AF											;; STR_ARROW_NONSEL
-	DEC C
-	PUSH BC
-	JR NZ,br_30EE
-	BIT 7,(IX+MENU_INIT_ROW)
-	JR NZ,br_30E7
-	LD A,Print_DoubleSize								;; Text_double_size
-	CALL Print_String
-	LD A,&AE											;; Arrows for Selected item
-	JR br_30EE
+	LD		A,Print_Arrow_Unsel_menu					;; Arrow for unselected menu items
+	DEC		C
+	PUSH	BC
+	JR		NZ,smenu_print
+	BIT		7,(IX+MENU_INIT_ROW)						;; test bit7 of MENU_INIT_ROW
+	JR		NZ,smenu_singlesize							;; if set, goto Print single size
+smenu_doublesize:
+	LD		A,Print_DoubleSize							;; else, bit7=0, then Text_double_size
+	CALL	Print_String
+	LD		A,Print_Arrow_Sel_Menu						;; Arrows for Selected item
+	JR		smenu_print
 
-br_30E7
-	LD A,Print_SingleSize								;; Text_single_size
-	CALL Print_String
-	LD A,&AE											;; Arrows for Selected item
-br_30EE
-	CALL Print_String
-	LD A,(IX+MENU_NB_ITEMS)
-	POP BC
-	PUSH BC
-	SUB B
-	ADD A,(IX+MENU_SEL_STRINGID)						;; Currently selected item String
-	CALL Print_String
-	POP HL
-	PUSH HL
-	LD BC,(MenuCursor)									;; restore current cursor position
-	LD A,L
-	AND A
-	JR NZ,br_310E
-	BIT 7,(IX+MENU_INIT_ROW)
-	JR NZ,br_310E
-	INC B
+smenu_singlesize:
+	LD		A,Print_SingleSize							;; Text_single_size
+	CALL	Print_String
+	LD		A,Print_Arrow_Sel_Menu						;; Arrows for Selected item
+smenu_print:
+	CALL	Print_String
+	LD		A,(IX+MENU_NB_ITEMS)
+	POP		BC
+	PUSH	BC
+	SUB		B
+	ADD		A,(IX+MENU_SEL_STRINGID)					;; Currently selected item String
+	CALL	Print_String
+	POP		HL
+	PUSH	HL
+	LD		BC,(MenuCursor)								;; restore current cursor position
+	LD		A,L
+	AND		A
+	JR		NZ,br_310E
+	BIT		7,(IX+MENU_INIT_ROW)						;; test bi7 of MENU_INIT_ROW
+	JR		NZ,br_310E									;; if set, skip (single size)
+	INC		B											;; else incr B twice (double size)
 br_310E
-	INC B
-	PUSH BC
-	CALL Set_Cursor_position
-	LD A,Print_SingleSize								;; Text_single_size
-	CALL Print_String
-	BIT 7,(IX+MENU_INIT_ROW)
-	JR NZ,br_3123
-	LD A,Print_ClrEOL									;; String ID 02 = Clear end of line
-	CALL Print_String
+	INC		B
+	PUSH	BC
+	CALL	Set_Cursor_position
+	LD		A,Print_SingleSize							;; Text_single_size
+	CALL	Print_String
+	BIT		7,(IX+MENU_INIT_ROW)						;; test bi7 of MENU_INIT_ROW
+	JR		NZ,br_3123									;; if set, skip (single size)
+	LD		A,Print_ClrEOL								;; else : String ID 02 = Clear end of line
+	CALL	Print_String
 br_3123
-	POP BC
-	INC B
-	LD (MenuCursor),BC									;; next cursor position
-	CALL Set_Cursor_position
-	POP BC
-	DJNZ drwmen_loop
+	POP		BC
+	INC		B
+	LD		(MenuCursor),BC								;; next cursor position
+	CALL	Set_Cursor_position
+	POP		BC
+	DJNZ	drwmen_loop
 	SCF
 	RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Main Strings data
 .String_Table_Main:
-	DEFB 	Delimiter        							;; Delimiter (ID &80)
-	DEFB 	"PLAY"										;; String "PLAY"
-	DEFB 	Delimiter        							;; Delimiter (String ID &81)
-	DEFB 	Print_ColorAttr, &01						;; String Attribute 2 Color_code_1
-	DEFB 	Delimiter									;; Delimiter (String ID &82)
-	DEFB 	Print_ColorAttr, &02      					;; String Attribute 2 Color_code_2
-	DEFB 	Delimiter       							;; Delimiter (String ID &83)
-	DEFB 	Print_ColorAttr, &03 						;; String Attribute 2 Color_code_3
-	DEFB 	Delimiter        							;; Delimiter (ID &84)
-	DEFB 	" THE "										;; String " THE "
-	DEFB 	Delimiter      								;; Delimiter (ID &85)
-	DEFB 	"GAME"										;; String "GAME"
-	DEFB 	Delimiter       							;; Delimiter (ID &86)
-	DEFB 	"SELECT"									;; String "SELECT"
-	DEFB 	Delimiter      								;; Delimiter (ID &87)
-	DEFB 	"KEY"										;; String "KEY"
-	DEFB 	Delimiter        							;; Delimiter (ID &88)
-	DEFB 	"ANY "										;; String "ANY "
-	DEFB 	&87											;; Pointer on string ID &87 ("KEY")
-	DEFB 	Delimiter     								;; Delimiter (ID &89)
-	DEFB 	"SENSITIVITY"								;; String "SENSITIVITY"
-	DEFB 	Delimiter									;; Delimiter (ID &8A)
-	DEFB 	Print_Color_Attr_2							;; Macro item ID &82
-	DEFB 	"PRESS "									;; String "PRESS "
-	DEFB 	Delimiter									;; Delimiter (ID &8B)
-	DEFB 	Print_Color_Attr_2							;; Macro item ID &82
-	DEFB 	" TO "										;; String " TO "
-	DEFB 	Delimiter  									;; Delimiter (ID &8C)
-	DEFB 	Print_Color_Attr_3							;; Macro item ID &83
-	DEFB 	&E0             							;; Pointer on string ID &E0 ("RETURN")
-	DEFB 	Delimiter									;; Delimiter (ID &8D)
-	DEFB 	Print_Color_Attr_3							;; Macro item ID &83
-	DEFB 	"SHIFT"										;; String "SHIFT"
-	DEFB 	Delimiter									;; Delimiter (ID &8E)
-	DEFB 	"LEFT"										;; String "LEFT"
-	DEFB 	Delimiter									;; Delimiter (ID &8F)
-	DEFB 	"RIGHT"										;; String "RIGHT"
-	DEFB 	Delimiter									;; Delimiter (ID &90)
-	DEFB 	"DOWN"										;; String "DOWN"
-	DEFB 	Delimiter									;; Delimiter (ID &91)
-	DEFB 	"UP"										;; String "UP"
-	DEFB 	Delimiter									;; Delimiter (ID &92)
-	DEFB 	"JUMP"										;; String "JUMP"
-	DEFB 	Delimiter									;; Delimiter (ID &93)
-	DEFB 	"CARRY"										;; String "CARRY"
-	DEFB 	Delimiter									;; Delimiter (ID &94)
-	DEFB 	"FIRE"										;; String "FIRE"
-	DEFB 	Delimiter									;; Delimiter (ID &95)
-	DEFB 	"SWOP"										;; String "SWOP" ; Note: it is "SWOP" not "SWAP"!
-	DEFB 	Delimiter									;; Delimiter (ID &96)
-	DEFB 	"LOTS OF IT"								;; String "LOTS OF IT"
-	DEFB 	Delimiter									;; Delimiter (ID &97)
-	DEFB 	"NOT SO MUCH"								;; String "NOT SO MUCH"
-	DEFB 	Delimiter									;; Delimiter (ID &98)
-	DEFB 	"PARDON"									;; String "PARDON"
-	DEFB 	Delimiter        							;; Delimiter (ID &99)
-	DEFB 	Print_WipeScreen 							;; Screen_Wipe_Code
-	DEFB 	&C5             							;; Title_Screen_Code
-	DEFB 	&A3             							;; String Code "|PRESS..."
-	DEFB 	Delimiter      								;; Delimiter (ID &9A)
-	DEFB 	&80, &84, &85     							;; Pointer on the ID &80,&84,&85 strings ("PLAY"," THE ","GAME")
-	DEFB 	Delimiter   								;; Delimiter (ID &9B)
-	DEFB 	&86, &84, &87, "S"     						;; Pointer on the ID &86,&84,&87 strings ("SELECT"," THE ","KEY"+"S")
-	DEFB 	Delimiter     								;; Delimiter (ID &9C)
-	DEFB 	"ADJUST"									;; String "ADJUST"
-	DEFB 	&84											;; Pointer on the ID &84 string (" THE ")
-	DEFB 	"SOUND"										;; String "SOUND"
-	DEFB 	Delimiter        							;; Delimiter (ID &9D)
-	DEFB 	"CONTROL "									;; String "CONTROL "
-	DEFB 	&89											;; Pointer on the ID &89 string ("SENSITIVITY")
-	DEFB 	Delimiter     								;; Delimiter (ID &9E)
-	DEFB 	"HIGH "										;; String "HIGH "
-	DEFB 	&89											;; Pointer on the ID &89 string ("SENSITIVITY")
-	DEFB 	Delimiter    								;; Delimiter (ID &9F)
-	DEFB 	"LOW "										;; String "LOW "
-	DEFB 	&89											;; Pointer on the ID &89 string ("SENSITIVITY")
-	DEFB 	Delimiter  									;; Delimiter (ID &A0)
-	DEFB 	"OLD "										;; String "OLD "
-	DEFB 	&85											;; Pointer on the ID &85 string ("GAME")
-	DEFB 	Delimiter   								;; Delimiter (ID &A1)
-	DEFB 	"NEW "										;; String "NEW "
-	DEFB 	&85											;; Pointer on the ID &85 string ("GAME")
-	DEFB 	Delimiter     								;; Delimiter (ID &A2)
-	DEFB 	"MAIN MENU"									;; String "MAIN MENU"
-	DEFB 	Delimiter  									;; Delimiter (ID &A3)
-	DEFB 	Print_SingleSize_at_pos, &02, &15			;; Macro ID &B9 Text_col Text_row
-	DEFB 	&8A             							;; Pointer on the ID &8A string ("|PRESS")
-	DEFB 	Print_Color_Attr_3							;; Macro ID &83 (color 3)
-	DEFB 	&88, &8B          							;; Pointer on the ID &88,&8B strings ("ANY " + "KEY", " TO ")
-	DEFB 	"MOVE CURSOR"								;; String "MOVE CURSOR"
-	DEFB 	Print_SetPosition, &01, &17					;; Set_Text_Position Text_col Text_row
-	DEFB 	" "											;; String " "
-	DEFB 	&8A, &8C, &8B, &86							;; Pointer on the ID &8A,&8C,&8B,&86 strings ("|PRESS","|RETURN"," TO ","SELECT")
-	DEFB 	" OPTION"									;; String " OPTION"
-	DEFB 	Print_ClrEOL             					;; Clr_EOL
-	DEFB 	Delimiter    								;; Delimiter (ID &A4)
-	DEFB 	Print_SetPosition, &05, &03					;; Set_Text_Position Text_col Text_row
-	DEFB 	&8A, &8D, &8B, &C8							;; Pointer on the ID &8A,&8D,&8B,&C8 strings ("|PRESS","|SHIFT"," TO ","FINISH")
-	DEFB 	Print_ClrEOL             					;; Clr_EOL
-	DEFB 	Delimiter      								;; Delimiter (ID &A5)
-	DEFB 	Print_SetPosition, &05, &03					;; Set_Text_Position Text_col Text_row
-	DEFB 	&8A, &8C, &8B, &C8            				;; Pointer on the ID &8A,&8C,&8B,&C8 strings ("|PRESS","|RETURN"," TO ","FINISH")
-	DEFB 	Print_ClrEOL           						;; Clr_EOL
-	DEFB 	Delimiter     								;; Delimiter (ID &A6)
-	DEFB 	Print_Wipe_DblSize_pos, &08, &00			;; Macro ID &B0 Text_col Text_row
-	DEFB 	Print_Color_Attr_1							;; Macro ID &81
-	DEFB 	&9B             							;; Pointer on the ID &8C string ("SELECT THE KEYS")
-	DEFB 	&A7             							;; Pointer on the ID &A7
-	DEFB 	Delimiter       							;; Delimiter (ID &A7)
-	DEFB 	&A3             							;; Pointer on the ID &A3
-	DEFB 	Print_SetPosition, &05, &03					;; Set_Text_Position Text_col Text_row
-	DEFB 	&8A             							;; Pointer on the ID &8A string ("|PRESS")
-	DEFB 	Print_Color_Attr_1							;; Macro ID &81
-	DEFB 	&8D, &8B              						;; Pointer on the ID &8D,&8B strings ("|SHIFT"," TO ")
-	DEFB 	&C8             							;; Pointer on the ID &C8 string ("FINISH")
-	DEFB 	Print_ClrEOL        						;; Clr_EOL
-	DEFB 	Delimiter      								;; Delimiter (ID &A8)
-	DEFB 	Print_SetPosition, &05, &03					;; Set_Text_Position Text_col Text_row
-	DEFB 	Print_ClrEOL          						;; Clr_EOL
-	DEFB 	Print_SetPosition, &01, &15					;; Set_Text_Position Text_col Text_row
-	DEFB 	Print_ClrEOL          						;; Clr_EOL
-	DEFB 	Print_SetPosition, &01, &17					;; Set_Text_Position Text_col Text_row
-	DEFB 	&8A             							;; Pointer on the ID &8A string ("|PRESS")
-	DEFB 	Print_Color_Attr_3							;; Macro ID &83
-	DEFB 	&87, "S"             						;; Pointer on the ID &87 string ("KEY"+"S")
-	DEFB 	Print_Color_Attr_2							;; Macro ID &82
-	DEFB 	" REQUIRED FOR "							;; String " REQUIRED FOR "
-	DEFB 	Print_Color_Attr_3							;; Macro ID &83
-	DEFB 	Delimiter       							;; Delimiter (ID &A9)
-	DEFB 	Print_Wipe_DblSize_pos, &08, &00			;; Pointer on item ID &B0 Text_col Text_row
-	DEFB 	Print_Color_Attr_2							;; Macro ID &82
-	DEFB 	&9C             							;; Pointer on the ID &9C string ("ADJUST THE SOUND")
-	DEFB 	&A3             							;; Pointer on item ID &A3
-	DEFB 	Print_SetPosition, &06, &03					;; Set_Text_Position Text_col Text_row
-	DEFB 	Print_ColorAttr, &00             			;; Color_code Color_code_Rainbow
-	DEFB 	"MUSIC BY GUY STEVENS"						;; String "MUSIC BY GUY STEVENS"
-	DEFB 	Delimiter       							;; Delimiter (ID &AA)
-	DEFB 	Print_Wipe_DblSize_pos, &06, &00			;; Macro ID &B0 Text_col Text_row
-	DEFB 	Print_Color_Attr_2							;; Macro ID &82
-	DEFB 	&9D             							;; Pointer on item ID &9D ("CONTROL SENSITIVITY")
-	DEFB 	&A3             							;; Pointer on item ID &A3
-	DEFB 	Delimiter       							;; Delimiter (ID &AB)
-	DEFB 	Print_Wipe_DblSize_pos, &09, &00			;; Macro ID &B0 Text_col Text_row
-	DEFB 	Print_Color_Attr_2							;; Macro ID &82
-	DEFB 	&9A             							;; Pointer on item ID &9A ("PLAY THE GAME")
-	DEFB 	&A3             							;; Pointer on item ID &A3
-	DEFB 	Delimiter      								;; Delimiter (ID &AC = Paused Game message)
-	DEFB 	Print_DoubleSize      						;; Text_double_size
-	DEFB 	Print_Color_Attr_2							;; Macro ID &82
-	DEFB 	Print_SetPosition, &03, &03					;; Set_Text_Position Text_col Text_row
-	DEFB 	&8A             							;; Pointer on item ID &8A ("|PRESS")
-	DEFB 	Print_Color_Attr_3							;; Macro ID &83
-	DEFB 	&8D, &8B, &C8            					;; Pointer on item ID &8A,&8B,&C8 ("|SHIFT"," TO ","FINISH")
-	DEFB 	" "											;; String " "
-	DEFB 	&85											;; Pointer on the ID &85 string ("GAME")
-	DEFB 	Print_SetPosition, &04, &06					;; Set_Text_Position Text_col Text_row
-	DEFB 	&8A             							;; Pointer on item ID &8A ("|PRESS")
-	DEFB 	Print_Color_Attr_3							;; Macro ID &83
-	DEFB 	&88, &8B            						;; Pointer on the ID &88,&8B strings ("ANY " + "KEY"," TO ")
-	DEFB 	"RESTART"									;; String "RESTART"
-	DEFB 	Delimiter       							;; Delimiter (ID &AD) : Spaces
-	DEFB 	"   "										;; String "   "
-	DEFB 	Delimiter      								;; Delimiter (ID &AE) : Arrows for Selected item
-	DEFB 	Print_Color_Attr_3							;; Macro ID &83
-	DEFB 	Print_Arrow_1, Print_Arrow_2				;; Arrow1_code Arrow2_code
-	DEFB 	&AD             							;; Pointer on item ID &AD String ("   ")
-	DEFB 	Delimiter       							;; Delimiter (ID &AF) : Arrows for non-selected items
-	DEFB 	Print_SingleSize							;; Text_single_size
-	DEFB 	Print_Color_Attr_1							;; Macro ID &81
-	DEFB 	Print_Arrow_3, Print_Arrow_4				;; Arrow3_code Arrow4_code
-	DEFB 	&AD             							;; Pointer on item ID &AD String ("   ")
-	DEFB 	Delimiter       							;; Delimiter (ID &B0) ; needs to be followed by the 2 bytes argument of the &06 macro at the end
-	DEFB 	Print_WipeScreen							;; Screen_Wipe_Code
-	DEFB 	Print_ColorScheme, &09            			;; Select color scheme nb 09
-	DEFB 	Print_DoubleSize 							;; Text_double_size
-	DEFB 	Print_SetPosition							;; Set_Text_Position (&B0 will need to be followed by the 2 argument bytes for Text_col Text_row)
-	DEFB 	Delimiter     								;; Delimiter (ID &B1) ; used to display CNT_SPEED
-	DEFB 	Print_SingleSize_at_pos, &05, &14			;; Macro ID &B9 Text_col Text_row
-	DEFB 	Delimiter       							;; Delimiter (ID &B2) ; used to display CNT_SPRING
-	DEFB 	Print_SingleSize_at_pos, &19, &14			;; Macro ID &B9 Text_col Text_row
-	DEFB 	Delimiter     								;; Delimiter (ID &B3) ; used to display CNT_HEELS_INVULN
-	DEFB 	Print_SingleSize_at_pos, &19, &17			;; Macro ID &B9 Text_col Text_row
-	DEFB 	Delimiter       							;; Delimiter (ID &B4) ; used to display CNT_HEAD_INVULN
-	DEFB 	Print_SingleSize_at_pos, &05, &17			;; Macro ID &B9 Text_col Text_row
-	DEFB 	Delimiter        							;; Delimiter (ID &B5) ; used to display CNT_HEELS_LIVES
-	DEFB 	Print_DoubleSize 							;; Text_double_size
-	DEFB 	Print_SetPosition, &12, &16					;; Set_Text_Position Text_col Text_row
-	DEFB 	Delimiter        							;; Delimiter (ID &B6) ; used to display CNT_HEAD_LIVES
-	DEFB 	Print_DoubleSize 							;; Text_double_size
-	DEFB 	Print_SetPosition, &0C, &16					;; Set_Text_Position Text_col Text_row
-	DEFB 	Delimiter        							;; Delimiter (ID &B7) ; used to display CNT_DONUTS
-	DEFB 	Print_SingleSize_at_pos, &01, &11			;; Macro ID &B9 Text_col Text_row
-	DEFB 	Delimiter     								;; Delimiter (ID &B8)
-	DEFB 	Print_SingleSize							;; Text_single_size
-	DEFB 	Print_Color_Attr_2							;; Macro ID &82 (color 2)
-	DEFB 	Print_SetPosition, &1A, &13					;; Set_Text_Position Text_col Text_row
-	DEFB 	Print_Icon_Spring							;; Item_Spring_code
-	DEFB 	Print_SetPosition, &1A, &16					;; Set_Text_Position Text_col Text_row
-	DEFB 	Print_Color_Attr_2							;; Macro ID &82 (color 2)
-	DEFB 	Print_Icon_Sheild							;; Item_Shield_code
-	DEFB 	Print_SetPosition, &06, &13					;; Set_Text_Position Text_col Text_row
-	DEFB 	Print_Color_Attr_2							;; Macro ID &82 (color 2)
-	DEFB 	Print_Icon_Speed							;; Item_LightningSpeed_code
-	DEFB 	Print_SetPosition, &06, &16					;; Set_Text_Position Text_col Text_row
-	DEFB 	Print_Color_Attr_2							;; Macro ID &82 (color 2)
-	DEFB 	Print_Icon_Sheild							;; Item_Shield_code
-	DEFB 	Delimiter      								;; Delimiter (ID &B9) ; needs to be followed by the 2 bytes argument of the &06 macro at the end
-	DEFB 	Print_SingleSize							;; Text_single_size
-	DEFB 	Print_SetPosition							;; Set_Text_Position (&B9 will need to be followed by the 2 argument bytes for Text_col Text_row)
-	DEFB 	Delimiter      								;; Delimiter (ID &BA)
-	DEFB 	&C5             							;; Pointer on item ID &C5 : Title_Screen_Code
-	DEFB 	Print_SetPosition, &0A, &08					;; Set_Text_Position Text_col Text_row
-	DEFB 	Print_Color_Attr_2							;; Macro ID &82
-	DEFB 	Print_DoubleSize             				;; Text_double_size
-	DEFB 	Print_ColorAttr, &00						;; Color_code Color_Rainbow
-	DEFB 	Delimiter   								;; Delimiter (ID &BB)
-	DEFB 	Print_SingleSize_at_pos, &06, &11			;; Macro ID &B9 Text_col Text_row
-	DEFB 	Print_Color_Attr_1							;; Macro ID &81
-	DEFB 	"EXPLORED "									;; String "EXPLORED "
-	DEFB 	Delimiter     								;; Delimiter (ID &BC)
-	DEFB 	" ROOMS"             						;; String " ROOMS"
-	DEFB 	Print_SetPosition, &09, &0E					;; Set_Text_Position Text_col Text_row
-	DEFB 	Print_Color_Attr_2							;; Macro ID &82
-	DEFB 	"SCORE "									;; String "SCORE "
-	DEFB 	Delimiter       							;; Delimiter (ID &BD)
-	DEFB 	"0"											;; String "0"
-	DEFB 	Print_SetPosition, &05, &14					;; Set_Text_Position Text_col Text_row
-	DEFB 	Print_Color_Attr_3							;; Macro ID &83
-	DEFB 	"LIBERATED "								;; String "LIBERATED "
-	DEFB 	Delimiter        							;; Delimiter (ID &BE)
-	DEFB 	" PLANETS"             						;; String " PLANETS"
-	DEFB 	Delimiter        							;; Delimiter (ID &BF)
-	DEFB 	"  DUMMY"             						;; String "  DUMMY"
-	DEFB 	Delimiter         							;; Delimiter (ID &C0)
-	DEFB 	"  NOVICE"             						;; String "  NOVICE"
-	DEFB 	Delimiter       							;; Delimiter (ID &C1)
-	DEFB 	"   SPY    "								;; String "   SPY    "
-	DEFB 	Delimiter      								;; Delimiter (ID &C2)
-	DEFB 	"MASTER SPY"								;; String "MASTER SPY"
-	DEFB 	Delimiter       							;; Delimiter (ID &C3)
-	DEFB 	"   HERO"             						;; String "   HERO"
-	DEFB 	Delimiter      								;; Delimiter (ID &C4)
-	DEFB 	" EMPEROR"             						;; String " EMPEROR"
-	DEFB 	Delimiter      								;; Delimiter (ID &C5)
-	DEFB 	Print_ColorScheme, &0A						;; Select color scheme nb 0A
-	DEFB 	Print_DoubleSize          					;; Text_double_size
-	DEFB 	Print_SetPosition, &08, &00					;; Set_Text_Position Text_col Text_row
-	DEFB 	Print_Color_Attr_2							;; Macro ID &82
-	DEFB 	"HEAD      "								;; String "HEAD      "
-	DEFB 	"HEELS"										;; String "HEELS"
-	DEFB 	Print_SingleSize_at_pos, &0C, &01			;; Macro ID &B9 Text_col Text_row
-	DEFB 	Print_ColorAttr, &00						;; Color_attr_code Color_rainbow
-	DEFB 	" OVER "            						;; String " OVER "
-	DEFB 	Print_SetPosition, &01, &00					;; Set_Text_Position Text_col Text_row
-	DEFB 	" JON"       								;; String " JON"
-	DEFB 	Print_SetPosition, &01, &02					;; Set_Text_Position Text_col Text_row
-	DEFB 	"RITMAN"             						;; String "RITMAN"
-	DEFB 	Print_SetPosition, &19, &00					;; Set_Text_Position Text_col Text_row
-	DEFB 	"BERNIE"	         						;; String "BERNIE"
-	DEFB 	Print_SetPosition, &18, &02					;; Set_Text_Position Text_col Text_row
-	DEFB 	"DRUMMOND"		             				;; String "DRUMMOND"
-	DEFB 	Delimiter    								;; Delimiter (ID &C6)
-	DEFB 	Print_WipeScreen  			    			;; Screen_Wipe_Code
-	DEFB 	Print_ColorScheme, &06						;; Select color scheme nb 06
-	DEFB 	Print_SetPosition, &05, &00					;; Set_Text_Position Text_col Text_row
-	DEFB 	Print_DoubleSize             				;; Text_double_size
-	DEFB 	Print_Color_Attr_3							;; Macro ID &83
-	DEFB 	&84											;; Pointer on item ID &84 : String " THE "
-	DEFB 	&C7             							;; Pointer on item ID &C7 : String "BLACKTOOTH"
-	DEFB 	" EMPIRE"									;; String " EMPIRE"
-	DEFB 	Print_SingleSize							;; Text_single_size
-	DEFB 	Print_SetPosition, &03, &09					;; Set_Text_Position Text_col Text_row
-	DEFB 	Print_Color_Attr_1							;; Macro ID &81
-	DEFB 	"EGYPTUS"     								;; String "EGYPTUS"
-	DEFB 	Print_SetPosition, &15, &17					;; Set_Text_Position Text_col Text_row
-	DEFB 	"BOOK WORLD"								;; String "BOOK WORLD"
-	DEFB 	Print_SetPosition, &03, &17					;; Set_Text_Position Text_col Text_row
-	DEFB 	"SAFARI"             						;; String "SAFARI"
-	DEFB 	Print_SetPosition, &14,	&09					;; Set_Text_Position Text_col Text_row
-	DEFB 	"PENITENTIARY"								;; String "PENITENTIARY"
-	DEFB 	Print_SetPosition, &0B, &10					;; Set_Text_Position Text_col Text_row
-	DEFB 	&C7             							;; Pointer on item ID &C7 : String "BLACKTOOTH"
-	DEFB 	Delimiter     								;; Delimiter (ID &C7)
-	DEFB 	"BLACKTOOTH"								;; String "BLACKTOOTH"
-	DEFB 	Delimiter     								;; Delimiter (ID &C8)
-	DEFB 	"FINISH"             						;; String "FINISH"
-	DEFB 	Delimiter       							;; Delimiter (ID &C9)
-	DEFB 	&B6											;; Pointer on item ID &B6
-	DEFB 	Print_ColorAttr, &00						;; Color_attr_code Color_Rainbow
-	DEFB 	"FREEDOM "									;; String "FREEDOM "
-	DEFB 	Delimiter    								;; Delimiter (ID &CA)
-	DEFB 	Print_WipeScreen        					;; Screen_Wipe_Code
-	DEFB 	Print_ColorScheme, &06						;; Select color scheme nb 06
-	DEFB 	Print_SingleSize_at_pos, &00, &0A			;; Macro ID &B9 Text_col Text_row
-	DEFB 	Print_Color_Attr_2							;; Macro ID &82
-	DEFB 	&84											;; Pointer on item ID &84 : String " THE "
-	DEFB 	"PEOPLE SALUTE YOUR HEROISM"      			;; String "PEOPLE SALUTE YOUR HEROISM"
-	DEFB 	Print_SetPosition, &08, &0C					;; Set_Text_Position Text_col Text_row
-	DEFB 	"AND PROCLAIM YOU"							;; String "AND PROCLAIM YOU"
-	DEFB 	Print_DoubleSize   							;; Text_double_size
-	DEFB 	Print_SetPosition, &0B, &10					;; Set_Text_Position Text_col Text_row
-	DEFB 	Print_ColorAttr, &00						;; Color_attr_code Color_Rainbow
-	DEFB 	Print_StringID_Emperor						;; Pointer on item ID &C4 : String " EMPEROR"
-	DEFB 	Delimiter       							;; Delimiter (ID &CB)
+	DEFB 	Delimiter, "PLAY"										;; ID &80 : String "PLAY"
+	DEFB 	Delimiter, Print_ColorAttr, 1							;; ID &81 : String Attribute 2 Color_code_1
+	DEFB 	Delimiter, Print_ColorAttr, 2      						;; ID &82 : String Attribute 2 Color_code_2
+	DEFB 	Delimiter, Print_ColorAttr, 3 							;; ID &83 : String Attribute 2 Color_code_3
+	DEFB 	Delimiter, " THE "										;; ID &84 : String " THE "
+	DEFB 	Delimiter, "GAME"										;; ID &85 : String "GAME"
+	DEFB 	Delimiter, "SELECT"										;; ID &86 : String "SELECT"
+	DEFB 	Delimiter, "KEY"										;; ID &87 : String "KEY"
+	DEFB 	Delimiter, "ANY ", Print_KEY							;; ID &88 : String "ANY ", "KEY"
+	DEFB 	Delimiter, "SENSITIVITY"								;; ID &89 : String "SENSITIVITY"
+	DEFB 	Delimiter, Print_Color_Attr_2, "PRESS "					;; ID &8A : Macro item ID &82, "PRESS "
+	DEFB 	Delimiter, Print_Color_Attr_2, " TO "					;; ID &8B : Macro item ID &82, " TO "
+	DEFB 	Delimiter, Print_Color_Attr_3, Print_RETURN				;; ID &8C : Macro item ID &83, ID &E0 ("RETURN")
+	DEFB 	Delimiter, Print_Color_Attr_3, "SHIFT"					;; ID &8D : Macro item ID &83, "SHIFT"
+	DEFB 	Delimiter, "LEFT"										;; ID &8E : String "LEFT"
+	DEFB 	Delimiter, "RIGHT"										;; ID &8F : String "RIGHT"
+	DEFB 	Delimiter, "DOWN"										;; ID &90 : String "DOWN"
+	DEFB 	Delimiter, "UP"											;; ID &91 : String "UP"
+	DEFB 	Delimiter, "JUMP"										;; ID &92 : String "JUMP"
+	DEFB 	Delimiter, "CARRY"										;; ID &93 : String "CARRY"
+	DEFB 	Delimiter, "FIRE"										;; ID &94 : String "FIRE"
+	DEFB 	Delimiter, "SWOP"										;; ID &95 : String "SWOP" ; Note: it is "SWOP" not "SWAP"!
+	DEFB 	Delimiter, "LOTS OF IT"									;; ID &96 : String "LOTS OF IT"
+	DEFB 	Delimiter, "NOT SO MUCH"								;; ID &97 : String "NOT SO MUCH"
+	DEFB 	Delimiter, "PARDON"										;; ID &98 : String "PARDON"
+	DEFB 	Delimiter, Print_WipeScreen 							;; ID &99 : Screen_Wipe_Code
+	DEFB 			   Print_TitleScreen, Print_PRESS				;;			Title_Screen_Code, "|PRESS..."
+	DEFB 	Delimiter, Print_PLAY, Print_THE, Print_GAME			;; ID &9A : Pointer on the ID &80,&84,&85 strings ("PLAY"," THE ","GAME")
+	DEFB 	Delimiter, Print_SELECT, Print_THE, Print_KEY, "S"   	;; ID &9B : Pointer on the ID &86,&84,&87 strings ("SELECT"," THE ","KEY"+"S")
+	DEFB 	Delimiter, "ADJUST", Print_THE, "SOUND"					;; ID &9C : String "ADJUST", " THE ", "SOUND"
+	DEFB 	Delimiter, "CONTROL ", Print_SENSITIVITY				;; ID &9D : String "CONTROL ", "SENSITIVITY"
+	DEFB 	Delimiter, "HIGH ", Print_SENSITIVITY					;; ID &9E : String "HIGH ", "SENSITIVITY"
+	DEFB 	Delimiter, "LOW ", Print_SENSITIVITY					;; ID &9F : String "LOW ", "SENSITIVITY"
+	DEFB 	Delimiter, "OLD ", Print_GAME							;; ID &A0 : String "OLD ", "GAME"
+	DEFB 	Delimiter, "NEW ", Print_GAME							;; ID &A1 : String "NEW ", "GAME"
+	DEFB 	Delimiter, "MAIN MENU"									;; ID &A2 : String "MAIN MENU"
+	DEFB 	Delimiter, Print_SingleSize_at_pos, &02, &15			;; ID &A3 : Macro ID &B9 Text_col Text_row
+	DEFB 			   Print_PRESS_2, Print_Color_Attr_3	 		;;			Pointer on the ID &8A string ("|PRESS"), Macro ID &83 (color 3)
+	DEFB 			   Print_ANYKEY, Print_TO, "MOVE CURSOR"		;;			Pointer on the ID &88,&8B strings ("ANY " + "KEY", " TO "), "MOVE CURSOR"
+	DEFB 			   Print_SetPos, &01, &17, " "					;;			Set_Text_Position Text_col Text_row, String " "
+	DEFB 			   Print_PRESS_2, Print_RET, Print_TO 			;;			Pointer on the ID &8A,&8C,&8B,&86 strings ("|PRESS","|RETURN"," TO ")
+	DEFB 			   Print_SELECT, " OPTION", Print_ClrEOL		;;			String "SELECT", String " OPTION", Clr_EOL
+	DEFB 	Delimiter, Print_SetPos, &05, &03						;; ID &A4 : Set_Text_Position Text_col Text_row
+	DEFB 			   Print_PRESS_2, Print_SHIFT, Print_TO			;;			Pointer on the ID &8A,&8D,&8B,&C8 strings ("|PRESS","|SHIFT"," TO ")
+	DEFB 			   Print_FINISH, Print_ClrEOL             		;;			String "FINISH", Clr_EOL
+	DEFB 	Delimiter, Print_SetPos, &05, &03						;; ID &A5 : Set_Text_Position Text_col Text_row
+	DEFB 			   Print_PRESS_2, Print_RET, Print_TO			;;			Pointer on the ID &8A,&8C,&8B,&C8 strings ("|PRESS","|RETURN"," TO ")
+	DEFB 			   Print_FINISH, Print_ClrEOL           		;;			String "FINISH", Clr_EOL
+	DEFB 	Delimiter, Print_Wipe_DblSize_pos, &08, &00				;; ID &A6 : Macro ID &B0 Text_col Text_row
+	DEFB 			   Print_Color_Attr_1, Print_SelKey				;;			Macro ID &81, Pointer on the ID &8C string ("SELECT THE KEYS")
+	DEFB 			   Print_ShiftToFinish							;;			Pointer on the ID &A7
+	DEFB 	Delimiter, Print_PRESS, Print_SetPos, &05, &03			;; ID &A7 : Pointer on the ID &A3, Set_Text_Position Text_col Text_row
+	DEFB 			   Print_PRESS_2, Print_Color_Attr_1    		;;			Pointer on the ID &8A string ("|PRESS"), Macro ID &81
+	DEFB 			   Print_SHIFT, Print_TO, Print_FINISH			;;			Pointer on the ID &8D,&8B,&C8 strings ("|SHIFT"," TO ","FINISH")
+	DEFB 			   Print_ClrEOL        							;; 			Clr_EOL
+	DEFB 	Delimiter, Print_SetPos, &05, &03, Print_ClrEOL			;; ID &A8 : Set_Text_Position Text_col Text_row, Clr_EOL
+	DEFB 			   Print_SetPos, &01, &15, Print_ClrEOL			;;			Set_Text_Position Text_col Text_row, Clr_EOL
+	DEFB 			   Print_SetPos, &01, &17, Print_PRESS_2		;;			Set_Text_Position Text_col Text_row, ID &8A string ("|PRESS")
+	DEFB 			   Print_Color_Attr_3, Print_KEY, "S"			;; 			Macro ID &83, Pointer on the ID &87 string ("KEY"+"S")
+	DEFB 			   Print_Color_Attr_2, " REQUIRED FOR "			;;			Macro ID &82, String " REQUIRED FOR "
+	DEFB 			   Print_Color_Attr_3							;; 			Macro ID &83
+	DEFB 	Delimiter, Print_Wipe_DblSize_pos, &08, &00				;; ID &A9 : Pointer on item ID &B0 Text_col Text_row
+	DEFB 			   Print_Color_Attr_2, Print_AdjustSnd			;;			Macro ID &82, ID &9C string ("ADJUST THE SOUND")
+	DEFB 			   Print_PRESS, Print_SetPos, &06, &03			;;			Pointer on item ID &A3, Set_Text_Position Text_col Text_row
+	DEFB 			   Print_ColorAttr, Color_Rainbow     			;;			Color_code Color_Rainbow
+	DEFB 			   "MUSIC BY GUY STEVENS"						;;			String "MUSIC BY GUY STEVENS"
+	DEFB 	Delimiter, Print_Wipe_DblSize_pos, &06, &00				;; ID &AA : Macro ID &B0 Text_col Text_row
+	DEFB 			   Print_Color_Attr_2, Print_CtrlSens			;;			Macro ID &82, Pointer on item ID &9D ("CONTROL SENSITIVITY")
+	DEFB 			   Print_PRESS       							;;			Pointer on item ID &A3
+	DEFB 	Delimiter, Print_Wipe_DblSize_pos, &09, &00				;; ID &AB : Macro ID &B0 Text_col Text_row
+	DEFB 			   Print_Color_Attr_2, Print_Play_Game			;;			Macro ID &82, Pointer on item ID &9A ("PLAY THE GAME")
+	DEFB 			   Print_PRESS      							;;			Pointer on item ID &A3
+	DEFB 	Delimiter, Print_DoubleSize, Print_Color_Attr_2			;; ID &AC : Paused Game message : Text_double_size, Macro ID &82
+	DEFB 			   Print_SetPos, &03, &03, Print_PRESS_2		;;			Set_Text_Position Text_col Text_row, ID &8A ("|PRESS")
+	DEFB 			   Print_Color_Attr_3, Print_SHIFT				;;			Macro ID &83, ID &8A,
+	DEFB 			   Print_TO, Print_FINISH, " "					;;			Pointer on item ID &8B,&C8 ("|SHIFT"," TO ","FINISH"), String " "
+	DEFB 			   Print_GAME, Print_SetPos, &04, &06			;;			Pointer on the ID &85 string ("GAME"), Set_Text_Position Text_col Text_row
+	DEFB 			   Print_PRESS_2, Print_Color_Attr_3			;;			Pointer on item ID &8A ("|PRESS"), Macro ID &83
+	DEFB 			   Print_ANYKEY, Print_TO, "RESTART"			;;			Pointer on the ID &88,&8B strings ("ANY " + "KEY", " TO "), "RESTART"
+	DEFB 	Delimiter, "   "										;; ID &AD : Spaces : String "   "
+	DEFB 	Delimiter, Print_Color_Attr_3							;; ID &AE : Arrows for Selected Menu item : Macro ID &83
+	DEFB 			   Print_Arrow_1, Print_Arrow_2, Print_Spaces	;;			Arrow1_code Arrow2_code, &AD String ("   ")
+	DEFB 	Delimiter, Print_SingleSize, Print_Color_Attr_1			;; ID &AF : Arrows for non-selected Menu items : Text_single_size, Macro ID &81
+	DEFB 			   Print_Arrow_3, Print_Arrow_4, Print_Spaces	;;			Arrow3_code Arrow4_code, ID &AD String ("   ")
+	DEFB 	Delimiter, Print_WipeScreen, Print_ColorScheme, 9		;; ID &B0 : needs to be followed by the 2 bytes argument of the &06 macro at the end ; Screen_Wipe_Code, Select color scheme nb 09
+	DEFB 			   Print_DoubleSize, Print_SetPos				;;			Text_double_size, Set_Text_Position (&B0 will need to be followed by the 2 argument bytes for Text_col Text_row)
+	DEFB 	Delimiter, Print_SingleSize_at_pos, &05, &14			;; ID &B1 : positionning used to display CNT_SPEED ; Macro ID &B9 Text_col Text_row
+	DEFB 	Delimiter, Print_SingleSize_at_pos, &19, &14			;; ID &B2 : positionning used to display CNT_SPRING ; Macro ID &B9 Text_col Text_row
+	DEFB 	Delimiter, Print_SingleSize_at_pos, &19, &17			;; ID &B3 : positionning used to display CNT_HEELS_INVULN ; Macro ID &B9 Text_col Text_row
+	DEFB 	Delimiter, Print_SingleSize_at_pos, &05, &17			;; ID &B4 : positionning used to display CNT_HEAD_INVULN ; Macro ID &B9 Text_col Text_row
+	DEFB 	Delimiter, Print_DoubleSize, Print_SetPos, &12, &16 	;; ID &B5 : positionning used to display CNT_HEELS_LIVES ; Text_double_size, Set_Text_Position Text_col Text_row
+	DEFB 	Delimiter, Print_DoubleSize, Print_SetPos, &0C, &16		;; ID &B6 : positionning used to display CNT_HEAD_LIVES ; Text_double_size, Set_Text_Position Text_col Text_row
+	DEFB 	Delimiter, Print_SingleSize_at_pos, &01, &11			;; ID &B7 : positionning used to display CNT_DONUTS ; Macro ID &B9 Text_col Text_row
+	DEFB 	Delimiter, Print_SingleSize, Print_Color_Attr_2			;; ID &B8 : Text_single_size, Macro ID &82 (color 2)
+	DEFB 			   Print_SetPos, &1A, &13, Print_Icon_Spring	;;			Set_Text_Position Text_col Text_row, Item_Spring_code
+	DEFB 			   Print_SetPos, &1A, &16						;;			Set_Text_Position Text_col Text_row
+	DEFB 			   Print_Color_Attr_2, Print_Icon_Shield		;;			Macro ID &82 (color 2), Item_Shield_code
+	DEFB 			   Print_SetPos, &06, &13						;;			Set_Text_Position Text_col Text_row
+	DEFB 			   Print_Color_Attr_2, Print_Icon_Speed			;;			Macro ID &82 (color 2), Item_LightningSpeed_code
+	DEFB 			   Print_SetPos, &06, &16						;;			Set_Text_Position Text_col Text_row
+	DEFB 			   Print_Color_Attr_2, Print_Icon_Shield		;;			Macro ID &82 (color 2), Item_Shield_code
+	DEFB 	Delimiter, Print_SingleSize, Print_SetPos				;; ID &B9 : needs to be followed by the 2 bytes argument of the &06 macro at the end : Text_single_size, Set_Text_Position (&B9 will need to be followed by the 2 argument bytes for Text_col Text_row)
+	DEFB 	Delimiter, Print_TitleScreen							;; ID &BA : Pointer on item ID &C5 : Title_Screen_Code
+	DEFB 			   Print_SetPos, &0A, &08						;;			Set_Text_Position Text_col Text_row
+	DEFB 			   Print_Color_Attr_2, Print_DoubleSize			;;			Macro ID &82, Text_double_size
+	DEFB 			   Print_ColorAttr, Color_Rainbow				;;			Color_code Color_Rainbow
+	DEFB 	Delimiter, Print_SingleSize_at_pos, &06, &11			;; ID &BB : Macro ID &B9 Text_col Text_row
+	DEFB 			   Print_Color_Attr_1, "EXPLORED "				;;			Macro ID &81, String "EXPLORED "
+	DEFB 	Delimiter, " ROOMS", Print_SetPos, &09, &0E				;; ID &BC : String " ROOMS", Set_Text_Position Text_col Text_row
+	DEFB 			   Print_Color_Attr_2, "SCORE "					;;			Macro ID &82, String "SCORE "
+	DEFB 	Delimiter, "0", Print_SetPos, &05, &14					;; ID &BD : String "0", Set_Text_Position Text_col Text_row
+	DEFB 			   Print_Color_Attr_3, "LIBERATED "				;;			Macro ID &83, String "LIBERATED "
+	DEFB 	Delimiter, " PLANETS"             						;; ID &BE : String " PLANETS"
+	DEFB 	Delimiter, "  DUMMY"             						;; ID &BF : String "  DUMMY"
+	DEFB 	Delimiter, "  NOVICE"             						;; ID &C0 : String "  NOVICE"
+	DEFB 	Delimiter, "   SPY    "									;; ID &C1 : String "   SPY    "
+	DEFB 	Delimiter, "MASTER SPY"									;; ID &C2 : String "MASTER SPY"
+	DEFB 	Delimiter, "   HERO"             						;; ID &C3 : String "   HERO"
+	DEFB 	Delimiter, " EMPEROR"             						;; ID &C4 : String " EMPEROR"
+	DEFB 	Delimiter, Print_ColorScheme, 10, Print_DoubleSize		;; ID &C5 : Select color scheme nb 0A, Text_double_size
+	DEFB 			   Print_SetPos, &08, &00						;;			Set_Text_Position Text_col Text_row
+	DEFB 			   Print_Color_Attr_2, "HEAD      HEELS"		;;			Macro ID &82, String "HEAD       HEELS"
+	DEFB 			   Print_SingleSize_at_pos, &0C, &01			;;			Macro ID &B9 Text_col Text_row
+	DEFB 			   Print_ColorAttr, Color_Rainbow				;;			Color_attr_code Color_rainbow
+	DEFB 			   " OVER ", Print_SetPos, &01, &00				;;			String " OVER ", Set_Text_Position Text_col Text_row
+	DEFB 			   " JON", Print_SetPos, &01, &02				;;			String " JON", Set_Text_Position Text_col Text_row
+	DEFB 			   "RITMAN", Print_SetPos, &19, &00				;;			String "RITMAN", Set_Text_Position Text_col Text_row
+	DEFB 			   "BERNIE", Print_SetPos, &18, &02				;;			String "BERNIE", Set_Text_Position Text_col Text_row
+	DEFB 			   "DRUMMOND"		             				;;			String "DRUMMOND"
+	DEFB 	Delimiter, Print_WipeScreen, Print_ColorScheme, 6		;; ID &C6 : Screen_Wipe_Code, Select color scheme nb 06
+	DEFB 			   Print_SetPos, &05, &00						;; 			Set_Text_Position Text_col Text_row
+	DEFB 			   Print_DoubleSize, Print_Color_Attr_3			;; 			Text_double_size, Macro ID &83
+	DEFB 			   Print_THE, Print_BLACKTOOTH, " EMPIRE"		;; 			Pointer on item ID &84 : String " THE ", ID &C7 : String "BLACKTOOTH", String " EMPIRE"
+	DEFB 			   Print_SingleSize, Print_SetPos, &03, &09		;;			Text_single_size, Set_Text_Position Text_col Text_row
+	DEFB 			   Print_Color_Attr_1, "EGYPTUS"				;;			Macro ID &81, String "EGYPTUS"
+	DEFB 			   Print_SetPos, &15, &17						;;			Set_Text_Position Text_col Text_row
+	DEFB 			   "BOOK WORLD", Print_SetPos, &03, &17			;;			String "BOOK WORLD", Set_Text_Position Text_col Text_row
+	DEFB 			   "SAFARI", Print_SetPos, &14,	&09				;;			String "SAFARI", Set_Text_Position Text_col Text_row
+	DEFB 			   "PENITENTIARY", Print_SetPos, &0B, &10		;;			String "PENITENTIARY", Set_Text_Position Text_col Text_row
+	DEFB 			   Print_BLACKTOOTH								;;			Pointer on item ID &C7 : String "BLACKTOOTH"
+	DEFB 	Delimiter, "BLACKTOOTH"									;; ID &C7 : String "BLACKTOOTH"
+	DEFB 	Delimiter, "FINISH"             						;; ID &C8 : String "FINISH"
+	DEFB 	Delimiter, Print_FreedomPOS								;; ID &C9 : Pointer on item ID &B6
+	DEFB 			   Print_ColorAttr, Color_Rainbow, "FREEDOM "	;;			Color_attr_code Color_Rainbow, String "FREEDOM "
+	DEFB 	Delimiter, Print_WipeScreen, Print_ColorScheme, 6		;; ID &CA : Screen_Wipe_Code, Select color scheme nb 06
+	DEFB 			   Print_SingleSize_at_pos, &00, &0A			;; 			Macro ID &B9 Text_col Text_row
+	DEFB 			   Print_Color_Attr_2, Print_THE				;; 			Macro ID &82, ID &84 : String " THE "
+	DEFB 			   "PEOPLE SALUTE YOUR HEROISM"      			;; 			String "PEOPLE SALUTE YOUR HEROISM"
+	DEFB 			   Print_SetPos, &08, &0C						;;			Set_Text_Position Text_col Text_row
+	DEFB 			   "AND PROCLAIM YOU", Print_DoubleSize			;;			String "AND PROCLAIM YOU", Text_double_size
+	DEFB 			   Print_SetPos, &0B, &10						;;			Set_Text_Position Text_col Text_row
+	DEFB 			   Print_ColorAttr, Color_Rainbow				;;			Color_attr_code Color_Rainbow
+	DEFB 			   Print_Emperor								;;			Pointer on item ID &C4 : String " EMPEROR"
+	DEFB 	Delimiter       										;; End Delimiter (ID &CB)
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; Swap RoomId with the room at the other end of the teleport.
+;; Find where the Teleport in the current room brings us and update
+;; the current room Id
 .Teleport_swap_room:
 	LD		BC,(current_Room_ID)  						;; get current_Room_ID in BC
 	LD		HL,Teleport_data							;; HL points on Teleport_data
@@ -9909,8 +9858,8 @@ br_3123
 	JR		NZ,Scan_teleport_pairs						;; loop Scan_teleport_pairs if no match else found!
 	RET													;; DE has the destination room
 
-;; Loads (HL) into DE, incrementing HL.
-;; Compares BC with DE, sets Z if equal.
+;; get Teleport value in DE and match with value in BC.
+;; Zero is set if equal.
 get_teleport_pair_in_DE:													;; look for the BC room ID in the Teleport_data table at HL
 	LD		A,C
 	LD		E,(HL)
@@ -9940,10 +9889,10 @@ Teleport_data:
 	DEFW 	&A500, &88D0 				;; Room ID A500 end up at Room ID 88D0 : Moonbase Main to Egyptus (both way)
 	DEFW 	&BCD0, &DED0 				;; Room ID BCD0 end up at Room ID DED0 : Egyptus mid to Egyptus early
 	DEFW 	&2DB0, &8BD0 				;; Room ID 2DB0 end up at Room ID 8BD0 : Egyptus just before crown to Egyptus beginning
-	DEFW 	&1190, &E1C0 				;; Room ID 1190 end up at Room ID E1C0 : Penitentiary Crown room () to Penitentiary mid1
-	DEFW 	&00B0, &E2C0 				;; Room ID 00B0 end up at Room ID E2C0 : Penitentiary Far in () to Penitentiary mid2
+	DEFW 	&1190, &E1C0 				;; Room ID 1190 end up at Room ID E1C0 : Penitentiary Crown room to Penitentiary mid1
+	DEFW 	&00B0, &E2C0 				;; Room ID 00B0 end up at Room ID E2C0 : Penitentiary Far in, to Penitentiary mid2
 	DEFW 	&10B0, &C100 				;; Room ID 10B0 end up at Room ID C100 : Penitentiary just before crown to Begining Penitentiary
-	DEFW 	&8BF0, &00F0 				;; Room ID 8BF0 end up at Room ID 00F0 : Safari (Egyptus???) Far room to Safari begining
+	DEFW 	&8BF0, &00F0 				;; Room ID 8BF0 end up at Room ID 00F0 : Safari Far room to Safari begining
 	DEFW 	&9730, &EF20 				;; Room ID 9730 end up at Room ID EF20 : Bookworld just before crown to Bookworld beginning
 	DEFW 	&1D00, &A800 				;; Room ID 1D00 end up at Room ID A800 : Moonbase Main to Moonbase Upper (both way)
 	DEFW 	&BA70, &4E00 				;; Room ID BA70 end up at Room ID 4E00 : Moonbase Upper to Market (both way)
@@ -9952,7 +9901,8 @@ Teleport_data:
 	DEFW 	&8B30, RoomID_Victory		;; Room ID 8B30 end up at Room ID 8D30 : Castle to Freedom (Victory room! 8D30 game over)
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; Takes sprite codes in HL and a height in A, and applies truncation
+;; Burries the doorway edge into the ground if needed.
+;; Takes sprite codes in L and a height in A, and applies truncation
 ;; of the third column A * 2 + from the top of the column. This
 ;; performs removal of the bits of the door hidden by the walls.
 ;; If the door is raised, more of the frame is visible, so A is
@@ -9960,35 +9910,34 @@ Teleport_data:
 .OccludeDoorway:
     ;; Copy the sprite (and mask) indexed by L to DoorwayBuf
 	PUSH 	AF
-	LD		A,L
+	LD		A,L											;; L = doorway sprite code
 	LD		H,0
 	LD		(Sprite_Code),A								;; update sprite code
 	CALL 	Sprite3x56
 	EX		DE,HL
 	LD		DE,DoorwayBuf + MOVE_OFFSET
 	PUSH 	DE
-	LD		BC,&0150									;; 56 * 3 * 2
+	LD		BC,56 * 3 * 2								;; 56 lines * 3 bytes * 2
 	LDIR												;; repeat LD (DE),(HL); DE++, HL++, BC-- until BC=0
 	POP		HL
 	POP		AF
 	;; A = Min(A * 2 + 8, 0x38)
 	ADD		A,A
-	ADD		A,8
-	CP		&39
-	JR		c,occdw_1
-	LD		A,&38
-	;; A *= 3
+	ADD		A,8											;; A*2 + 8
+	CP		&39											;; compare with &39
+	JR		c,occdw_1									;; if <= &38, keep A and jump occdw_1
+	LD		A,&38										;; else use A=&38
 occdw_1:
 	LD		B,A
 	ADD 	A,A
-	ADD 	A,B
+	ADD 	A,B											;; A*3
 	;; DE = Top of sprite + A
     ;; HL = Top of mask + A
 	LD		E,A
-	LD		D,0
+	LD		D,0											;; DE = A*3
 	ADD 	HL,DE
 	EX		DE,HL
-	LD		HL,&00A8									;; 56 * 3
+	LD		HL,56 * 3
 	ADD 	HL,DE
 	LD		A,B
 	NEG
@@ -10029,7 +9978,7 @@ occdw_2:
 	DEFB 	4								;; width of sprite in bytes
 
 .Sprite_Code:
-	DEFB	&00             				;; Variable for sprite code
+	DEFB	&00             				;; Variable for current sprite code being drawn
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; This will init another table in 6900-69FF used as a look-up table
@@ -10060,30 +10009,29 @@ table2_decomp:
 ;; For a given sprite code, generates the X and Y extents, and sets
 ;; the current sprite code and sprite width.
 ;;
-;; Parameters: Sprite code is passed in in A.
-;;             X coordinate in C, Y coordinate in B
+;; Parameters: Sprite code in A. X coordinate in C, Y coordinate in B
 ;; Returns: X extent in BC, Y extent in HL
 .GetSprExtents:
-	LD (Sprite_Code),A									;; update sprite code
-	AND &7F
-	CP &10
-	JR c,Case3x56										;; Codes < &10 are 3x56 so go Case3x56, else:
-	LD DE,&0606											;; 3x24 or 3x32 (3x32 will be modified)
-	LD H,&12
-	CP &54
-	JR c,gsext_1
-	LD DE,&0808					 						;; Codes >= &54 are 4x28
-	LD H,&14
+	LD		(Sprite_Code),A								;; update sprite code
+	AND		&7F
+	CP		SPR_1st_3x32_sprite
+	JR		c,Case3x56									;; Codes < &10 are 3x56 so go Case3x56, else:
+	LD		DE,&06 * WORD_HIGH_BYTE + &06				;; else 3x24 or 3x32 (3x32 will be modified)
+	LD		H,&12
+	CP		SPR_1st_4x28_sprite
+	JR		c,gsext_1
+	LD		DE,&08 * WORD_HIGH_BYTE + &08				;; Codes >= &54 are 4x28
+	LD		H,&14
 gsext_1:
-	CP &18
-	JR NC,SSW_2
-	LD A,(SpriteFlags)
-	AND &02												;; bit1 of stored SPRFLAGS
-	LD D,&04
-	LD H,&0C
-	JR Z,SSW_2
-	LD D,&00
-	LD H,&10
+	CP		SPR_1st_3x24_sprite
+	JR		NC,SSW_2
+	LD		A,(SpriteFlags)
+	AND		&02											;; bit1 of stored SPRFLAGS
+	LD		D,&04
+	LD		H,&0C
+	JR		Z,SSW_2
+	LD		D,&00
+	LD		H,&10
     ;; All cases but 3x56 join up here:
     ;; D is Y extent down, H is Y extent up
     ;; E is half-width (in double-pixels)
@@ -10095,141 +10043,134 @@ gsext_1:
     ;;
     ;; The 3x32 case is split into 2 parts of height 16 each.
 SSW_2:
-	LD A,B
-	ADD A,D
-	LD L,A
-	SUB D
-	SUB H
-	LD H,A
-	LD A,C
-	ADD A,E
-	LD C,A
-	SUB E
-	SUB E
-	LD B,A						 						;; B = C - 2*E
-	LD A,E
-	AND A
+	LD		A,B
+	ADD		A,D
+	LD		L,A
+	SUB		D
+	SUB		H
+	LD		H,A
+	LD		A,C
+	ADD		A,E
+	LD		C,A
+	SUB		E
+	SUB		E
+	LD		B,A						 					;; B = C - 2*E
+	LD		A,E
+	AND		A
 	RRA													;; And save width in bytes to SpriteWidth
-	LD (Sprite_Width),A									;; update Sprite_Width
+	LD		(Sprite_Width),A							;; update Sprite_Width
 	RET
 
 ;; -----------------------------------------------------------------------------------------------------------
+;; Horrible hack to get the current object - we're usually
+;; called via Blit_Objects, which sets this.
+;;
+;; However, IntersectObj is also called via AddObject, so err...
+;; either something clever's going on, or the extents can be
+;; slightly wrong in the AddObject case for doors.
 .Case3x56:
-    ;; Horrible hack to get the current object - we're usually
-    ;; called via Blit_Objects, which sets this.
-    ;;
-    ;; However, IntersectObj is also called via AddObject, so err...
-    ;; either something clever's going on, or the extents can be
-    ;; slightly wrong in the AddObject case for doors.
-    ;;
-    ;; TODO: Tie these into the object definitions and flags
-	LD HL,(smc_CurrObject2+1)
-	INC HL
-	INC HL
-	BIT 5,(HL)											;; Bit 5 = is LHS door
-	EX AF,AF'
-	LD A,(HL)
-	SUB &10												;; NC for < 9 or > 30 - ie near doors
-	CP &20
-	LD L,&04
-	JR NC,br_359A
-	LD L,&08
+	LD		HL,(smc_CurrObject2+1)
+	INC		HL
+	INC		HL
+	BIT		5,(HL)										;; Bit 5 = is LHS door
+	EX		AF,AF'
+	LD		A,(HL)
+	SUB		&10											;; NC for < 9 or > 30 - ie near doors
+	CP		&20
+	LD		L,&04
+	JR		NC,br_359A
+	LD		L,&08
 br_359A
-	LD A,B					 							;; L = (Flag - &10) >= &20 ? 8 : 4
-	ADD A,L
-	LD L,A
-	SUB &38
-	LD H,A
-	EX AF,AF'
-	LD A,C
-	LD B,&08
-	JR NZ,br_35A8
-	LD B,&04
+	LD		A,B					 						;; L = (Flag - &10) >= &20 ? 8 : 4
+	ADD		A,L
+	LD		L,A
+	SUB		&38
+	LD		H,A
+	EX		AF,AF'
+	LD		A,C
+	LD		B,&08
+	JR		NZ,br_35A8
+	LD		B,&04
 br_35A8
 	;; Use 8 for left doors, 4 for right.
-	ADD A,B												;; B = (Flag & 0x20) ? 8 : 4
-	LD C,A
-	SUB &0C
-	LD B,A
-	LD A,&03											;; Always 3 bytes wide.
-	LD (Sprite_Width),A									;; update Sprite_Width
+	ADD		A,B											;; B = (Flag & 0x20) ? 8 : 4
+	LD		C,A
+	SUB		&0C
+	LD		B,A
+	LD		A,&03										;; Always 3 bytes wide.
+	LD		(Sprite_Width),A							;; update Sprite_Width
 	RET
-
-;; -----------------------------------------------------------------------------------------------------------
-SPR_first_4x28_sprite	EQU		SPR_DOORSTEP		;; &54
-SPR_first_3x24_sprite	EQU		SPR_HEELS1			;; &18
-SPR_first_3x32_sprite	EQU		SPR_VISOROHALF		;; &10
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Looks up based on SpriteCode. Top bit set means flip horizontally.
 ;; Return height in B, image in DE, mask in HL.
 .Load_sprite_image_address_into_DE:
-	LD A,(Sprite_Code)									;; get sprite code
-	AND &7F												;; Top bit holds 'reverse?'. Ignore.
-	CP SPR_first_4x28_sprite							;; >= 0x54 -> 4x28 (&54 is the SPR_DOORSTEP, the first of the 4x28 sprites)
-	JP NC,Sprite4x28
-	CP SPR_first_3x24_sprite							;; >= 0x18 -> 3x24 (&18 is the SPR_HEELS1, the first of the 3x24 sprites)
-	JR NC,Sprite3x24
-	CP SPR_first_3x32_sprite							;; >= 0x10 -> 3x32
-	LD H,&00
-	JR NC,Sprite3x32
-	LD L,A
-	LD DE,(smc_CurrObject2+1)
-	INC DE
-	INC DE
+	LD		A,(Sprite_Code)								;; get sprite code
+	AND		&7F											;; Ignore top bit holding 'Flipped' info
+	CP		SPR_1st_4x28_sprite							;; >= 0x54 -> 4x28 (&54 is the SPR_DOORSTEP, the first of the 4x28 sprites)
+	JP		NC,Sprite4x28
+	CP		SPR_1st_3x24_sprite							;; >= 0x18 -> 3x24 (&18 is the SPR_HEELS1, the first of the 3x24 sprites)
+	JR		NC,Sprite3x24
+	CP		SPR_1st_3x32_sprite							;; >= 0x10 -> 3x32
+	LD		H,&00
+	JR		NC,Sprite3x32
+	LD		L,A
+	LD		DE,(smc_CurrObject2+1)
+	INC		DE
+	INC		DE
 	;; Normal case if the object's flag & 3 != 3
-	LD A,(DE)
-	OR &FC												;; ~&03
-	INC A
-	JR NZ,Sprite3x56
+	LD		A,(DE)
+	OR		&FC											;; ~&03
+	INC		A
+	JR		NZ,Sprite3x56
 	;; flag & 3 == 3 case:
-	LD A,(Sprite_Code)									;; get sprite code
-	LD C,A
+	LD		A,(Sprite_Code)								;; get sprite code
+	LD		C,A
 	RLA
-	LD A,(RoomDimensionsIdx)
-	JR c,br_35E2										;; Flip bit set?
-	CP &06												;; Narrow-in-U-direction room?
-	JR br_35E4
+	LD		A,(RoomDimensionsIdx)
+	JR		c,br_35E2									;; Flip bit set?
+	CP		&06											;; Narrow-in-U-direction room?
+	JR		br_35E4
 
 br_35E2
-	CP &03												;; Narrow-in-V-direction room?
+	CP		&03											;; Narrow-in-V-direction room?
 br_35E4
-	JR Z,Sprite3x56
+	JR		Z,Sprite3x56
 	;; Use DoorwayBuf.
-	LD A,(DoorwayFlipped)
-	XOR C
+	LD		A,(DoorwayFlipped)
+	XOR		C
 	RLA
-	LD DE,DoorwayImgBuf + MOVE_OFFSET
-	LD HL,DoorwayMaskBuf + MOVE_OFFSET					;; DoorwayMaskBuf : DoorwayBuf + 56 * 3
-	RET NC
+	LD		DE,DoorwayImgBuf + MOVE_OFFSET
+	LD		HL,DoorwayMaskBuf + MOVE_OFFSET				;; DoorwayMaskBuf : DoorwayBuf + 56 * 3
+	RET		NC
 	;; And flip it if necessary.
-	LD A,C
-	LD (DoorwayFlipped),A
-	LD B,&70											;; 56*2
-	JR FlipSprite3
+	LD		A,C
+	LD		(DoorwayFlipped),A
+	LD		B,56*2
+	JR		FlipSprite3									;; will RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Deal with a 3 byte x sprite 56 pixels high.
 ;; Same parameters/return as Load_sprite_image_address_into_DE.
 .Sprite3x56:
-	LD A,L
-	LD E,A												;; *1
-	ADD A,A												;; *2
-	ADD A,A												;; *4
-	ADD A,E												;; *5
-	ADD A,A												;; *10
-	LD L,A
-	ADD HL,HL											;; *20
-	ADD HL,HL											;; *40
-	ADD HL,HL											;; 80x
-	LD A,E												;; *1
-	ADD A,H												;; *256
-	LD H,A												;; finally 336x = 3x56x2x
-	LD DE,&8270											;; IMG_3x56
-	ADD HL,DE
-	LD DE,&00A8											;; 56*3 ; Point to mask
-	LD B,&70											;; 56*2 ; Height of image + height of mask
-	JR Sprite3Wide
+	LD		A,L
+	LD		E,A											;; *1
+	ADD		A,A											;; *2
+	ADD		A,A											;; *4
+	ADD		A,E											;; *5
+	ADD		A,A											;; *10
+	LD		L,A
+	ADD		HL,HL										;; *20
+	ADD		HL,HL										;; *40
+	ADD		HL,HL										;; 80x
+	LD		A,E											;; *1
+	ADD		A,H											;; *256
+	LD		H,A											;; finally 336x = 3x56x2x
+	LD		DE,img_3x56_bin	+ MOVE_OFFSET				;; Image 3x56 base addr
+	ADD		HL,DE
+	LD		DE,56*3										;; &00A8 = 56*3 ; Point to mask
+	LD		B,56*2										;; Height of image + height of mask
+	JR		Sprite3Wide
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Deal with a 3 byte x 32 pixel high sprite.
@@ -10238,156 +10179,156 @@ br_35E4
 ;; Returns a half-height offset sprite if bit 2 is not set, since the
 ;; 3x32 sprites are broken into 2 16-bit-high chunks.
 .Sprite3x32:
-	SUB &10
-	LD L,A
-	ADD A,A
-	ADD A,L
-	LD L,A
-	ADD HL,HL
-	ADD HL,HL
-	ADD HL,HL
-	ADD HL,HL
-	ADD HL,HL
-	ADD HL,HL											;; 3x32x2x
-	LD DE,&8A50											;; IMG_3x32
-	ADD HL,DE
-	LD DE,&0060											;; 32*3 : number of bytes in image
-	LD B,&40											;; 32*2 : height image + height mask
-	EX DE,HL
-	ADD HL,DE
+	SUB		SPR_1st_3x32_sprite							;; align 3x32 sprite codes to 0
+	LD		L,A
+	ADD		A,A
+	ADD		A,L
+	LD		L,A
+	ADD		HL,HL
+	ADD		HL,HL
+	ADD		HL,HL
+	ADD		HL,HL
+	ADD		HL,HL
+	ADD		HL,HL										;; 3x32x2x
+	LD		DE,img_3x32_bin	+ MOVE_OFFSET				;; Image 3x32 base addr
+	ADD		HL,DE
+	LD		DE,32*3										;; number of bytes in image
+	LD		B,32*2										;; height image + height mask
+	EX		DE,HL
+	ADD		HL,DE
 	EXX
-	CALL NeedsFlip
+	CALL	NeedsFlip
 	EXX
-	CALL NC,FlipSprite3
+	CALL	NC,FlipSprite3
 	;; If bit 2 is not set, move half a sprite down.
-	LD A,(SpriteFlags)
-	AND &02
-	RET NZ
-	LD BC,&0030
-	ADD HL,BC
-	EX DE,HL
-	ADD HL,BC
-	EX DE,HL
+	LD		A,(SpriteFlags)
+	AND		&02
+	RET		NZ
+	LD		BC,16*3
+	ADD		HL,BC
+	EX		DE,HL
+	ADD		HL,BC
+	EX		DE,HL
 	RET
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; Deal with a 3 byte x 24 pixel high sprite
+;; Deal with a 3 byte (x2 img/mask, 4pix per byte, hence 3*2*4 = 24 pix wide) x 24 pixel high sprite
 ;; Same parameters/return as Load_sprite_image_address_into_DE.
 ;; Return : height image+mask in B, image in DE, mask in HL.
 .Sprite3x24:
-	SUB SPR_first_3x24_sprite							;; Sprite code was >= &18, realign number at &00 for 1st sprite (SPR_HEELS1) and so on
-	LD D,A												;; A = D = sprite number in img_3x24 table
-	LD E,&00											;; DE = sprite number * 256
-	LD H,E												;; init H = E = 0
-	ADD A,A												;; *2
-	ADD A,A												;; *4
-	LD L,A												;; L=A
-	ADD HL,HL											;; *8
-	ADD HL,HL											;; HL = sprite number x16
-	SRL D												;; Carry=Dbit0 ; int(D/2);
-	RR E												;; Ebit7=Carry; these 2 lines do a DE/2, DE= sprite number * 128
-	ADD HL,DE											;; HL = sprite number * 144 ; 144x = 2x3x24
-	LD DE,&8BD0											;; IMG_3x24 base addr
-	ADD HL,DE											;; from base addr, add the offset of the sprite we want
-	LD DE,&0048											;; &48=72=24*3 (offset for mask = number of bytes in image)
-	LD B,&30											;; &30=48=24*2 (height image + height mask)
+	SUB		SPR_1st_3x24_sprite							;; Sprite code was >= &18, realign number at 0 for 1st sprite (SPR_HEELS1) and so on
+	LD		D,A											;; A = D = sprite number in img_3x24 table
+	LD		E,&00										;; DE = sprite number * 256
+	LD		H,E											;; init H = E = 0
+	ADD		A,A											;; *2
+	ADD		A,A											;; *4
+	LD		L,A											;; L=A
+	ADD		HL,HL										;; *8
+	ADD		HL,HL										;; HL = sprite number x16
+	SRL		D											;; Carry=Dbit0 ; int(D/2);
+	RR		E											;; E bit7=Carry; these 2 lines do a DE/2, DE= sprite number * 128
+	ADD		HL,DE										;; HL = sprite number * 144 ; 144x = 2x3x24
+	LD		DE,img_3x24_bin	+ MOVE_OFFSET				;; Images 3x24 base addr
+	ADD		HL,DE										;; from base addr, add the offset of the sprite we want
+	LD		DE,24*3										;; &48=72=24*3 (offset for mask = number of bytes in image)
+	LD		B,24*2										;; &30=48=24*2 (height image + height mask)
 .Sprite3Wide:
-	EX DE,HL											;; HL = offset mask, DE = img addr
-	ADD HL,DE											;; HL = mask addr
+	EX		DE,HL										;; HL = offset mask, DE = img addr
+	ADD		HL,DE										;; HL = mask addr
 	EXX													;; DE = mask addr, HL = img addr, save BC
-	CALL NeedsFlip
+	CALL	NeedsFlip
 	EXX													;; HL = mask addr, DE = img addr, restore B=height*2
-	RET c												;; if Carry set, no need to flip, else flip
+	RET		c											;; if Carry set, no need to flip, else flip
 ;; Flip a 3-character-wide sprite. Height in B, source in DE.
 .FlipSprite3:
-	PUSH HL
-	PUSH DE
-	EX DE,HL
-	LD D,RevTable / 256									;; &69 = RevTable >> 8
+	PUSH	HL
+	PUSH	DE
+	EX		DE,HL
+	LD		D,RevTable / WORD_HIGH_BYTE					;; &69 = RevTable >> 8
 fspr3_loop:
-	LD C,(HL)
-	LD (smc_flipsprite3+1),HL							;; Self-modifying code! will put the value in the "LD (???),A"
-	INC HL
-	LD E,(HL)
-	LD A,(DE)
-	LD (HL),A
-	INC HL
-	LD E,(HL)
-	LD A,(DE)
+	LD		C,(HL)
+	LD		(smc_flipsprite3+1),HL						;; Self-modifying code! will put the value in the "LD (???),A"
+	INC		HL
+	LD		E,(HL)
+	LD		A,(DE)
+	LD		(HL),A
+	INC		HL
+	LD		E,(HL)
+	LD		A,(DE)
 smc_flipsprite3:
-	LD (&0000),A										;; Target of self-modifying code. value is set at &3666
+	LD		(&0000),A									;; Target of self-modifying code. value is set at &3666
 	;;3671 DEFW 00 00
-	LD E,C
-	LD A,(DE)
-	LD (HL),A
-	INC HL
-	DJNZ fspr3_loop
-	POP DE
-	POP HL
+	LD		E,C
+	LD		A,(DE)
+	LD		(HL),A
+	INC		HL
+	DJNZ	fspr3_loop
+	POP		DE
+	POP		HL
 	RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Looks up a 4x28 sprite.
 ;; Same parameters/return as Load_sprite_image_address_into_DE.
 .Sprite4x28:
-	SUB SPR_first_4x28_sprite							;; SPR_DOORSTEP ID &54 becomes id 0 and so on
-	LD D,A
+	SUB		SPR_1st_4x28_sprite							;; SPR_DOORSTEP ID &54 becomes id 0 and so on
+	LD		D,A
 	RLCA
 	RLCA
-	LD H,&00
-	LD L,A
-	LD E,H
-	ADD HL,HL
-	ADD HL,HL
-	ADD HL,HL
-	EX DE,HL
-	SBC HL,DE											;; 224x = 4x28x2x
-	LD DE,&AA30											;; IMG_4x28
-	ADD HL,DE
-	LD DE,&0070											;; 28*4 = number of bytes in image
-	LD B,&38											;; 28*2 = height of image + height of mask
-	EX DE,HL
-	ADD HL,DE
+	LD		H,&00
+	LD		L,A
+	LD		E,H
+	ADD		HL,HL
+	ADD		HL,HL
+	ADD		HL,HL
+	EX		DE,HL
+	SBC		HL,DE										;; 224x = 4x28x2x
+	LD		DE,img_4x28_bin	+ MOVE_OFFSET				;; images 4x28 base addr
+	ADD		HL,DE
+	LD		DE,28*4										;; 28*4 = number of bytes in image
+	LD		B,28*2										;; 28*2 = height of image + height of mask
+	EX		DE,HL
+	ADD		HL,DE
 	EXX
-	CALL NeedsFlip
+	CALL	NeedsFlip
 	EXX
-	RET c
+	RET		c
 ;; Flip a 4-character-wide sprite. Height in B, source in DE.
 flipSprite4:
-	PUSH HL
-	PUSH DE
-	EX DE,HL
-	LD D,RevTable / 256									;; &69 = RevTable >> 8
+	PUSH	HL
+	PUSH	DE
+	EX		DE,HL
+	LD		D,RevTable / WORD_HIGH_BYTE					;; &69 = RevTable >> 8
 fspr4_loop:
-	LD C,(HL)
-	LD (smc_fs_addr+1),HL								;; Self-modifying code at 3683
-	INC HL
-	LD E,(HL)
-	INC HL
-	LD A,(DE)
-	LD E,(HL)
-	LD (HL),A
-	DEC HL
-	LD A,(DE)
-	LD (HL),A
-	INC HL
-	INC HL
-	LD E,(HL)
-	LD A,(DE)
+	LD		C,(HL)
+	LD		(smc_fs_addr+1),HL							;; Self-modifying code at 3683
+	INC		HL
+	LD		E,(HL)
+	INC		HL
+	LD		A,(DE)
+	LD		E,(HL)
+	LD		(HL),A
+	DEC		HL
+	LD		A,(DE)
+	LD		(HL),A
+	INC		HL
+	INC		HL
+	LD		E,(HL)
+	LD		A,(DE)
 smc_fs_addr:
-	LD (&0000),A										;; Target of self-modifying code
+	LD		(&0000),A									;; Target of self-modifying code
 	;;3683 DEFW 00 00														; modified at addr 36A2
-	LD E,C
-	LD A,(DE)
-	LD (HL),A
-	INC HL
-	DJNZ fspr4_loop
-	POP DE
-	POP HL
+	LD		E,C
+	LD		A,(DE)
+	LD		(HL),A
+	INC		HL
+	DJNZ	fspr4_loop
+	POP		DE
+	POP		HL
 	RET
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; Look up the sprite in the bitmap, returns with C set if the top bit of
+;; Look up the sprite in the bitmap, returns with Carry set if the top bit of
 ;; SpriteCode matches the bitmap, otherwise updates the bitmap (assumes
 ;; that the caller will flip the sprite if we return NC). In effect, a
 ;; simple cache.
@@ -10396,7 +10337,7 @@ smc_fs_addr:
 	LD		C,A
 	AND		&07
 	INC		A
-	LD		B,A
+	LD		B,A											;; B = A[2:0] + 1
 	LD		A,&01
 ndflp_1:
 	RRCA												;; right shift B times
@@ -10406,7 +10347,7 @@ ndflp_1:
 	RRA
 	RRA
 	RRA
-	AND		&0F
+	AND		&0F											;; bits [6:3]
 	LD		E,A
 	LD		D,0
 	LD		HL,SpriteFlips_buffer + MOVE_OFFSET			;; buffer 16 bytes to flip sprite
@@ -10479,9 +10420,9 @@ ndflp_1:
 	AND 	&03											;; get them and only them
 	JR		Z,initobj_1									;; if they are 0 (normal height), skip to initobj_1, else (object will be 2 sprites stacked):
 Bottoms_array_m1		EQU		Bottoms_array - 1
-	ADD		A,Bottoms_array_m1 and &00FF				;; &F1 = (Bottoms_array-1) & &00FF ; + A (can be 1to3, hence the minus 1)
+	ADD		A,Bottoms_array_m1 and WORD_LOW_BYTE		;; &F1 = (Bottoms_array-1) & &00FF ; + A (can be 1to3, hence the minus 1)
 	LD		E,A
-	ADC		A,Bottoms_array_m1 / 256					;; DE = (Bottoms_array-1) >> 8 + offset ; &36F1 + offset (can be +1, 2 or 3, this is why we have "Bottoms_array-1")
+	ADC		A,Bottoms_array_m1 / WORD_HIGH_BYTE			;; DE = (Bottoms_array-1) >> 8 + offset ; &36F1 + offset (can be +1, 2 or 3, this is why we have "Bottoms_array-1")
 	SUB		E
 	LD		D,A
 	LD		A,(DE)										;; get bottom sprite in A
@@ -10519,7 +10460,7 @@ initobj_2:
 ;; Set the sprite or animation up for an object.
 ;; Object pointer in IY, sprite/animation code in A
 .SetObjSprite:
-	LD		(IY+O_ANIM),0								;; anim reset (code = 0, frame = 0)
+	LD		(IY+O_ANIM),NO_ANIM_code					;; anim reset (code = 0 (no anim), frame = 0)
 	LD		(IY+O_SPRITE),A								;; set sprite code
 	CP		&80											;; test bit7 (anim) of sprite code
 	RET 	c											;; if anim bit not set then leave, else if anim bit set (sprite code > &80 = not a static sprite, but an animation)
@@ -10533,7 +10474,7 @@ initobj_2:
 	RET
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; Takes an object pointer in DE (From Objects buffer 6A40-...), and
+;; Takes an object pointer in DE (From ObjectsBuffer 6A40-...), and
 ;; index the object function in A.
 ;; Note that the function ID starts at 1, so to align on the ObjFnTbl
 ;; table, need to do a -1.
@@ -10544,9 +10485,9 @@ initobj_2:
 	POP 	IY											;; current object pointer in IY
 	DEC 	A											;; Function ID (-1 to align on table)
 	ADD 	A,A											;; *2 (word align as it is addr that are stored in this table)
-	ADD 	A,ObjFnTbl and &00FF						;; &7F = ObjFnTbl & &00FF
+	ADD 	A,ObjFnTbl and WORD_LOW_BYTE				;; &7F = ObjFnTbl & &00FF
 	LD		L,A
-	ADC 	A,ObjFnTbl / 256							;; &38 = ObjFnTbl >> 8	; &387F+object_num_offset
+	ADC 	A,ObjFnTbl / WORD_HIGH_BYTE					;; &38 = ObjFnTbl >> 8	; &387F+object_num_offset
 	SUB 	L
 	LD		H,A											;; HL = pointer on the function pointer
 	LD		A,(HL)										;; get the function pointer...
@@ -10587,15 +10528,15 @@ initobj_2:
 	LD		C,(IY+O_ANIM)								;; get anim code [7:3] and frame [2:0]
 	LD		A,C											;; save full anim code
 	AND 	&F8											;; sprite is in [7:3]; frame index in [2:0]
-	CP		&08											;; compare with the value 8
+	CP		FIRST_ANIM_code								;; compare with the value 8 (ANIM_VAPE1 and frame=0)
 	CCF													;; invert Carry
 	RET		NC											;; if value < 8 (which means value == 0 here due to the AND F8), leave (no anim) with NC, else:
 	RRCA												;; Right shift twice,  values from 08 to F8
 	RRCA												;; become from 02 to 3E
 	SUB		2											;; minus 2 gives : 00 to 3C, which is anim ID (0 to 1E) multiplied by 2
-	ADD 	A,AnimTable and &00FF						;; &F3 = AnimTable & &00FF
+	ADD 	A,AnimTable and WORD_LOW_BYTE				;; &F3 = AnimTable & &00FF
 	LD		L,A
-	ADC		A,AnimTable / 256							;; &37 = (AnimTable >> 8) + anim code * 2 ; &37F3+offset
+	ADC		A,AnimTable / WORD_HIGH_BYTE				;; &37 = (AnimTable >> 8) + anim code * 2 ; &37F3+offset
 	SUB		L
 	LD		H,A											;; HL = points on the anim pointer
 	LD		A,C											;; get back the full anim code
@@ -10628,21 +10569,21 @@ initobj_2:
 	;; ANIM_ROBOMOUSE (&0E)  &80 : 1000.0|000 = &10|0, &10-2 = &0E and
 	;; ANIM_ROBOMOUSEB (&0F) &81 : 1000.1|000 = &11|0, &11-2 = &0F
 	;; because of the AND &F0 both anim codes &0E and &0F match &80
-	AND		&F0
-	CP		&80
+	AND		&F0											;; clear the 'B' so it matches ANIM_ROBOMOUSE and ANIM_ROBOMOUSEB
+	CP		ANIM_ROBOMOUSE_code
 	LD		C,&02										;; ROBOMOUSE sound set to Sound ID &02
 	JR		Z,anim_setsound								;; if match ROBOMOUSE then go set the sound, else:
 	;; In the same way, &90 will match ANIM_BEE and ANIM_BEEB
-	CP		&90
+	CP		ANIM_BEE_code
 	LD		C,&01										;; in that case set Sound ID &01
 .anim_setsound:
 	LD		A,C
-	CALL 	Z,SetSound
+	CALL 	Z,SetSound									;; only sound for BEE and ROBOTMOUSE else no sound
 	SCF													;; Return with Carry set (anim updated)
 	RET
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; Pointers on the anim sprites list from the anim codes [7:3] code and [2:0] frame
+;; Pointers on the anim sprites list from the anim codes [7:3] and [2:0] frame
 ;; Note : The 'B' version is the moving-away-from-viewers version (Back/rear view).
 ;; The code &00 = no anim.
 .AnimTable:
@@ -10681,53 +10622,53 @@ initobj_2:
 ;; -----------------------------------------------------------------------------------------------------------
 .AnimTable_data:
 AnimVape1:
-	DEFB 	SPR_FLIP or SPR_VAPE1, SPR_VAPE1, SPR_VAPE2, SPR_VAPE3, &00   					;; &80|SPR_VAPE1,SPR_VAPE1,SPR_VAPE2,SPR_VAPE3,&00
+	DEFB 	SPR_VAPE1 or SPR_FLIP, SPR_VAPE1, SPR_VAPE2, SPR_VAPE3, &00   			;; &80|SPR_VAPE1,SPR_VAPE1,SPR_VAPE2,SPR_VAPE3,&00
 AnimVisorO:
-	DEFB 	SPR_VISOROHALF, &00																;; SPR_VISOROHALF,&00
+	DEFB 	SPR_VISOROHALF, &00														;; SPR_VISOROHALF,&00
 AnimVisorC:
-	DEFB 	SPR_VISORCHALF, &00																;; SPR_VISORCHALF,&00
+	DEFB 	SPR_VISORCHALF, &00														;; SPR_VISORCHALF,&00
 AnimVape2:
-	DEFB 	SPR_VAPE1, SPR_VAPE2, SPR_VAPE2, SPR_VAPE1, &00        							;; SPR_VAPE1,SPR_VAPE2,SPR_VAPE2,SPR_VAPE1,&00
+	DEFB 	SPR_VAPE1, SPR_VAPE2, SPR_VAPE2, SPR_VAPE1, &00        					;; SPR_VAPE1,SPR_VAPE2,SPR_VAPE2,SPR_VAPE1,&00
 AnimFish:
-	DEFB 	SPR_FISH1, SPR_FISH1, SPR_FISH2, SPR_FISH2, &00        							;; SPR_FISH1,SPR_FISH1,SPR_FISH2,SPR_FISH2,&00
+	DEFB 	SPR_FISH1, SPR_FISH1, SPR_FISH2, SPR_FISH2, &00        					;; SPR_FISH1,SPR_FISH1,SPR_FISH2,SPR_FISH2,&00
 AnimTeleport:
-	DEFB 	SPR_TELEPORT, SPR_FLIP or SPR_TELEPORT, &00		         						;; SPR_TELEPORT,&80|SPR_TELEPORT,&00
+	DEFB 	SPR_TELEPORT, SPR_TELEPORT or SPR_FLIP, &00		         				;; SPR_TELEPORT,&80|SPR_TELEPORT,&00
 AnimSpring:
-	DEFB 	SPR_SPRING, SPR_SPRING, SPR_SPRUNG, SPR_SPRING, SPR_SPRUNG, &00					;; SPR_SPRING,SPR_SPRING,SPR_SPRUNG,SPR_SPRING,SPR_SPRUNG,&00
+	DEFB 	SPR_SPRING, SPR_SPRING, SPR_SPRUNG, SPR_SPRING, SPR_SPRUNG, &00			;; SPR_SPRING,SPR_SPRING,SPR_SPRUNG,SPR_SPRING,SPR_SPRUNG,&00
 AnimMonocat:
-	DEFB 	SPR_MONOCAT1, SPR_MONOCAT1, SPR_MONOCAT2, SPR_MONOCAT2, &00        				;; SPR_MONOCAT1,SPR_MONOCAT1,SPR_MONOCAT2,SPR_MONOCAT2,&00
+	DEFB 	SPR_MONOCAT1, SPR_MONOCAT1, SPR_MONOCAT2, SPR_MONOCAT2, &00        		;; SPR_MONOCAT1,SPR_MONOCAT1,SPR_MONOCAT2,SPR_MONOCAT2,&00
 AnimMonocatB:
-	DEFB 	SPR_MONOCATB1, SPR_MONOCATB1, SPR_MONOCATB2, SPR_MONOCATB2, &00        			;; SPR_MONOCATB1,SPR_MONOCATB1,SPR_MONOCATB2,SPR_MONOCATB2,&00
+	DEFB 	SPR_MONOCATB1, SPR_MONOCATB1, SPR_MONOCATB2, SPR_MONOCATB2, &00     	;; SPR_MONOCATB1,SPR_MONOCATB1,SPR_MONOCATB2,SPR_MONOCATB2,&00
 AnimVape3:
-	DEFB 	SPR_VAPE3, SPR_VAPE2, SPR_VAPE3, SPR_FLIP or SPR_VAPE3							;; SPR_VAPE3,SPR_VAPE2,SPR_VAPE3,&80|SPR_VAPE3
-	DEFB	SPR_FLIP or SPR_VAPE2, SPR_FLIP or SPR_VAPE3, &00									;; &80|SPR_VAPE2,&80|SPR_VAPE3,&00
+	DEFB 	SPR_VAPE3, SPR_VAPE2, SPR_VAPE3, SPR_VAPE3 or SPR_FLIP					;; SPR_VAPE3,SPR_VAPE2,SPR_VAPE3,&80|SPR_VAPE3
+	DEFB	SPR_VAPE2 or SPR_FLIP, SPR_VAPE3 or SPR_FLIP, &00						;; &80|SPR_VAPE2,&80|SPR_VAPE3,&00
 AnimRobomouse:
-	DEFB 	SPR_ROBOMOUSE, &00         														;; SPR_ROBOMOUSE,&00
+	DEFB 	SPR_ROBOMOUSE, &00         												;; SPR_ROBOMOUSE,&00
 AnimRobomouseB:
-	DEFB 	SPR_ROBOMOUSEB, &00             												;; SPR_ROBOMOUSEB,&00
+	DEFB 	SPR_ROBOMOUSEB, &00             										;; SPR_ROBOMOUSEB,&00
 AnimBee:
-	DEFB 	SPR_BEE1, SPR_BEE2, SPR_FLIP or SPR_BEE2, SPR_FLIP or SPR_BEE1, &00       		;; SPR_BEE1,SPR_BEE2,&80|SPR_BEE2,&80|SPR_BEE1,&00
+	DEFB 	SPR_BEE1, SPR_BEE2, SPR_BEE2 or SPR_FLIP, SPR_BEE1 or SPR_FLIP, &00 	;; SPR_BEE1,SPR_BEE2,&80|SPR_BEE2,&80|SPR_BEE1,&00
 AnimBeacon:
-	DEFB 	SPR_BEACON, SPR_FLIP or SPR_BEACON, &00       									;; SPR_BEACON,&80|SPR_BEACON,&00
+	DEFB 	SPR_BEACON, SPR_BEACON or SPR_FLIP, &00       							;; SPR_BEACON,&80|SPR_BEACON,&00
 AnimFace:
-	DEFB 	SPR_FACE, &00          															;; SPR_FACE,&00
+	DEFB 	SPR_FACE, &00          													;; SPR_FACE,&00
 AnimFaceB:
-	DEFB 	SPR_FACEB, &00          														;; SPR_FACEB,&00
+	DEFB 	SPR_FACEB, &00          												;; SPR_FACEB,&00
 AnimChimp:
-	DEFB 	SPR_CHIMP, &00          														;; SPR_CHIMP,&00
+	DEFB 	SPR_CHIMP, &00          												;; SPR_CHIMP,&00
 AnimChimpB:
-	DEFB 	SPR_CHIMPB, &00          														;; SPR_CHIMPB,&00
+	DEFB 	SPR_CHIMPB, &00          												;; SPR_CHIMPB,&00
 AnimCharles:
-	DEFB 	SPR_CHARLES, &00          														;; SPR_CHARLES,&00
+	DEFB 	SPR_CHARLES, &00          												;; SPR_CHARLES,&00
 AnimCharlesB:
-	DEFB 	SPR_CHARLESB, &00          														;; SPR_CHARLESB,&00
+	DEFB 	SPR_CHARLESB, &00          												;; SPR_CHARLESB,&00
 AnimTrunk:
-	DEFB 	SPR_TRUNK, &00          														;; SPR_TRUNK,&00
+	DEFB 	SPR_TRUNK, &00          												;; SPR_TRUNK,&00
 AnimTrunkB:
-	DEFB 	SPR_TRUNKB, &00          														;; SPR_TRUNKB,&00
+	DEFB 	SPR_TRUNKB, &00          												;; SPR_TRUNKB,&00
 AnimHeliplat:
-	DEFB 	SPR_HELIPLAT1, SPR_HELIPLAT2, SPR_FLIP or SPR_HELIPLAT2							;; SPR_HELIPLAT1,SPR_HELIPLAT2,&80|SPR_HELIPLAT2
-	DEFB	SPR_FLIP or SPR_HELIPLAT1, &00													;; &80|SPR_HELIPLAT1,&00
+	DEFB 	SPR_HELIPLAT1, SPR_HELIPLAT2, SPR_HELIPLAT2 or SPR_FLIP					;; SPR_HELIPLAT1,SPR_HELIPLAT2,&80|SPR_HELIPLAT2
+	DEFB	SPR_HELIPLAT1 or SPR_FLIP, &00											;; &80|SPR_HELIPLAT1,&00
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Table has base index of 1 in CallObjFn
@@ -10771,20 +10712,20 @@ OBJFN_RESPECT			EQU		&25
 
 ;; -----------------------------------------------------------------------------------------------------------
 .ObjFnTbl:
-	DEFW	ObjFnPushable		;; OBJFN_PUSHABLE: 	01 ObjFnPushable   4DDC
-	DEFW 	ObjFnRollers1		;; OBJFN_ROLLERS1: 	02 ObjFnRollers1	4D46
-	DEFW 	ObjFnRollers2		;; OBJFN_ROLLERS2: 	03 ObjFnRollers2	4D4A
-	DEFW 	ObjFnRollers3		;; OBJFN_ROLLERS3: 	04 ObjFnRollers3	4D4E
-	DEFW 	ObjFnRollers4		;; OBJFN_ROLLERS4: 	05 ObjFnRollers4	4D52
-	DEFW 	ObjFnVisor1			;; OBJFN_VISOR1:   	06 ObjFnVisor1	4DF3
-	DEFW 	ObjFnMonocat		;; OBJFN_MONOCAT:  	07 ObjFnMonocat	4DF8
-	DEFW 	ObjFnAnticlock		;; OBJFN_ANTICLOCK:	08 ObjFnAnticlock	4DFD
-	DEFW 	ObjFnRandB			;; OBJFN_RANDB:    	09 ObjFnRandB	4E11
-	DEFW 	ObjFnBall			;; OBJFN_BALL:     	0A ObjFnBall	4C86
-	DEFW 	ObjFnBee			;; OBJFN_BEE:      	0B ObjFnBee	4E02
-	DEFW 	ObjFnRandQ			;; OBJFN_RANDQ:    	0c ObjFnRandQ	4E07
-	DEFW 	ObjFnRandR			;; OBJFN_RANDR:    	0d ObjFnRandR	4E0C
-	DEFW 	ObjFnSwitch			;; OBJFN_SWITCH:   	0e ObjFnSwitch	4CD6
+	DEFW	ObjFnPushable		;; OBJFN_PUSHABLE: 	01 ObjFnPushable 4DDC
+	DEFW 	ObjFnRollers1		;; OBJFN_ROLLERS1: 	02 ObjFnRollers1 4D46
+	DEFW 	ObjFnRollers2		;; OBJFN_ROLLERS2: 	03 ObjFnRollers2 4D4A
+	DEFW 	ObjFnRollers3		;; OBJFN_ROLLERS3: 	04 ObjFnRollers3 4D4E
+	DEFW 	ObjFnRollers4		;; OBJFN_ROLLERS4: 	05 ObjFnRollers4 4D52
+	DEFW 	ObjFnVisor1			;; OBJFN_VISOR1:   	06 ObjFnVisor1 4DF3
+	DEFW 	ObjFnMonocat		;; OBJFN_MONOCAT:  	07 ObjFnMonocat 4DF8
+	DEFW 	ObjFnAnticlock		;; OBJFN_ANTICLOCK:	08 ObjFnAnticlock 4DFD
+	DEFW 	ObjFnRandB			;; OBJFN_RANDB:    	09 ObjFnRandB 4E11
+	DEFW 	ObjFnBall			;; OBJFN_BALL:     	0A ObjFnBall 4C86
+	DEFW 	ObjFnBee			;; OBJFN_BEE:      	0B ObjFnBee 4E02
+	DEFW 	ObjFnRandK			;; OBJFN_RANDQ:    	0c ObjFnRandK 4E07
+	DEFW 	ObjFnRandR			;; OBJFN_RANDR:    	0d ObjFnRandR 4E0C
+	DEFW 	ObjFnSwitch			;; OBJFN_SWITCH:   	0e ObjFnSwitch 4CD6
 	DEFW 	ObjFnHomeIn			;; OBJFN_HOMEIN:   	0f ObjFnHomeIn 4E16
 	DEFW 	ObjFnHeliplat3		;; OBJFN_HELIPLAT3:	10 ObjFnHeliplat3 4E82
 	DEFW 	ObjFnFade			;; OBJFN_FADE:     	11 ObjFnFade 4D80
@@ -10807,7 +10748,7 @@ OBJFN_RESPECT			EQU		&25
 	DEFW 	ObjFnDisappear		;; OBJFN_DISAPPEAR:	22 ObjFnDisappear 4D92
 	DEFW 	ObjFnDriven			;; OBJFN_DRIVEN:   	23 ObjFnDriven 4C3F
 	DEFW 	ObjFnCannonFire		;; OBJFN_CANNONBALL: 24 ObjFnCannonFire 4C29 (victory room)
-	DEFW 	ObjFnRespectful		;; OBJFN_RESPECT:   25 ObjFnRespectful	4E1B (Emperor's Guard)
+	DEFW 	ObjFnRespectful		;; OBJFN_RESPECT:   25 ObjFnRespectful 4E1B (Emperor's Guard)
 
 ;; -----------------------------------------------------------------------------------------------------------
 ANIM_VAPE1				EQU		&81
@@ -10841,6 +10782,15 @@ ANIM_TRUNK				EQU		&9C
 ANIM_TRUNKB				EQU		&9D
 ANIM_HELIPLAT			EQU		&9E
 ANIM_HELIPLATB			EQU		&9F
+;; -----------------------------------------------------------------------------------------------------------
+;; value set in O_ANIM; [7:3] = AnimID (bit3=Front/Back for most values); [2:0] = frame index
+NO_ANIM_code			EQU		&00					;; [7:3] AnimID = 0 (no anim), [2:0] frame = 0
+ANIM_VAPE1_code			EQU		&08					;; [7:3] AnimID = 1 (&81), [2:0] frame = 0
+ANIM_VAPE2_code			EQU		&20					;; [7:3] AnimID = 4 (&84), [2:0] frame = 0
+ANIM_SPRING_code		EQU		&50					;; [7:3] AnimID = &A (&8A), [2:0] frame = 0
+ANIM_ROBOMOUSE_code		EQU		&80					;; [7:3] AnimID = &10 (&90), [2:0] frame = 0
+ANIM_BEE_code			EQU		&90					;; [7:3] AnimID = &12 (&92), [2:0] frame = 0
+FIRST_ANIM_code			EQU		ANIM_VAPE1_code
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Flags for double-height objects (enemies)
@@ -10937,40 +10887,90 @@ ObjVars:
 	DEFB 	&1B								;; length : 27 bytes
 ObjVars_reset_data:
 	DEFB 	&00								;; reset for idx Objects
-	DEFW 	Objects         				;; reset for dest Objects 6A40
-	DEFW 	ObjectLists      				;; reset for ALstPtr ObjectLists + 0	39A9
-	DEFW 	ObjectLists + 2 				;; reset for BLstPtr ObjectLists + 2  	39AB
-	DEFW 	&0000							;; reset for AList
-	DEFW 	&0000							;; reset for BList
-	DEFW 	&0000, &0000					;; reset for Next V room
-	DEFW 	&0000, &0000					;; reset for Next U room
-	DEFW 	&0000, &0000					;; reset for Next Far room
-	DEFW 	&0000, &0000					;; reset for Next Near room
+	DEFW 	ObjectsBuffer      				;; reset for dest Objects 6A40
+	DEFW 	ObjList_Regular_Far2Near		;; reset for B List Pointer ObjectLists + 0 39A9
+	DEFW 	ObjList_Regular_Near2Far		;; reset for A List Pointer ObjectLists + 2 39AB
+	DEFW 	&0000, &0000					;; reset for B and A usual list 1st item
+	DEFW 	&0000, &0000					;; reset for Next V room B & A
+	DEFW 	&0000, &0000					;; reset for Next U room B & A
+	DEFW 	&0000, &0000					;; reset for Next Far room B & A
+	DEFW 	&0000, &0000					;; reset for Next Near room B & A
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; The index into ObjectLists.
+;; Two lists are produced. They are in reverse order from eachother (B=far to near, A=Near to far).
+;; Exemple: Lets say we have this in memory (it is Heels in Room ID &157, Fish already taken)
+;;  =====================================================
+;; 		24B0	00 00 C0 6A 10 3D 27 C0 18 21 80 FF FF 00 00 00 00 00   ; Heels_variables
+;; 		24C2	64 6A 00 00 10 3D 29 BA 1F 25 01 FF FF 64 6A 00 00 00   ; Head_variables
+;; 		...
+;; 		39A5	A9 39			; B list start pointer
+;; 		39A7	AB 39			; A list start pointer
+;; 		39A9	B2 24			; B start @ 24B2 = First item in B list is Heels
+;; 		39AB	AC 6A			; A start @ 6AAC = First item in A list is the Drum object
+;; 		39AD	00 00 00 00		; no extra V room
+;; 		39B1	00 00 00 00		; no extra U room
+;; 		39B5	54 6A 40 6A		; First Far B list @ 6A54 (NE doorway), First Far A list @ 6A40 (NE doorway)
+;; 		39B9	78 6A 88 6A		; First Near B list @ 6A78 (SE doorway), First Near A list @ 6A88 (SW doorway)
+;; 		...
+;;	.ObjectsBuffer:		; objects list Buffer
+;; 		6a40	52 6A 00 00 17 4C 24 AE 00 00 02 FF FF 00 00 00 00 08   ; NE right side doorway (flipped)
+;; 		6a52	00 00 42 6A 15 4C 2C AE 01 00 02 FF FF 00 00 00 00 08   ; NE left side doorway (flipped)
+;; 		6a64	76 6A 9C 6A 05 24 14 C0 00 00 02 FF FF 00 00 00 00 08   ; SE left side doorway
+;; 		6a76	00 00 66 6A 04 2C 14 C0 01 00 02 FF FF 00 00 00 00 08   ; SE right side doorway
+;; 		6a88	9A 6A 00 00 36 04 24 C0 00 00 02 FF FF 00 00 00 00 08   ; SW right side (flipped)
+;; 		6a9a	64 6A 8A 6A 34 04 2C C0 01 00 02 FF FF 00 00 00 00 08   ; SW left side (flipped)
+;; 		6aac	BE 6A 00 00 40 0C 1C C0 46 00 81 FF FF 00 00 00 02 08 	; Drum object
+;; 		6abe	B0 24 AE 6A 01 24 2C C0 5A 00 81 FF FF 00 00 00 02 08	; Anvil object
+;; 		6ad2	...
+;;  =====================================================
+;; The B list is: at 39A5 we get 39A9 which points on 24B2 (Heels O_NEXT_BLIST) with value 6AC0.
+;; At 6AC0 (Anvil) we have 6AAE; At 6AAE (Drum) we have 0, so "end of the list".
+;; To sum up B list has : Heels, Anvil, Drum
+;; Similarly, the A list is: (39A7)=39AB, (39AB)=6AAC (Drum), (6AAC)=6ABE (Anvil), (6ABE)=24B0 (Heels), (24B0)=0 (end)
+;; In other words the A list has Drum, Anvil, Heels.
+;; In the same way the Far lists are:
+;; 		B: NEdoor (left/farside), NEdoor(right/nearside), end
+;; 		A: NEdoor(right/nearside), NEdoor (left/farside), end
+;; and the Near lists are:
+;; 		B: SEdoor (right/farside), SEdoor (left/nearside), SWdoor (left/farside), SWdoor (right/nearside), end
+;;		A: SWdoor (right/nearside), SWdoor (left/farside), SEdoor (left/nearside), SEdoor (right/farside), end
+;; -----------------------------------------------------------------------------------------------------------
+
 .SaveRestore_Block2:											;; Save/Restore block 2 : &1D (29 bytes)
-.ObjListIdx:
+.ObjListIdx:													;; The index into ObjectLists.
 	DEFB 	&00								;; list index
 Object_Destination:												;; Current pointer for where we write objects into (6A40 buffer)
-	DEFW 	Objects
-.ObjListAPtr:													;; 'A' list item pointers are offset +2 from 'B' list pointers.
-	DEFW 	ObjectLists 					;; ObjectLists + 0 : 39A9
-.ObjListBPtr:
-	DEFW 	ObjectLists + 2					;; ObjectLists + 2 : 39AB
-;; Each list consists of a pair of pointers to linked lists of
-;; objects (ListA and ListB). They're opposite directions in a
-;; doubly-linked list, and each side has a head node, it seems.
+	DEFW 	ObjectsBuffer
+;; 'A' list item pointers are offset +2 from 'B' list pointers.
+.ObjListF2NPtr:
+	DEFW 	ObjList_Regular_Far2Near		;; pointer on the B list start (ObjectLists + 0 : 39A9)
+.ObjListN2FPtr:
+	DEFW 	ObjList_Regular_Near2Far		;; pointer on the A list start (ObjectLists + 2 : 39AB)
+
 ObjectLists:
-	DEFW 	&0000 							;; ObjectLists + 0   ; Usual list
-	DEFW 	&0000             				;; ObjectLists + 2   ; Usual list
-	DEFW 	&0000, &0000            		;; ObjectLists + 1*4 ; Next room in V direction
-	DEFW 	&0000, &0000            		;; ObjectLists + 2*4 ; Next room in U direction
-	DEFW 	&0000, &0000            		;; ObjectLists + 3*4 ; Far
-	DEFW 	&0000, &0000            		;; ObjectLists + 4*4 ; Near
+ObjList_Regular_Far2Near:										;; list type 0 ; ObjectLists + 0 ; Regular B (Far to Near) list 1st item pointer
+	DEFW 	&0000
+ObjList_Regular_Near2Far:                         				;; list type 0 ; ObjectLists + 2 ; Regular A (Near to Far) list 1st item pointer
+	DEFW 	&0000
+ObjList_NextRoomV_Far2Near:                        				;; list type 1 ; ObjectLists + 4 ; Next room in V direction B list pointers
+	DEFW 	&0000
+ObjList_NextRoomV_Near2Far:           		            		;; list type 1 ; ObjectLists + 6 ; Next room in V direction A list pointers
+	DEFW 	&0000
+ObjList_NextRoomU_Far2Near:           							;; list type 2 ; ObjectLists + 8 ; Next room in U direction B list pointers
+	DEFW 	&0000
+ObjList_NextRoomU_Near2Far:          							;; list type 2 ; ObjectLists + 10 ; Next room in U direction A list pointers
+	DEFW 	&0000
+ObjList_Far_Far2Near:                 							;; list type 3 ; ObjectLists + 12 ; Far (far corner of main room) B list pointers
+	DEFW 	&0000
+ObjList_Far_Near2Far:                 							;; list type 3 ; ObjectLists + 14 ; Far A list pointers
+	DEFW 	&0000
+ObjList_Near_Far2Near:                							;; list type 4 ; ObjectLists + 16 ; Near (near corner of main room) B list pointers
+	DEFW 	&0000
+ObjList_Near_Near2Far:                							;; list type 4 ; ObjectLists + 18 ; Near A list pointers
+	DEFW 	&0000
 
 Saved_Object_Destination:
-	DEFW 	Objects							;; Objects : 6A40
+	DEFW 	ObjectsBuffer					;; ObjectsBuffer : 6A40
 .SaveRestore_Block2_end
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -10978,20 +10978,20 @@ Saved_Object_Destination:
 	DEFW 	&0000
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; Given an list index in A (3 far, 4 near, 0 mid), set the object list index and pointers.
+;; Set the object list index and pointers. list index in A (3 far, 4 near, 0 mid), .
 .SetObjList:
 	LD		(ObjListIdx),A								;; update object list index
 	ADD		A,A											;; *2
 	ADD		A,A											;; *4
-	ADD		A,ObjectLists and &00FF						;; &A9 = (ObjectLists & &00FF) + (4 * object id)
+	ADD		A,ObjectLists and WORD_LOW_BYTE				;; &A9 = (ObjectLists & &00FF) + (4 * object id)
 	LD		L,A
-	ADC		A,ObjectLists / 256							;; &39 = ObjectLists >> 8 ; &39A9+offset
+	ADC		A,ObjectLists / WORD_HIGH_BYTE				;; &39 = ObjectLists >> 8 ; &39A9+offset
 	SUB		L
 	LD		H,A											;; HL = ObjectLists + 4*index
-	LD		(ObjListAPtr),HL							;; pointer A
+	LD		(ObjListF2NPtr),HL							;; pointer B list
 	INC		HL
 	INC		HL											;; next word in list
-	LD		(ObjListBPtr),HL							;; pointer B
+	LD		(ObjListN2FPtr),HL							;; pointer A list
 	RET
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -11004,8 +11004,8 @@ Saved_Object_Destination:
 	ADD		HL,DE										;; HL have the 2nd object pointer+2 (DE the first object pointer+2)
 	PUSH	HL											;; save 2nd object pointer+2
 	EX		DE,HL										;; exchange, HL=first object pointer+2 and DE the 2nd
-	LD		BC,&0005									;; Copy bytes 2 to 6 (thus including U and V)
-	LDIR												;; Copy: repeat LD (DE),(HL); DE++, HL++, BC-- until BC=0
+	LD		BC,5										;; Copy bytes 2 to 6 (thus including U and V)
+	LDIR												;; Copy: 5x repeat LD (DE),(HL); DE++, HL++, BC-- until BC=0
 	LD		A,(HL)										;; read Z of first
 	SUB		6											;; sub 6 = 1 character height unit above
 	LD		(DE),A										;; set Z of second to be exactly above
@@ -11057,8 +11057,8 @@ snkdblob_1:
 	LD		(HL),A										;; write out.
 	INC		HL											;; offset &0A (O_FUNC)
 	LD		(HL),&00									;; is set to 0
-	LD		DE,&0008
-	ADD		HL,DE										;; at this point HL plus 8 points after the 2nd object.
+	LD		DE,&0008									;; offset to point on the (first byte of) next object
+	ADD		HL,DE										;; at this point "HL plus 8" points on the next object
 	LD		(Object_Destination),HL						;; update Object_Destination, ready for next object
 	;; IY points on the 1st copied object. If bit5 of offset 9
 	;; (O_SPRFLAGS) is set, set the sprite on this second object.
@@ -11074,22 +11074,23 @@ addob_1:
 	POP		HL
 	;; will fall in Enlist
 ;; -----------------------------------------------------------------------------------------------------------
-.Enlist:																	;; both HL and IY point on the copied Object addr
+;; Enlist the object. Both HL and IY point on the copied Object addr
+.Enlist:
 	LD		A,(ObjListIdx)								;; read object index
 	DEC		A
 	CP		&02											;; index-1 compared to 2
 	JR		NC,EnlistAux								;; if index in A >= 3, then skip to EnlistAux
 	;; If it's not double-height, insert on the current list.
 	INC		HL
-	INC		HL											;; HL point on the A list Ptr
+	INC		HL											;; HL point on the list Ptr
 	BIT		3,(IY+O_FLAGS)								;; test Tall bit
 	JR		Z,EnlistObj									;; single height, then EnlistObj
-	PUSH	HL											;; else double objects, save A list Ptr
+	PUSH	HL											;; else double objects, save list Ptr
 	CALL	EnlistObj									;; EnlistObj
 	POP		DE											;; A list ptr in DE
 	CALL	SyncDoubleObject							;; sync both objects UVZ that make one bigger
 	PUSH	HL											;; HL is the 2nd object pointer+2 at this point
-	CALL	GetUVZExtents_Alst
+	CALL	GetUVZExtents_Far2Near
 	EXX
 	PUSH	IY
 	POP		HL											;; first object pointer in HL
@@ -11101,7 +11102,7 @@ addob_1:
 ;; Put the object in HL into its depth-sorted position in the list.
 .EnlistObj:
 	PUSH	HL
-	CALL	GetUVZExtents_Alst
+	CALL	GetUVZExtents_Far2Near
 	EXX
 	JR		DepthInsertHd
 
@@ -11113,12 +11114,12 @@ addob_1:
 	INC		HL											;; now point on A list ptr
 	BIT		3,(IY+O_FLAGS)								;; Tall bit
 	JR		Z,EnlistObjAux								;; single height, goto EnlistObjAux
-	PUSH	HL											;; else EnlistObjAux first
+	PUSH	HL											;; else EnlistObjAux first part
 	CALL	EnlistObjAux
 	POP		DE
 	CALL	SyncDoubleObject							;; sync and insert 2nd part
 	PUSH	HL
-	CALL	GetUVZExtents_Alst
+	CALL	GetUVZExtents_Far2Near
 	EXX
 	PUSH	IY
 	POP		HL
@@ -11129,35 +11130,34 @@ addob_1:
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Object in HL. Inserts object into appropriate object list
 ;; based on coordinates.
-;;
-;; List 3 is far away, 0 in middle, 4 is near.
+;; List 3 is far away in the main room, 0 in "middle", 4 is near.
 .EnlistObjAux:
 	PUSH	HL
-	CALL	GetUVZExtents_Alst
+	CALL	GetUVZExtents_Far2Near
 	;; If object is beyond high U boundary, put on list 3.
-	LD		A,3
+	LD		A,3											;; 3: Far side
 	EX		AF,AF'
-	LD		A,(Max_min_UV_Table+2)							;; MaxU
+	LD		A,(MaxU)
 	CP		D
 	JR		c,elonjax_1
 	;; If object is beyond high V boundary, put on list 3.
-	LD		A,(Max_min_UV_Table+3)							;; MaxV
+	LD		A,(MaxV)
 	CP		H
 	JR		c,elonjax_1
 	;; If object is beyond low U boundary, put on list 4.
-	LD		A,4
+	LD		A,4											;; 4: near side
 	EX		AF,AF'
-	LD		A,(Max_min_UV_Table)							;; MinU
+	LD		A,(MinU)
 	DEC		A
 	CP		E
 	JR		NC,elonjax_1
 	;; If object is beyond low V boundary, put on list 4.
-	LD		A,(Max_min_UV_Table+1)							;; MinV
+	LD		A,(MinV)
 	DEC		A
 	CP		L
 	JR		NC,elonjax_1
 	;; Otherwise, within boundaries, put on list 0.
-	XOR		A
+	XOR		A											;; 0: within the room
 	EX		AF,AF'
 elonjax_1:
 	EXX
@@ -11166,15 +11166,13 @@ elonjax_1:
 	CALL	SetObjList
 	;; will fall in DepthInsertHd
 ;; -----------------------------------------------------------------------------------------------------------
-;; Does a DepthInsert on the list pointed to by ObjListAPtr
-.DepthInsertHd:
-	LD		HL,(ObjListAPtr)
-;; Object extents in alt registers, 'A' pointer in HL.
+;; DepthInsertHd : Does a DepthInsert on the list pointed to by ObjListF2NPtr.
+;; DepthInsert : Object extents in alt registers, 'B' pointer (far to near) in HL.
 ;; Object to insert is on the stack.
-;;
-;; I believe this traverses a list sorted far-to-near, and
-;; loads up HL with the nearest object further away from our
-;; object.
+;; Goes thru the list sorted far-to-near, and loads up HL with the
+;; nearest object further away from our object.
+.DepthInsertHd:
+	LD		HL,(ObjListF2NPtr)
 .DepthInsert:
 	LD		(SortObj),HL
 .DepIns2:
@@ -11185,7 +11183,7 @@ elonjax_1:
 	OR		H
 	JR		Z,DepIns3									;; Zero? Done!
 	PUSH	HL
-	CALL	GetUVZExtents_Alst
+	CALL	GetUVZExtents_Far2Near
 	CALL	DepthCmp
 	POP		HL
 	JR		NC,DepthInsert  							;; Update SortObj if current HL is far away
@@ -11211,10 +11209,10 @@ elonjax_1:
     ;; Put DE's new 'next' pointer into HL.
 	LD		L,C
 	LD		H,A
-	;; And if it's zero, load HL with pointer referred to by ObjListBPtr
+	;; And if it's zero, load HL with pointer referred to by ObjListN2FPtr
 	OR		C
 	JR		NZ,br_3ADF
-	LD		HL,(ObjListBPtr)
+	LD		HL,(ObjListN2FPtr)
 	INC		HL
 	INC		HL
 br_3ADF
@@ -11243,7 +11241,7 @@ br_3ADF
 ;; object made out of two subcomponents, and both must be
 ;; unlinked.
 .Unlink:
-	BIT		3,(IY+O_FLAGS)										;; "Tall" bit
+	BIT		3,(IY+O_FLAGS)									;; "Tall" bit
 	JR		Z,UnlinkObj
 	PUSH	HL
 	CALL	UnlinkObj
@@ -11280,7 +11278,7 @@ br_3ADF
 	INC		DE
 	INC		DE
 	JR		NZ,ulnk_1
-	LD		DE,(ObjListAPtr)
+	LD		DE,(ObjListF2NPtr)
 	;; HL pointer at 'A' pointer now. Copy *HL to *DE, saving
     ;; value in HL.
 ulnk_1:
@@ -11291,11 +11289,11 @@ ulnk_1:
 	LD		(DE),A
 	LD		H,A
 	LD		L,C
-	;; If the pointer was null, put the head of the B list in HL.
+	;; If the pointer was null, put the head of the A list in HL.
 	OR		C
 	DEC		HL
 	JR		NZ,br_3B1F
-	LD		HL,(ObjListBPtr)
+	LD		HL,(ObjListN2FPtr)
 	INC		HL
 br_3B1F
 	;; Make HL's next B object the saved DE B pointer.
@@ -11306,11 +11304,11 @@ br_3B1F
 	RET
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; Like GetUVZExtents_Blst, but applies extra height adjustment.
+;; Like "GetUVZExtents_Near2Far", but applies extra height adjustment.
 ;; A has the object flags.
-;; increases height by 6 if flag bit 3 is set.
+;; Increases height by 6 if flag bit 3 is set.
 .GetUVZExtents_AdjustLowZ:
-	CALL 	GetUVZExtents_Blst
+	CALL 	GetUVZExtents_Near2Far
 	AND 	%00001000									;; test bit3
 	RET 	Z											;; no need for adjustement if bit3 = 0
 	LD		A,C
@@ -11319,15 +11317,15 @@ br_3B1F
 	RET
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; * GetUVZExtents_Alst :  At entry, HL points on the object variables array + 2 (ie. A list pointer)
-;; 	  Then first thing, HL will be updated to point on Object O_FLAGS
-;; * GetUVZExtents_Blst : At entry, HL points on the object variables array + 0 (ie. B list pointer)
-;;    (Apparently GetUVZExtents_Blst is only used by Heels_variables and Head_variables).
+;; * GetUVZExtents_Near2Far : At entry, HL points on the object variables array + 0 (ie. A list pointer)
+;;    (Apparently GetUVZExtents_Near2Far is only used by Heels_variables and Head_variables).
 ;;    Then first thing, HL will be updated to point on Object O_FLAGS
+;; * GetUVZExtents_Far2Near :  At entry, HL points on the object variables array + 2 (ie. B list pointer)
+;; 	  Then first thing, HL will be updated to point on Object O_FLAGS
 ;; So given an object (variables array) in HL, returns its U, V and Z extents.
 ;; Moves in a particular direction:
 ;;
-;; Values are based on the bottom 3 flag bits [2:0]
+;; Values are based on the bottom 3 bits [2:0] of O_FLAGS
 ;; Flag   U      V      Z
 ;; 000	+3 -3  +3 -3  0  -6
 ;; 001	+4 -4  +4 -4  0  -6
@@ -11337,10 +11335,10 @@ br_3B1F
 ;; 101	 0 -4  +4  0  0 -18
 ;; 110	+4  0   0 -4  0 -18		It returns flags in A.
 ;; 111	 0 -4   0 -4  0 -18
-.GetUVZExtents_Blst:
+.GetUVZExtents_Near2Far:
 	INC 	HL
 	INC 	HL
-.GetUVZExtents_Alst:
+.GetUVZExtents_Far2Near:
 	INC 	HL
 	INC 	HL
 	LD		A,(HL)										;; A = object O_FLAGS
@@ -11466,174 +11464,174 @@ GUVZE_z_zm18:
 ;;  A = 0 if there's an overlap in 2 dimensions, &FF otherwise
 .DepthCmp:
     ;; L < H' && H > L' -> U Overlap
-	LD A,L
+	LD		A,L
 	EXX
-	CP H
-	LD A,L
+	CP		H
+	LD		A,L
 	EXX
-	JR NC,NoUOverlap
-	CP H
-	JR c,UOverlap
+	JR		NC,NoUOverlap
+	CP		H
+	JR		c,UOverlap
 .NoUOverlap:
     ;; E < D' && D > E' -> V Overlap
-	LD A,E
+	LD		A,E
 	EXX
-	CP D
-	LD A,E
+	CP		D
+	LD		A,E
 	EXX
-	JR NC,dpth_1
-	CP D
-	JR c,VNoUOverlap
+	JR		NC,dpth_1
+	CP		D
+	JR		c,VNoUOverlap
 dpth_1
-	LD A,C
+	LD		A,C
 	EXX
-	CP B
+	CP		B
 NoUVOverlap:
     ;; C < B' && B > C' -> Z Overlap
-	LD A,C
+	LD		A,C
 	EXX
-	JR NC,NoUVZOverlap
-	CP B
-	JR c,ZNoUVOverlap
+	JR		NC,NoUVZOverlap
+	CP		B
+	JR		c,ZNoUVOverlap
 .NoUVZOverlap:
     ;; No overlaps at all - simple depth comparison
     ;; HL = U + V + Z (lower coords)
-	LD A,L
-	ADD A,E													;; HL = L + E + C
-	ADD A,C
-	LD L,A
-	ADC A,0													;; Add Carry
-	SUB L
-	LD H,A
+	LD		A,L
+	ADD		A,E												;; HL = L + E + C
+	ADD		A,C
+	LD		L,A
+	ADC		A,0												;; Add Carry
+	SUB		L
+	LD		H,A
 	;; DE = U' + V' + Z' (lower co-ords)
 	EXX
-	LD A,L
-	ADD A,E
-	ADD A,C
+	LD		A,L
+	ADD		A,E
+	ADD		A,C
 	EXX
-	LD E,A
-	ADC A,0													;; Add Carry
-	SUB E
-	LD D,A
+	LD		E,A
+	ADC		A,0												;; Add Carry
+	SUB		E
+	LD		D,A
 	;; Compare depths
-	SBC HL,DE
-	LD A,&FF
+	SBC		HL,DE
+	LD		A,&FF
 	RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 .ZNoUVOverlap:
     ;; Overlaps in Z, not U or V. In this case, we compare on U + V
-	LD A,L
-	ADD A,E
-	LD L,A
+	LD		A,L
+	ADD		A,E
+	LD		L,A
 	EXX
-	LD A,L
-	ADD A,E
+	LD		A,L
+	ADD		A,E
 	EXX
-	CP L
+	CP		L
 	CCF
-	LD A,&FF
+	LD		A,&FF
 	RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 .UOverlap:
     ;; E < D' && D > E' -> V Overlap
-	LD A,E
+	LD		A,E
 	EXX
-	CP D
-	LD A,E
+	CP		D
+	LD		A,E
 	EXX
-	JR NC,UNoVOverlap
-	CP D
-	JR c,UVOverlap
+	JR		NC,UNoVOverlap
+	CP		D
+	JR		c,UVOverlap
 .UNoVOverlap:
     ;; C < B' && B > C' -> Z Overlap
-	LD A,C
+	LD		A,C
 	EXX
-	CP B
-	LD A,C
+	CP		B
+	LD		A,C
 	EXX
-	JR NC,UNoVZOverlap
-	CP B
-	JR c,UZNoVOverlap
+	JR		NC,UNoVZOverlap
+	CP		B
+	JR		c,UZNoVOverlap
 .UNoVZOverlap:
     ;; Compare on Z  + V
 	EXX
-	ADD A,E
+	ADD		A,E
 	EXX
-	LD L,A
-	ADC A,0													;; Add Carry
-	SUB L
-	LD H,A
-	LD A,C
-	ADD A,E
-	LD E,A
-	ADC A,0													;; Add Carry
-	SUB E
-	LD D,A
-	SBC HL,DE
+	LD		L,A
+	ADC		A,0												;; Add Carry
+	SUB		L
+	LD		H,A
+	LD		A,C
+	ADD		A,E
+	LD		E,A
+	ADC		A,0												;; Add Carry
+	SUB		E
+	LD		D,A
+	SBC		HL,DE
 	CCF
-	LD A,&FF
+	LD		A,&FF
 	RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 .UZNoVOverlap:
     ;; Compare on V
-	LD A,E
+	LD		A,E
 	EXX
-	CP E
+	CP		E
 	EXX
-	LD A,&00
+	LD		A,&00
 	RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 .UVOverlap:
     ;; Compare on Z
-	LD A,C
+	LD		A,C
 	EXX
-	CP C
+	CP		C
 	EXX
-	LD A,&00
+	LD		A,&00
 	RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 .VNoUOverlap:
     ;; C < B' && B > C' -> Z Overlap
-	LD A,C
+	LD		A,C
 	EXX
-	CP B
-	LD A,C
+	CP		B
+	LD		A,C
 	EXX
-	JR NC,VNoUZOverlap
-	CP B
-	JR c,VZNoUOverlap
+	JR		NC,VNoUZOverlap
+	CP		B
+	JR		c,VZNoUOverlap
 .VNoUZOverlap:
     ;; Compare on U + Z
 	EXX
-	ADD A,L
+	ADD		A,L
 	EXX
-	LD E,A
-	ADC A,0													;; Add Carry
-	SUB E
-	LD D,A
-	LD A,C
-	ADD A,L
-	LD L,A
-	ADC A,0													;; Add Carry
-	SUB L
-	LD H,A
-	SBC HL,DE
-	LD A,&FF
+	LD		E,A
+	ADC		A,0												;; Add Carry
+	SUB		E
+	LD		D,A
+	LD		A,C
+	ADD		A,L
+	LD		L,A
+	ADC		A,0												;; Add Carry
+	SUB		L
+	LD		H,A
+	SBC		HL,DE
+	LD		A,&FF
 	RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 .VZNoUOverlap:
     ;; Compare on U
-	LD A,L
+	LD		A,L
 	EXX
-	CP L
+	CP		L
 	EXX
-	LD A,&00
+	LD		A,&00
 	RET
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -11642,9 +11640,9 @@ Walls_PanelBase:
 Walls_PanelFlipsPtr:
 	DEFW 	&0000 					;; Pointer to byte full of whether walls need to flip
 Walls_ScreenMaxV:
-	DEFB 	&00
+	DEFB 	&00						;; The line (Y + X)/2 = ScreenMaxV is the line of MaxV onscreen.
 Walls_ScreenMaxU:
-	DEFB 	&00
+	DEFB 	&00						;; The line (Y - X)/2 = ScreenMaxU is the line of MaxU onscreen.
 Walls_CornerX:
 	DEFB 	&00
 Walls_DoorZ:
@@ -11673,68 +11671,69 @@ Walls_DoorZ:
 ;; Configure the walls.
 ;; Height of highest door in A.
 .ConfigWalls:
-	LD (Walls_DoorZ),A									;; door height
-	CALL VWall
+	LD		(Walls_DoorZ),A								;; door height
+	CALL	VWall
     ;; Skip if there's an extra room visible in the U dir.
-	LD A,(Has_no_wall)
-	AND 4												;; test bit 2 : wall U side (ne)
-	RET NZ												;; if there is a wall, leave (else can see further into next room
+	LD		A,(Has_no_wall)
+	AND		&04											;; test bit 2 : wall U side (ne)
+	RET		NZ											;; if there is a wall, leave (else can see further into next room
 	;; Put the wall mask in B' and stash the reflection flag at smc_OWFlag.
     ;; Step size in DE, direction extent in A.
-	LD B,4
+	LD		B,4
 	EXX
-	LD A,&80
-	LD (smc_OWFlag+1),A									;; self mode code, value of "OR ..."
-	CALL GetCorner
-	LD DE,&0002
-	LD A,(IY-1)											;; (IY-&01) ; MaxV
-	SUB (IY-3)											;; (IY-&03) ; MinV
-	JR OneWall
+	LD		A,&80
+	LD		(smc_OWFlag+1),A							;; self mode code, value of "OR ..."
+	CALL	GetCorner
+	LD		DE,&0002									;; +2
+	LD		A,(IY-1)									;; (IY-&01) ; MaxV
+	SUB		(IY-3)										;; (IY-&03) ; MinV
+	JR		OneWall
 
+;; -----------------------------------------------------------------------------------------------------------
 ;; Draw wall parallel to U axis.
 .VWall:
     ;; Skip if there's an extra room in the V direction.
-	LD A,(Has_no_wall)
-	AND &08
-	RET NZ
+	LD		A,(Has_no_wall)
+	AND		&08
+	RET		NZ
 	;; Put the wall mask in B' and stash the reflection flag at smc_OWFlag.
     ;; Step size in DE, direction extent in A.
-	LD B,&08
+	LD		B,&08
 	EXX
-	XOR A
-	LD (smc_OWFlag+1),A									;; self mode code, value of "OR ..."
-	CALL GetCorner
-	DEC L
-	DEC L
-	LD DE,&FFFE											;; -2
-	LD A,(IY-2)											;; (IY-&02) ; MaxU
-	SUB (IY-4)											;; (IY-&04)   ; MinU
-;; Room extent in A, movement step in DE, BackgrdBuff pointer in HL, X/Y in B/C
-;; The flag for this wall in B'
+	XOR		A
+	LD		(smc_OWFlag+1),A							;; self mode code, value of "OR ..."
+	CALL	GetCorner
+	DEC		L
+	DEC		L
+	LD		DE,&FFFE									;; -2
+	LD		A,(IY-2)									;; (IY-&02) ; MaxU
+	SUB		(IY-4)										;; (IY-&04) ; MinU
+;; Room extent in A, movement step in DE, BackgrdBuff pointer in HL,
+;; X/Y in B/C. The flag for this wall in B'
 .OneWall:
     ;; Divide wall extent by 16 (one panel?)
 	RRA
 	RRA
 	RRA
 	RRA
-	AND &0F
+	AND		&0F
 	;; Move BackgrdBuff pointer to IX.
-	PUSH HL
-	POP IX
+	PUSH	HL
+	POP		IX
 	EXX
 	;; Updated extent in C, check if this wall has a door.
-	LD C,A
-	LD A,(Has_Door)										;; Has_Door
-	AND B
-	CP &01
+	LD		C,A
+	LD		A,(Has_Door)								;; Has_Door
+	AND		B
+	CP		&01
 	;; Carry set means no door. Stash it in F'
 	EX		AF,AF'
 	LD		A,(WorldId)									;; which world? (for panels selection)
 	LD		B,A
 PanelFlips_after_move	EQU		PanelFlips + MOVE_OFFSET
-	ADD 	A,PanelFlips_after_move and &00FF			;; &D8 = (PanelFlips & &FF)
+	ADD 	A,PanelFlips_after_move and WORD_LOW_BYTE	;; &D8 = (PanelFlips & &FF)
 	LD		L,A
-	ADC 	A,PanelFlips_after_move / 256				;; &70 = (PanelFlips >> 8)	; &70D8+offset
+	ADC 	A,PanelFlips_after_move / WORD_HIGH_BYTE	;; &70 = (PanelFlips >> 8)	; &70D8+offset
 	SUB 	L
 	LD		H,A											;; HL = PanelFlips + WorldId
 	LD		(Walls_PanelFlipsPtr),HL					;; in Walls_PanelFlipsPtr
@@ -11744,18 +11743,18 @@ PanelFlips_after_move	EQU		PanelFlips + MOVE_OFFSET
 	ADD		A,A
 	ADD 	A,A											;; A = WorldId x 8
 Panel_WorldData_m1		EQU		Panel_WorldData - 1							;; = &3DA9; minus 1 so that the FetchData2b (using DataPtr and dummy CurrData) will start at Panel_WorldData
-	ADD 	A,Panel_WorldData_m1 and &00FF				;; ((A + Panel_WorldData - 1) & FF)
+	ADD 	A,Panel_WorldData_m1 and WORD_LOW_BYTE		;; ((A + Panel_WorldData - 1) & FF)
 	LD		L,A
-	ADC 	A,Panel_WorldData_m1 / 256					;; ((A + Panel_WorldData - 1) >> 8) ; &3DA9+offset
+	ADC 	A,Panel_WorldData_m1 / WORD_HIGH_BYTE		;; ((A + Panel_WorldData - 1) >> 8) ; &3DA9+offset
 	SUB 	L
 	LD		H,A											;; HL is (Panel_WorldData) + (8 x WorldId) - 1
 	LD		(DataPtr),HL
 	LD		A,&80										;; dummy data so that first read will start at "Panel_WorldData + (8 x worldID)"
 	LD		(CurrData),A
-	LD		A,PanelsBaseAddr and &00FF					;; &9A = PanelsBaseAddr & FF
+	LD		A,PanelsBaseAddr and WORD_LOW_BYTE			;; &9A = PanelsBaseAddr & FF
 	ADD		A,B											;; add WorldId x2
 	LD		L,A
-	ADC 	A,PanelsBaseAddr / 256						;; &3D = PanelsBaseAddr >> 8 ; &3D9A
+	ADC 	A,PanelsBaseAddr / WORD_HIGH_BYTE			;; &3D = PanelsBaseAddr >> 8 ; &3D9A
 	SUB 	L
 	LD		H,A											;; HL = PanelsBaseAddr + 2 x WorldId
 	LD		A,(HL)
@@ -11763,125 +11762,125 @@ Panel_WorldData_m1		EQU		Panel_WorldData - 1							;; = &3DA9; minus 1 so that t
 	LD		H,(HL)
 	LD		L,A											;; HL = Panels Base Addr for current WorldId
 	LD		(Walls_PanelBase),HL						;; Set the panel codes for the current world.
-	LD A,&FF
+	LD		A,&FF
 	;; Recover the no door flag, stick the extent in A, push A and flag.
-	EX AF,AF'
-	LD A,C
-	PUSH AF
+	EX		AF,AF'
+	LD		A,C
+	PUSH	AF
 	;; Find the location of the panel info we care about.
     ;; Extent = 4 -> B = &01
-	SUB 4
-	LD B,&01
-	JR Z,owctd_1
+	SUB		4
+	LD		B,&01
+	JR		Z,owctd_1
 	;; Extent = 5 -> B = &0F
-	LD B,&0F
-	INC A
-	JR Z,owctd_1
+	LD		B,&0F
+	INC		A
+	JR		Z,owctd_1
 	;; Extent = 6 -> B = &19
-	LD B,&19
-	INC A
-	JR Z,owctd_1
+	LD		B,&19
+	INC		A
+	JR		Z,owctd_1
 	;; Otherwise, B = &1F
-	LD B,&1F
+	LD		B,&1F
 owctd_1:
-	POP AF
-	JR c,owctd_2										;; No door? A' is &FF and we jump.
+	POP		AF
+	JR		c,owctd_2									;; No door? A' is &FF and we jump.
 	;; We have a door
-	LD A,C
-	ADD A,A
-	ADD A,B
-	LD B,A												;; Add 2xC to B
-	LD A,C
-	EX AF,AF'											;; And put C (extent) in A'
+	LD		A,C
+	ADD		A,A
+	ADD		A,B
+	LD		B,A											;; Add 2xC to B
+	LD		A,C
+	EX		AF,AF'										;; And put C (extent) in A'
 	;; Skip B entries, to get the panels we want.
 owctd_2:
-	CALL FetchData2b
-	DJNZ owctd_2
+	CALL	FetchData2b
+	DJNZ	owctd_2
 	;; Put 2x extent in B.
-	LD B,C
-	SLA B
+	LD		B,C
+	SLA		B
 	;; Then enter the wall-panel-processing loop.
 .OWPanel:
-	EX AF,AF'
+	EX		AF,AF'
 	;; Loop through A panels, then hit OWDoor.
-	DEC A
-	JR Z,OWDoor
+	DEC		A
+	JR		Z,OWDoor
 	;; Otherwise update entries in BackgrdBuff.
-	EX AF,AF'
+	EX		AF,AF'
 .smc_OWFlag:
-	OR &00
+	OR		&00											;; the value will be modified with self-modifying code
 	;;3D11 DEFB 00															; self-modifying code at 3D32, 3D51, 3C74, 3C8F adds a flip if needed.
-	LD (IX+1),A											;; Set the wall-panel sprite
+	LD		(IX+1),A									;; Set the wall-panel sprite
 	EXX
-	LD A,C
-	ADD A,&08
-	LD (IX+0),C											;; Y start of wall (0 = clear)
-	LD C,A
-	ADD IX,DE											;; Move to next panel (L or R)
+	LD		A,C
+	ADD		A,&08
+	LD		(IX+0),C									;; Y start of wall (0 = clear)
+	LD		C,A
+	ADD		IX,DE										;; Move to next panel (L or R)
 	EXX
-	CALL FetchData2b
+	CALL	FetchData2b
 .OWPanelLoop:
-	DJNZ OWPanel
+	DJNZ	OWPanel
 	EXX
-	PUSH IX
-	POP HL
-	LD A,L
-	CP &40
-	RET NC
+	PUSH	IX
+	POP		HL
+	LD		A,L
+	CP		&40
+	RET		NC
 	;; If last entry is not clear, return
-	LD A,(IX+0)
-	AND A
-	RET NZ
+	LD		A,(IX+0)
+	AND		A
+	RET		NZ
 	;; If it is, add some Pillar.
-	LD A,(smc_OWFlag+1)									;; read value of "OR ..." ; self mod code
-	OR &05
-	LD (IX+1),A
-	LD A,C
-	SUB &10
-	LD (IX+0),A
+	LD		A,(smc_OWFlag+1)							;; read value of "OR ..." ; self mod code
+	OR		&05
+	LD		(IX+1),A
+	LD		A,C
+	SUB		&10
+	LD		(IX+0),A
 	RET
 
 .OWDoor:
 	EXX
-	LD A,(Walls_DoorZ)									;; DoorZ
-	AND A
-	LD A,C
-	JR Z,br_3D4C
-	ADD A,&10
-	LD C,A
+	LD		A,(Walls_DoorZ)								;; DoorZ
+	AND		A
+	LD		A,C
+	JR		Z,br_3D4C
+	ADD		A,&10
+	LD		C,A
 br_3D4C
-	SUB &10
-	LD (IX+0),A											;; Set height.
-	LD A,(smc_OWFlag+1)									;; read value of "OR ..." ; self mod
-	OR &04
-	LD (IX+1),A											;; Set wall to blank.
-	ADD IX,DE
-	LD (IX+1),A											;; Ditto next slot.
-	LD A,C
-	SUB 8
-	LD (IX+0),A											;; And lower for the next slot.
-	ADD A,&18
-	LD C,A
-	LD A,(Walls_DoorZ)									;; DoorZ
-	AND A
-	JR Z,br_3D71
-	LD A,C
-	SUB &10
-	LD C,A
+	SUB		&10
+	LD		(IX+0),A									;; Set height.
+	LD		A,(smc_OWFlag+1)							;; read value of "OR ..." ; self mod
+	OR		&04
+	LD		(IX+1),A									;; Set wall to blank.
+	ADD		IX,DE
+	LD		(IX+1),A									;; Ditto next slot.
+	LD		A,C
+	SUB		8
+	LD		(IX+0),A									;; And lower for the next slot.
+	ADD		A,&18
+	LD		C,A
+	LD		A,(Walls_DoorZ)								;; DoorZ
+	AND		A
+	JR		Z,br_3D71
+	LD		A,C
+	SUB		&10
+	LD		C,A
 br_3D71
-	ADD IX,DE
-	LD A,&FF
-	EX AF,AF'
+	ADD		IX,DE
+	LD		A,&FF
+	EX		AF,AF'
 	EXX
-	DEC B
-	JR OWPanelLoop
+	DEC		B
+	JR		OWPanelLoop
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Fetch 2 bits from data in CurrData, returned in A
 ;; CurrData and DataPtr updated as needed
 .FetchData2b:
 	PUSH 	BC
-	LD		B,&02										;; number of bit to fetch from CurrData
+	LD		B,2											;; number of bit to fetch from CurrData
 	CALL 	FetchData									;; fetch 2 bits in A
 	POP 	BC
 	RET
@@ -11891,9 +11890,9 @@ br_3D71
 ;; IY must point just after Max_min_UV_Table. (IY=Max_min_UV_Table+4)
 ;; Returns X in B, Y in C, BackgrdBuff pointer in HL
 .GetCorner:
-	LD		A,(IY-2)									;; IY-&02 = Max_min_UV_Table+2 = MaxU
+	LD		A,(IY-2)									;; MaxU = IY-&02 = Max_min_UV_Table+2
 	LD		D,A
-	LD		E,(IY-1)									;; IY-&01 = Max_min_UV_Table+3 = MaxV ; DE = MaxU;MaxV
+	LD		E,(IY-1)									;; MaxV = IY-&01 = Max_min_UV_Table+3 ; DE = MaxU;MaxV
 	SUB 	E											;; A = difference between those 2 values
 	ADD 	A,&80
 	LD		B,A											;; B = &80 + (MaxU - MaxV) = X coord
@@ -11901,7 +11900,7 @@ br_3D71
 	RRA													;; A = B/4
 	AND 	&3E											;; align on even value (word align)
 	LD		L,A											;; L can be &20 to &3E
-	LD		H,BackgrdBuff / 256							;; &6A = H = BackgrdBuff >> 8; HL = BackgrdBuff buffer word address
+	LD		H,BackgrdBuff / WORD_HIGH_BYTE				;; &6A = H = BackgrdBuff >> 8; HL = BackgrdBuff buffer word address
 	LD		A,&07
 	SUB 	E
 	SUB 	D											;; 7 - (MaxV + MaxU)
@@ -11912,15 +11911,15 @@ br_3D71
 ;; This table returns a pointer on the base wall panel for the current
 ;; world. From that base value, the Panel_WorldData will add an offset
 ;; to pick the wall panel we want for each part of the wall.
-.PanelsBaseAddr:								;; panel images base addr
-	DEFW 	img_blacktooth_walls + MOVE_OFFSET			;; img_wall_deco + &70 * 0  + MOVE_OFFSET ; 70F0 Blacktooth		; worldID 0
-	DEFW 	img_market_walls + MOVE_OFFSET				;; img_wall_deco + &70 * 3  + MOVE_OFFSET ; 7390 Market			; worldID 1
-	DEFW 	img_egyptus_walls + MOVE_OFFSET				;; img_wall_deco + &70 * 6  + MOVE_OFFSET ; 7630 Egyptus		; worldID 2
+.PanelsBaseAddr:															;; panel images base addr
+	DEFW 	img_blacktooth_walls   + MOVE_OFFSET		;; img_wall_deco + &70 * 0  + MOVE_OFFSET ; 70F0 Blacktooth		; worldID 0
+	DEFW 	img_market_walls	   + MOVE_OFFSET		;; img_wall_deco + &70 * 3  + MOVE_OFFSET ; 7390 Market			; worldID 1
+	DEFW 	img_egyptus_walls	   + MOVE_OFFSET		;; img_wall_deco + &70 * 6  + MOVE_OFFSET ; 7630 Egyptus		; worldID 2
 	DEFW 	img_penitentiary_walls + MOVE_OFFSET		;; img_wall_deco + &70 * 8  + MOVE_OFFSET ; 77F0 Penitentiary	; worldID 3
-	DEFW 	img_moonbase_walls + MOVE_OFFSET			;; img_wall_deco + &70 * 10 + MOVE_OFFSET ; 79B0 Moon base		; worldID 4
-	DEFW 	img_bookworld_walls	+ MOVE_OFFSET			;; img_wall_deco + &70 * 14 + MOVE_OFFSET ; 7D30 Book world		; worldID 5
-	DEFW 	img_safari_walls + MOVE_OFFSET				;; img_wall_deco + &70 * 16 + MOVE_OFFSET ; 7EF0 Safari			; worldID 6
-	DEFW 	img_prison_walls + MOVE_OFFSET				;; img_wall_deco + &70 * 19 + MOVE_OFFSET ; 8190 Prison			; worldID 7
+	DEFW 	img_moonbase_walls	   + MOVE_OFFSET		;; img_wall_deco + &70 * 10 + MOVE_OFFSET ; 79B0 Moon base		; worldID 4
+	DEFW 	img_bookworld_walls	   + MOVE_OFFSET		;; img_wall_deco + &70 * 14 + MOVE_OFFSET ; 7D30 Book world		; worldID 5
+	DEFW 	img_safari_walls	   + MOVE_OFFSET		;; img_wall_deco + &70 * 16 + MOVE_OFFSET ; 7EF0 Safari			; worldID 6
+	DEFW 	img_prison_walls	   + MOVE_OFFSET		;; img_wall_deco + &70 * 19 + MOVE_OFFSET ; 8190 Prison			; worldID 7
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Used when Wall building.
@@ -11939,7 +11938,8 @@ br_3D71
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Bit mask of worlds saved (5 bits : "1" means got crown for corresponding world).
-;; This will be used to count how many worlds have been saved.
+;; This will be used to count how many worlds have been saved:
+;; bit4 to 0 are : Blacktooth, BookWorld, Safari, Penitentiary, Egyptus
 .saved_World_Mask:
 	DEFB 	&00
 
@@ -11958,53 +11958,53 @@ NB_SPECIAL_TOTAL		EQU		NB_SPECIAL_ITEMS + NB_VICTORY_CROWN			;; 52 (&34) = 47 ta
 
 .tab_Specials_collectible:
 	;; <roomID word little-endian> <low byte : Z|SPR&> <high byte : UV> x 47
-	DEFW 	&1470, &7200				;; speId 0 : room id 1470 : U,V,Z = 7,2,0 + sprite Id 0 in SpecialSprites = SPR_PURSE
-	DEFW 	&3060, &4001				;; Hooter
-	DEFW 	&2EB0, &3409				;; Egyptus Crown
-	DEFW 	&00B0, &001A				;; Penitentiary Crown
-	DEFW 	&9AF0, &700B				;; Safari Crown
-	DEFW 	&A740, &441C				;; Book World Crown
-	DEFW 	&3730, &377D				;; Emperor Crown
-	DEFW 	&1570, &3468				;; Fish
-	DEFW 	&8960, &4748
-	DEFW 	&C560, &7668
-	DEFW 	&1B80, &7668
-	DEFW 	&BCD0, &3528
-	DEFW 	&1CD0, &7128				;; ...
-	DEFW 	&87F0, &7438
-	DEFW 	&FB20, &7128
-	DEFW 	&3160, &0548
-	DEFW 	&E2C0, &5438
-	DEFW 	&6920, &0768				;; Fish
-	DEFW 	&5260, &7762				;; Donuts Tray
-	DEFW 	&4760, &2772
-	DEFW 	&E3C0, &0742
-	DEFW 	&63F0, &7012				;; ...
-	DEFW 	&AA20, &0522
-	DEFW 	&6C30, &4622				;; Donuts Tray
-	DEFW 	&4760, &5773				;; Bunny Speed
-	DEFW 	&FA80, &6763				;; ...
-	DEFW 	&70F0, &6013
-	DEFW 	&7B10, &3173				;; Bunny Speed
-	DEFW 	&6460, &7074				;; Bunny Spring
-	DEFW 	&1A80, &4544				;; ...
-	DEFW 	&46F0, &7474				;; Bunny Spring
-	DEFW 	&C560, &7466				;; Bunny Lives
-	DEFW 	&9870, &0076
-	DEFW 	&3200, &5076
-	DEFW 	&2980, &4076				;; ...
-	DEFW 	&E0A0, &4016
-	DEFW 	&0FA0, &4766
-	DEFW 	&03B0, &4426
-	DEFW 	&83F0, &1736
-	DEFW 	RoomID_Head_1st, &0606	;; speId 39 roomID &8A40 : UVZ=060 + Sprite6 in SpecialSprites = BUNNY (lives); Initial Head's Room
-	DEFW 	&9920, &1476				;; Bunny Lives
-	DEFW 	&C560, &7565				;; Bunny Shield
-	DEFW 	&7760, &4475
-	DEFW 	&3600, &6675
-	DEFW 	&FEA0, &2275				;; ...
-	DEFW 	&42F0, &6165
-	DEFW 	&AE20, &0475				;; speId 46 : Bunny Shield
+	DEFW 	&1470, &7200 + SPE_PURSE_ID			;; speId 0 : Purser in room id &147 : U,V,Z = 7,2,0 + sprite Id 0 in SpecialSprites = SPR_PURSE
+	DEFW 	&3060, &4000 + SPE_HOOTER_ID		;; speId 1 : Hooter in room id &306 : UVZ = 4,0,0 + sprite Id 1 in SpecialSprites = SPR_HOOTER
+	DEFW 	&2EB0, &3400 + EGYPTUS_CROWN_ID		;; Egyptus Crown
+	DEFW 	&00B0, &0010 + PENIT_CROWN_ID		;; Penitentiary Crown
+	DEFW 	&9AF0, &7000 + SAFARI_CROWN_ID		;; Safari Crown
+	DEFW 	&A740, &4410 + BOOKWORLD_CROWN_ID	;; Book World Crown
+	DEFW 	&3730, &3770 + BLACKTOOTH_CROWN_ID	;; Emperor Crown
+	DEFW 	&1570, &3460 + SPE_FISH_ID			;; Fish
+	DEFW 	&8960, &4740 + SPE_FISH_ID
+	DEFW 	&C560, &7660 + SPE_FISH_ID
+	DEFW 	&1B80, &7660 + SPE_FISH_ID
+	DEFW 	&BCD0, &3520 + SPE_FISH_ID
+	DEFW 	&1CD0, &7120 + SPE_FISH_ID			;; ...
+	DEFW 	&87F0, &7430 + SPE_FISH_ID
+	DEFW 	&FB20, &7120 + SPE_FISH_ID
+	DEFW 	&3160, &0540 + SPE_FISH_ID
+	DEFW 	&E2C0, &5430 + SPE_FISH_ID
+	DEFW 	&6920, &0760 + SPE_FISH_ID			;; Fish (11th)
+	DEFW 	&5260, &7760 + SPE_DONUTS_ID		;; Donuts Tray
+	DEFW 	&4760, &2770 + SPE_DONUTS_ID
+	DEFW 	&E3C0, &0740 + SPE_DONUTS_ID
+	DEFW 	&63F0, &7010 + SPE_DONUTS_ID		;; ...
+	DEFW 	&AA20, &0520 + SPE_DONUTS_ID
+	DEFW 	&6C30, &4620 + SPE_DONUTS_ID		;; Donuts Tray
+	DEFW 	&4760, &5770 + BUNNY_SPEED_ID		;; Bunny Speed
+	DEFW 	&FA80, &6760 + BUNNY_SPEED_ID		;; ...
+	DEFW 	&70F0, &6010 + BUNNY_SPEED_ID
+	DEFW 	&7B10, &3170 + BUNNY_SPEED_ID		;; Bunny Speed
+	DEFW 	&6460, &7070 + BUNNY_SPRING_ID		;; Bunny Spring
+	DEFW 	&1A80, &4540 + BUNNY_SPRING_ID		;; ...
+	DEFW 	&46F0, &7470 + BUNNY_SPRING_ID		;; Bunny Spring
+	DEFW 	&C560, &7460 + BUNNY_LIVES_ID		;; Bunny Lives
+	DEFW 	&9870, &0070 + BUNNY_LIVES_ID
+	DEFW 	&3200, &5070 + BUNNY_LIVES_ID
+	DEFW 	&2980, &4070 + BUNNY_LIVES_ID		;; ...
+	DEFW 	&E0A0, &4010 + BUNNY_LIVES_ID
+	DEFW 	&0FA0, &4760 + BUNNY_LIVES_ID
+	DEFW 	&03B0, &4420 + BUNNY_LIVES_ID
+	DEFW 	&83F0, &1730 + BUNNY_LIVES_ID
+	DEFW 	RoomID_Head_1st, &0600 + BUNNY_LIVES_ID		;; speId 39 roomID &8A4 : UVZ=060 + Sprite6 in SpecialSprites = BUNNY (lives); Head's 1st Room
+	DEFW 	&9920, &1470 + BUNNY_LIVES_ID		;; Bunny Lives
+	DEFW 	&C560, &7560 + BUNNY_INVULN_ID		;; Bunny Shield
+	DEFW 	&7760, &4470 + BUNNY_INVULN_ID
+	DEFW 	&3600, &6670 + BUNNY_INVULN_ID
+	DEFW 	&FEA0, &2270 + BUNNY_INVULN_ID		;; ...
+	DEFW 	&42F0, &6160 + BUNNY_INVULN_ID
+	DEFW 	&AE20, &0470 + BUNNY_INVULN_ID		;; speId 46 : Bunny Shield
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; This is used when drawing the Victory Room to show (or not) a crown
@@ -12021,20 +12021,36 @@ NB_SPECIAL_TOTAL		EQU		NB_SPECIAL_ITEMS + NB_VICTORY_CROWN			;; 52 (&34) = 47 ta
 ;; because Ids 0 to 46 are in the tab_Specials_collectible table.
 .victoryRoom_Crowns:
 	;; <roomID word little-endian> <low byte : Z|SPR&> <high byte : UV>
-	DEFW 	RoomID_Victory, &477E 				;; speid47 : Egyptus            : 477E = U=4, V=7, Z=7, SPR_CROWN
-	DEFW 	RoomID_Victory, &176E 				;; speid48 : Penitentiary       : 176E = U=1, V=7, Z=6, SPR_CROWN
-	DEFW 	RoomID_Victory, &077E 				;; speid49 : Safari             : 077E = U=0, V=7, Z=7, SPR_CROWN
-	DEFW 	RoomID_Victory, &376E 				;; speid50 : Book World         : 376E = U=3, V=7, Z=6, SPR_CROWN
-	DEFW 	RoomID_Victory, &273E 				;; speid51 : BlackTooth Emperor : 273E = U=2, V=7, Z=3, SPR_CROWN
+	DEFW 	RoomID_Victory, &4770 + VICTORYROOM_CROWN_ID	;; speid47 : Egyptus            : 477E = U=4, V=7, Z=7, SPR_CROWN
+	DEFW 	RoomID_Victory, &1760 + VICTORYROOM_CROWN_ID	;; speid48 : Penitentiary       : 176E = U=1, V=7, Z=6, SPR_CROWN
+	DEFW 	RoomID_Victory, &0770 + VICTORYROOM_CROWN_ID	;; speid49 : Safari             : 077E = U=0, V=7, Z=7, SPR_CROWN
+	DEFW 	RoomID_Victory, &3760 + VICTORYROOM_CROWN_ID	;; speid50 : Book World         : 376E = U=3, V=7, Z=6, SPR_CROWN
+	DEFW 	RoomID_Victory, &2730 + VICTORYROOM_CROWN_ID	;; speid51 : BlackTooth Emperor : 273E = U=2, V=7, Z=3, SPR_CROWN
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; These are the sprites ID associated with special collectible objects.
 ;; e.g. Special obj Id &02 is "Donuts"
+SPE_PURSE_ID			EQU		&00
+SPE_HOOTER_ID			EQU		&01
+SPE_DONUTS_ID			EQU		&02
+BUNNY_SPEED_ID			EQU		&03
+BUNNY_SPRING_ID			EQU		&04
+BUNNY_INVULN_ID			EQU		&05
+BUNNY_LIVES_ID			EQU		&06
+SPE_FISH_ID				EQU		&08
+EGYPTUS_CROWN_ID		EQU		&09
+PENIT_CROWN_ID			EQU		&0A
+SAFARI_CROWN_ID			EQU		&0B
+BOOKWORLD_CROWN_ID		EQU		&0C
+BLACKTOOTH_CROWN_ID		EQU		&0D
+VICTORYROOM_CROWN_ID	EQU		&0E
+
 .SpecialSprites:
-	DEFB 	SPR_PURSE, SPR_HOOTER, SPR_DONUTS, SPR_BUNNY	;; SPR_PURSE, SPR_HOOTER, SPR_DONUTS, SPR_BUNNY (Speed)
-	DEFB 	SPR_BUNNY, SPR_BUNNY, SPR_BUNNY, &00			;; SPR_BUNNY (Spring), SPR_BUNNY (invuln), SPR_BUNNY (lives), 0
-	DEFB 	ANIM_FISH, SPR_CROWN, SPR_CROWN, SPR_CROWN		;; ANIM_FISH, SPR_CROWN (Egyptus), SPR_CROWN (Penitentiary), SPR_CROWN (Safari)
-	DEFB 	SPR_CROWN, SPR_CROWN, SPR_CROWN					;; SPR_CROWN (book world), SPR_CROWN (emperor), SPR_CROWN (victory room)
+	DEFB 	SPR_PURSE, SPR_HOOTER, SPR_DONUTS, SPR_BUNNY	;; 0:SPR_PURSE, 1:SPR_HOOTER, 2:SPR_DONUTS, 3:SPR_BUNNY (Speed)
+	DEFB 	SPR_BUNNY, SPR_BUNNY, SPR_BUNNY, &00			;; 4:SPR_BUNNY (Spring), 5:SPR_BUNNY (invuln), 6:SPR_BUNNY (lives), 7:0
+	DEFB 	ANIM_FISH, SPR_CROWN, SPR_CROWN, SPR_CROWN		;; 8:ANIM_FISH, 9:SPR_CROWN (Egyptus), &A:SPR_CROWN (Penitentiary), &B:SPR_CROWN (Safari)
+	DEFB 	SPR_CROWN, SPR_CROWN, SPR_CROWN					;; &C:SPR_CROWN (book world), &D:SPR_CROWN (emperor), &E:SPR_CROWN (displayed in victory room)
+FIRST_CROWN_ID			EQU		EGYPTUS_CROWN_ID
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Looking for the room Id in the special items table and point HL
@@ -12096,7 +12112,7 @@ special_found_end_2:
 	LD		A,(saved_World_Mask)						;; get saved_World_Mask
 	CPL													;; invert all bits of A (so we get 0=saved=match, and 1=not-saved=no-match)
 	LD		B,5											;; 5 crowns
-	LD		DE,&0004									;; 4 bytes per entry in the victoryRoom_Crowns table
+	LD		DE,4										;; 4 bytes per entry in the victoryRoom_Crowns table
 addcrowns_loop:
 	RR		(HL)										;; This loop replaces the bit 0 of (HL) n°i (i 0 to 4) [= low byte of room ID in the crown search table]....
 	RRA													;; ...with the bit n°i in A (saved world (complement))...
@@ -12115,7 +12131,7 @@ addspe_loop:
 	CALL 	GetNibbles									;; Fills in E, D from (HL+1) and B, C from (HL+2); HL will be incremented by 2 ; since HL was pointing on 2nd byte of object in tab_Specials_collectible, it gets E = Z, D = SPR, B = U, C = V
 	LD		IY,TmpObj_variables
 	LD		A,D											;; Special Sprite ID in D ; (E = Z, D = SPR, B = U, C = V)
-	CP		&0E											;; 0E is the Victory room SPR_CROWN sprite id in SpecialSprites, other special sprites are Purse, Hooter, Donut tray, Fish, Bunnies and World crowns. Note that the worlds crowns are not the victory room crowns.
+	CP		VICTORYROOM_CROWN_ID						;; &0E is the Victory room SPR_CROWN sprite (last) id in SpecialSprites, other special sprites are Purse, Hooter, Donut tray, Fish, Bunnies and World crowns. Note that the worlds crowns are not the victory room crowns.
 	LD		A,&60
 	JR		NZ,br_3F25									;; if Victory room Crown then O_FLAGS = 0, else O_FLAGS = &60
 	XOR		A
@@ -12124,9 +12140,9 @@ br_3F25
 	LD		(IY+O_SPECIAL),D        					;; Set special item sprite index in SpecialSprites.
 	LD		(IY+O_FUNC),OBJFN_SPECIAL					;; Set the object function OBJFN_SPECIAL
 	LD		A,D											;; index of special item in SpecialSprites
-	ADD 	A,SpecialSprites and &00FF					;; &BB = SpecialSprites & FF
+	ADD 	A,SpecialSprites and WORD_LOW_BYTE			;; &BB = SpecialSprites & FF
 	LD		L,A
-	ADC 	A,SpecialSprites / 256						;; &3E = SpecialSprites >> 8  ; 3EBB+offset
+	ADC 	A,SpecialSprites / WORD_HIGH_BYTE			;; &3E = SpecialSprites >> 8  ; 3EBB+offset
 	SUB 	L
 	LD		H,A											;; HL = pointer on sprite code in SpecialSprites ; HL = SpecialSprites + sprite_index
 	LD		A,(HL)										;; A = Sprite code for special item
@@ -12141,16 +12157,19 @@ br_3F25
 	CALL 	AddObjOpt
 
 	POP 	BC
-	POP 	DE											;; Restore state and carry on.
+	POP 	DE											;; Restore reg state
 	POP 	HL
 	CALL 	FindSpecCont
 	JR		addspe_loop
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; Reset the "collected" flag (bit0) on all the specials.
+;; Reset the "collected" flag (bit0 of room ID) on all the specials.
+;; When a special item is picked-up, the corresponding RoomID bit0 in
+;; tab_Specials_collectible is set, so that a search will no longer
+;; match that item.
 .ResetSpecials:
 	LD		HL,tab_Specials_collectible					;; in special collectible table
-	LD		DE,&0004									;; every 4 bytes in the table is the low byte for roomID
+	LD		DE,4										;; every 4 bytes in the table is the low byte for roomID
 	LD		B,NB_SPECIAL_TOTAL							;; &34=52 special obj : 47 tab_Specials_collectible items + 5 victoryRoom_Crowns
 rstspe_loop:																;; when the item was picked up, the bit0 was set (so we could not pick it up again)
 	RES 	0,(HL)										;; so reset it to reinit it
@@ -12178,9 +12197,9 @@ getspe_found:
 	DEC 	HL											;; point back on room ID in table
 	SET 	0,(HL)										;; set bit 0 of room ID low byte; so this item is no longer available (we picked it up already)
 	ADD 	A,A											;; *2 (word align)
-	ADD 	A,SpecialFns and &00FF						;; &89 : SpecialFns & &FF
+	ADD 	A,SpecialFns and WORD_LOW_BYTE				;; &89 : SpecialFns & &FF
 	LD		L,A
-	ADC 	A,SpecialFns / 256							;; &3F : SpecialFns >> 8 : &3F89 + special obj offset
+	ADC 	A,SpecialFns / WORD_HIGH_BYTE				;; &3F : SpecialFns >> 8 : &3F89 + special obj offset
 	SUB 	L
 	LD		H,A											;; SpecialFns + 2A
 	LD		E,(HL)
@@ -12199,25 +12218,25 @@ special_found_end_1:
 ;; For exemple when picking up the special item 'Donuts', we will
 ;; run the function at address "3FB4" : BoostDonuts.
 .SpecialFns:
-	DEFW 	PickUp2					;; 0 : Purse PickUp2	3FA5
-	DEFW 	PickUp2					;; 1 : Hooter PickUp2	3FA5
+	DEFW 	PickUp2					;; 0 : Purse PickUp2 3FA5
+	DEFW 	PickUp2					;; 1 : Hooter PickUp2 3FA5
 	DEFW 	BoostDonuts				;; 2 : Donuts BoostDonuts 3FB4
 	DEFW 	BoostSpeed				;; 3 : Bunny BoostSpeed 3FC3
 	DEFW 	BoostSpring				;; 4 : Bunny BoostSpring 3FCC
 	DEFW 	BoostInvuln				;; 5 : Bunny BoostInvuln 3FD8
 	DEFW 	BoostLives				;; 6 : Bunny BoostLives 3FDC
-	DEFW 	&0000					;; 7 :
+	DEFW 	&0000					;; 7 : <unused>
 	DEFW 	SaveContinue			;; 8 : Fish SaveContinue 4025
-	DEFW 	GetCrown				;; 9 : Crown GetCrown 4014
-	DEFW 	GetCrown				;; &A : Crown GetCrown 4014
-	DEFW 	GetCrown				;; &B : Crown GetCrown 4014
-	DEFW 	GetCrown				;; &C : Crown GetCrown 4014
+	DEFW 	GetCrown				;; 9 : Crown GetCrown 4014 (Egyptus)
+	DEFW 	GetCrown				;; &A : Crown GetCrown 4014 (Penitentiary)
+	DEFW 	GetCrown				;; &B : Crown GetCrown 4014 (Safari)
+	DEFW 	GetCrown				;; &C : Crown GetCrown 4014 (Book World)
 	DEFW 	GetCrown				;; &D : Crown GetCrown 4014 (Emperor)
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Pickup Purse or Hooter, update Inventory and update HUD
 ;; PickUp2 : D has the bitnb for the item: Purse bit 0, Hooter bit 1
-;; Pick_it_up : item bitnb in A (eg. bit 2 = donut tray)
+;; Pick_it_up : item bitnb in A (eg. bit2 = donut tray)
 .PickUp2:
 	LD		A,D											;; item bir nb
 .Pick_it_up:
@@ -12228,10 +12247,10 @@ special_found_end_1:
 	JP		Play_Sound									;; will RET
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; pick up a donut tray
+;; Pick up a donut tray
 .BoostDonuts:
 	LD		A,(selected_characters)						;; get selected_characters
-	AND 	&02											;; test if Head
+	AND 	HEAD_SELECTED								;; test if Head
 	RET 	Z											;; if not Head, then leave
 	LD		A,CNT_DONUTS
 	CALL 	BoostCountPlus								;; boost counter
@@ -12242,16 +12261,16 @@ special_found_end_1:
 ;; Pick up a Bunny. 4 types of Bunnies : lives, invulnerability, speed, extra jump.
 .BoostSpeed:
 	LD		A,(selected_characters)						;; get selected_characters
-	AND 	&02											;; test if Head
+	AND 	HEAD_SELECTED								;; test if Head
 	RET 	Z											;; if not Head, then leave
-	XOR		A											;; code for CNT_SPEED
+	XOR		A											;; 0 = code for CNT_SPEED
 	JR		BoostCountPlus								;; Boost!
 
 .BoostSpring:
 	LD		A,(selected_characters)						;; get selected_characters
-	AND 	&01											;; test if Heels
+	AND 	HEELS_SELECTED								;; test if Heels
 	RET 	Z											;; if not Heels, then leave
-	JR		BoostCountPlus								;; A = 01, code for CNT_SPRING, boost
+	JR		BoostCountPlus								;; A = 1, code for CNT_SPRING, boost
 
 ;; heels : c=2; a=b01 a=0 carry=1 a=2 push a ret
 ;; head : c=2 a=b10 a=1 carry=0 a=3 push a ret
@@ -12268,7 +12287,7 @@ special_found_end_1:
 ;; invuln and lives.
 .BoostMaybeDbl:
 	LD		A,(selected_characters)						;; get selected_characters
-	CP		&03											;; both Head and Heels?
+	CP		BOTH_SELECTED								;; both Head and Heels?
 	JR		Z,BoostCountDbl								;; if yes, then increment both (invuln if coming from BoostInvuln or lives if coming from BoostLives) (BoostCountDbl), else:
 	RRA													;; bit Head in bit0, bit Heels in Carry
 	AND 	1											;; if Head increment, if Heels add 0
@@ -12313,7 +12332,7 @@ fsnum_colorattr:
 ;; Pick up a crown; WorldId in D
 .GetCrown:
 	LD		A,D											;; special item ID
-	SUB 	9											;; in SpecialFns the GetCrown are items 9 to &E so align it at 0 (world nb)
+	SUB 	FIRST_CROWN_ID								;; in SpecialFns the GetCrown are items 9 to &E so align it at 0 (world nb)
 	LD		HL,saved_World_Mask							;; points on saved_World_Mask
 	CALL 	Set_bit_nb_A_in_content_HL					;; set the bit N (N in A) in (HL) corresponding to the world we saved.
 	LD		B,Sound_ID_Tada								;; Sound_ID &C1 = "Tada!"
@@ -12323,136 +12342,136 @@ fsnum_colorattr:
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Pick up a Fish (save points)
 .SaveContinue:
-	LD B,Sound_ID_Hornpipe								;; Sound_ID &C2 = Hornpipe
-	CALL Play_Sound
-	CALL GetContinueData								;; get current save array (18 bytes)
-	LD IX,tab_Specials_collectible
-	LD DE,&0004
-	LD B,&06
+	LD		B,Sound_ID_Hornpipe							;; Sound_ID &C2 = Hornpipe
+	CALL	Play_Sound
+	CALL	GetContinueData								;; HL = current Continue_Data save array index pointer (18 bytes sub-array)
+	LD		IX,tab_Specials_collectible					;; we will bit-pack the pick-up/not-picked-up bit (bit0 of room Id in the tab_Specials_collectible table) of all special items in the 6 first bytes
+	LD		DE,4										;; 4-bytes blocks to next item low byte room ID
+	LD		B,6											;; six 8-bits loops, so 48 (that's the 47 special item, and one from the crowns to dummy-complete)
 savecont_1:
-	LD (HL),&80
+	LD		(HL),&80									;; put the 1 in bit7 that'll be detected by the JR NC to indicate the byte is done.
 savecont_2:
-	LD A,(IX+0)
-	ADD IX,DE
-	RRA
-	RR (HL)
-	JR NC,savecont_2
-	INC HL
-	DJNZ savecont_1
-	EX DE,HL
-	LD HL,Save_point_value								;; Save point value (Continues)
-	INC (HL)											;; incr the number of active save point
-	LD HL,selected_characters							;; points on selected_characters
-	LD A,(HL)											;; save selected char first byte
-	LDI													;; do once : LD (DE),(HL); DE++, HL++, BC--
-	LD HL,Characters_lives								;; point on Characters_lives
-	LDI													;; do once : LD (DE),(HL); DE++, HL++, BC--
-	LDI													;; do once : LD (DE),(HL); DE++, HL++, BC--
-	CP &03
-	JR Z,SaveContinue_3
-	LD HL,TODO_2496										;; ???
-	CP (HL)
-	JR NZ,SaveContinue_3
-	LD HL,&BB31											;; save 4 bytes in buffer
-	LD BC,&0004
+	LD		A,(IX+0)									;; bit0 of RoomId low-byte will indicate if the corresponding special item has been picked up or not
+	ADD		IX,DE										;; point on next special item
+	RRA													;; bit0 in Carry
+	RR		(HL)										;; Carry in bit7 (and right rotate the rest)
+	JR		NC,savecont_2								;; do it until we see the 1 placed at 4036
+	INC		HL											;; next bitpacked byte
+	DJNZ	savecont_1									;; 6 times (48 bits)
+	EX		DE,HL
+	LD		HL,Save_point_value							;; Save point value (Continues)
+	INC		(HL)										;; incr the number of active save point
+	LD		HL,selected_characters						;; points on selected_characters
+	LD		A,(HL)										;; save selected char first byte
+	LDI													;; Copy : do once : LD (DE),(HL); DE++, HL++, BC--
+	LD		HL,Characters_lives							;; point on Characters_lives
+	LDI													;; Copy : do once : LD (DE),(HL); DE++, HL++, BC--
+	LDI													;; Copy : do once : LD (DE),(HL); DE++, HL++, BC--
+	CP		&03
+	JR		Z,SaveContinue_3
+	LD		HL,saved_selected_chars						;; ???
+	CP		(HL)
+	JR		NZ,SaveContinue_3
+	LD		HL,OCS_Saved + MOVE_OFFSET					;; save 4 bytes in buffer (Room access code and Room Entry UVZ position)=
+	LD		BC,&0004
 	LDIR												;; repeat LD (DE),(HL); DE++, HL++, BC-- until BC=0
-	LD HL,Other_Character_state + MOVE_OFFSET
-	JR SaveContinue_4
+	LD		HL,Other_Character_state + MOVE_OFFSET
+	JR		SaveContinue_4
 .SaveContinue_3
-	LD HL,&2492											;; SaveRestore_Block3
-	LD BC,&0004
-	LDIR												;; repeat LD (DE),(HL); DE++, HL++, BC-- until BC=0
-	LD HL,current_Room_ID								;; point on current_Room_ID
+	LD		HL,SaveRestore_Block3						;; point on saved_room_access_code and EntryPosition_uvz variables
+	LD		BC,&0004
+	LDIR												;; Copy : 4x repeat LD (DE),(HL); DE++, HL++, BC-- until BC=0
+	LD		HL,current_Room_ID							;; point on current_Room_ID
 .SaveContinue_4:
 	LDI													;; do once : LD (DE),(HL); DE++, HL++, BC--
 	LDI													;; do once : LD (DE),(HL); DE++, HL++, BC--
-	LD HL,current_Room_ID								;; point on current_Room_ID
+	LD		HL,current_Room_ID							;; point on current_Room_ID
 	LDI													;; do once : LD (DE),(HL); DE++, HL++, BC--
 	LDI													;; do once : LD (DE),(HL); DE++, HL++, BC--
 	RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 .DoContinue:
-	LD HL,Save_point_value								;; Save point value
-	DEC (HL)											;; use a save point
-	CALL GetContinueData
-	LD A,(HL)
-	AND &03
-	LD (Inventory),A									;; update inventory
-	LD A,(HL)
+	LD		HL,Save_point_value							;; Save point value
+	DEC		(HL)										;; use a save point
+	CALL	GetContinueData
+	LD		A,(HL)
+	AND		&03
+	LD		(Inventory),A								;; update inventory
+	LD		A,(HL)
 	RRA
 	RRA
-	AND &1F
-	LD (saved_World_Mask),A								;; update saved_World_Mask
-	PUSH HL
-	POP IX
-	LD HL,tab_Specials_collectible
-	LD DE,&0004
-	LD B,NB_SPECIAL_ITEMS
-	RR (HL)
-	JR br_40B3
+	AND		&1F
+	LD		(saved_World_Mask),A						;; update saved_World_Mask
+	PUSH	HL
+	POP		IX
+	LD		HL,tab_Specials_collectible					;; unpack the pick-up/not-pickedup bits from the first 6 bytes of the save point
+	LD		DE,4										;; 4 bytes per special item entry
+	LD		B,NB_SPECIAL_ITEMS
+	RR		(HL)
+	JR		br_40B3
 
 doco_loop:
-	RR (HL)
-	SRL (IX+0)
-	JR NZ,br_40B8
-	INC IX
+	RR		(HL)
+	SRL		(IX+0)
+	JR		NZ,br_40B8
+	INC		IX
 br_40B3
 	SCF
-	RR (IX+0)
+	RR		(IX+0)
 br_40B8
-	RL (HL)
-	ADD HL,DE
-	DJNZ doco_loop
-	PUSH IX
-	POP HL
-	INC HL
-	LD DE,selected_characters							;; points on selected_characters
-	LD A,(HL)
-	LDI													;; do once : LD (DE),(HL); DE++, HL++, BC--
-	LD DE,Characters_lives								;; point on Characters_lives
-	LDI													;; do once : LD (DE),(HL); DE++, HL++, BC--
-	LDI													;; do once : LD (DE),(HL); DE++, HL++, BC--
-	LD DE,access_new_room_code							;; point on access_new_room_code
-	LDI													;; do once : LD (DE),(HL); DE++, HL++, BC--
-	BIT 0,A
-	LD DE,Heels_variables+O_U							;; ??? Heels U?
-	JR Z,br_40DD
-	LD DE,Head_variables+O_U							;; ??? Head U?
+	RL		(HL)
+	ADD		HL,DE
+	DJNZ	doco_loop
+	PUSH	IX
+	POP		HL
+	INC		HL
+	LD		DE,selected_characters						;; points on selected_characters
+	LD		A,(HL)
+	LDI													;; Copy : do once : LD (DE),(HL); DE++, HL++, BC--
+	LD		DE,Characters_lives							;; point on Characters_lives
+	LDI													;; Copy : do once : LD (DE),(HL); DE++, HL++, BC--
+	LDI													;; Copy : do once : LD (DE),(HL); DE++, HL++, BC--
+	LD		DE,access_new_room_code						;; point on access_new_room_code
+	LDI													;; Copy : do once : LD (DE),(HL); DE++, HL++, BC--
+	BIT		0,A
+	LD		DE,Heels_variables+O_U						;; Heels U
+	JR		Z,br_40DD
+	LD		DE,Head_variables+O_U						;; Head U
 br_40DD
-	LD BC,&0003
-	LDIR												;; repeat LD (DE),(HL); DE++, HL++, BC-- until BC=0
-	LD DE,current_Room_ID								;; point on current_Room_ID
-	LDI													;; do once : LD (DE),(HL); DE++, HL++, BC--
-	LDI													;; do once : LD (DE),(HL); DE++, HL++, BC--
-	CP &03
-	JR Z,dconti_1
-	LD BC,(Characters_lives)							;; get Characters_lives
-	DEC B
-	JP M,dconti_1
-	DEC C
-	JP M,dconti_1
-	XOR &03
-	LD (Other_Character_state + MOVE_OFFSET),A
-	PUSH HL
-	CALL InitOtherChar
-	POP HL
+	LD		BC,3										;; U, V and Z
+	LDIR												;; Copy : 3x repeat LD (DE),(HL); DE++, HL++, BC-- until BC=0
+	LD		DE,current_Room_ID							;; point on current_Room_ID
+	LDI													;; Copy : do once : LD (DE),(HL); DE++, HL++, BC--
+	LDI													;; Copy : do once : LD (DE),(HL); DE++, HL++, BC--
+	CP		&03
+	JR		Z,dconti_1
+	LD		BC,(Characters_lives)						;; get Characters_lives
+	DEC		B
+	JP		M,dconti_1
+	DEC		C
+	JP		M,dconti_1
+	XOR		&03
+	LD		(Other_Character_state + MOVE_OFFSET),A
+	PUSH	HL
+	CALL	InitOtherChar
+	POP		HL
 dconti_1:
-	LD DE,current_Room_ID								;; point on current_Room_ID
-	LDI													;; do once : LD (DE),(HL); DE++, HL++, BC--
-	LDI													;; do once : LD (DE),(HL); DE++, HL++, BC--
-	LD BC,(current_Room_ID)								;; get current_Room_ID
-	SET 0,C
-	CALL Find_Specials
-	CALL GetNibbles										;; Fills in E, D from (HL+1) and B, C from (HL+2); HL will be incremented by 2
-	LD A,E
-	EX AF,AF'
-	LD DE,UVZ_coord_Set_UVZ
-	LD HL,UVZ_origin
-	CALL Set_UVZ
-	LD A,&08											;; room access code 8 = ???
-	LD (access_new_room_code),A							;; update access_new_room_code
-	LD (Teleport_down_anim_length),A
+	LD		DE,current_Room_ID							;; point on current_Room_ID
+	LDI													;; Copy : do once : LD (DE),(HL); DE++, HL++, BC--
+	LDI													;; Copy : do once : LD (DE),(HL); DE++, HL++, BC--
+	LD		BC,(current_Room_ID)						;; get current_Room_ID
+	SET		0,C
+	CALL	Find_Specials
+	CALL	GetNibbles									;; Fills in E, D from (HL+1) and B, C from (HL+2); HL will be incremented by 2
+	LD		A,E
+	EX		AF,AF'
+	LD		DE,UVZ_coord_Set_UVZ
+	LD		HL,UVZ_origin
+	CALL	Set_UVZ
+	LD		A,&08										;; room access code 8 = save point ???
+	LD		(access_new_room_code),A					;; update access_new_room_code
+	LD		(Teleport_down_anim_length),A
 	RET
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -12485,7 +12504,7 @@ fsbn_loop:
 	RET
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; Decrement one of the core counters and re-display it.
+;; Decrement one of the counters and print new value
 ;; Input : A can be: 0: speed, 1: spring, 2:Heels Invul, 3: Head Invul, 4:Heels Lives, 5:Head Lives, 6:Donuts
 ;; Output : Zero flag set if was 0; Zero flag reset is was able to decrement the counter.
 .Decrement_counter_and_display:
@@ -12500,9 +12519,9 @@ fsbn_loop:
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Re-prints all the Counters values on the HUD.
 .PrintStatus:
-	LD		A,Print_StringID_Icons						;; String code B8 = shield, spring, shield, lightning icons
+	LD		A,Print_Icons								;; String code B8 = shield, spring, shield, lightning icons
 	CALL 	Print_String								;; print icons
-	LD		A,7											;; 7 Counters
+	LD		A,NB_COUNTERS								;; 7 Counters
 prntstat_1:
 	PUSH 	AF
 	DEC 	A											;; foreach counter starting at n° 6
@@ -12523,7 +12542,7 @@ prntstat_1:
 	DAA													;; base10 adjust
 	LD		(HL),A										;; update value
 	RET 	NC											;; if not overflowed 99 leave with Carry reset, else:
-	LD		A,&99										;; clamp at 99
+	LD		A,&99										;; clamp at 99 (BCD)
 	LD		(HL),A										;; update the value to reflect this
 	RET													;; Ret with Carry set
 
@@ -12572,6 +12591,7 @@ CNT_HEAD_INVULN			EQU 	3
 CNT_HEELS_LIVES			EQU 	4
 CNT_HEAD_LIVES			EQU 	5
 CNT_DONUTS				EQU 	6
+NB_COUNTERS				EQU		7
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; These are the BCD values by how much the corresponding counters
@@ -12595,17 +12615,17 @@ CounterIncrements:
 .Continue_Data:
 	;; Default Values do not matter, they'll be overwritten :
 	;; should do a  DEFS 18*11,&00
-	DEFB 	&FF, &21, &00, &F8, &CD, &41, &4D, &F6, &01, &D1, &C9, &CD, &17, &28, &C3, &4, &6C, &CD
-	DEFB 	&67, &1D, &21, &DA, &76, &CD, &AD, &6A, &CD, &87, &55, &CD, &67, &1D, &CD, &8, &43, &CD
-	DEFB 	&AF, &5F, &21, &00, &00, &22, &73, &76, &C3, &67, &1D, &3A, &74, &76, &B7, &A, &D6, &4B
-	DEFB 	&3A, &73, &76, &FE, &F3, &DA, &D6, &4B, &37, &C9, &E6, &7F, &E5, &21, &73, &6, &CD, &00
-	DEFB 	&00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &0, &00, &00
-	DEFB 	&00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &0, &00, &00
-	DEFB 	&00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &0, &00, &00
-	DEFB 	&00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &0, &00, &00
-	DEFB 	&00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &0, &00, &00
-	DEFB 	&00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &0, &00, &00
-	DEFB 	&00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &0, &00, &00
+	DEFB 	&FF, &21, &00, &F8, &CD, &41, &4D, &F6, &01, &D1, &C9, &CD, &17, &28, &C3, &34, &6C, &CD
+	DEFB 	&67, &1D, &21, &DA, &76, &CD, &AD, &6A, &CD, &87, &55, &CD, &67, &1D, &CD, &88, &43, &CD
+	DEFB 	&AF, &5F, &21, &00, &00, &22, &73, &76, &C3, &67, &1D, &3A, &74, &76, &B7, &FA, &D6, &4B
+	DEFB 	&3A, &73, &76, &FE, &F3, &DA, &D6, &4B, &37, &C9, &E6, &7F, &E5, &21, &73, &76, &CD, &00
+	DEFB 	&00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00
+	DEFB 	&00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00
+	DEFB 	&00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00
+	DEFB 	&00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00
+	DEFB 	&00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00
+	DEFB 	&00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00
+	DEFB 	&00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00
 
 ;; -----------------------------------------------------------------------------------------------------------
 .UVZ_origin:
@@ -12627,14 +12647,16 @@ CounterIncrements:
 ;; 		with "43A2 01 26 00 LD BC,0026" to only check 38 bytes!). BUT countBits is used
 ;; 		by other parts of the code, so it does require a 301-byte RoomMask_buffer, off
 ;;      which most will always be "00".
+NB_ROOMS				EQU		301
+
 .RoomMask_buffer:
-	DEFS 	301, &00
+	DEFS 	NB_ROOMS, &00
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; This provides 3 bitpacked Counters, ie. they count how many "1"s are
 ;; set in the number of bytes defined whitin the functions:
 ;; PurseHooterCount:
-;; 		* Clears donut bit from Inventory and then count number of items remaining.
+;; 		* Clears Donuts tray bit from Inventory and then count number of items remaining.
 ;;        In other words, count the number of items owned in the list "Purse, Hooter".
 ;; SavedWorldCount:
 ;;		* Count how many of the 5 worlds we have saved.
@@ -12653,10 +12675,10 @@ CounterIncrements:
 ;; Output: result in DE
 .PurseHooterCount:
 	LD		HL,Inventory								;; pointer on Inventory
-	RES 	2,(HL)										;; Lose Donut tray (empty tray)
+	RES 	2,(HL)										;; Do not count the Donut tray
 edo1:
 	EXX
-	LD		BC,&0001									;; will count the "1" bits in 1 byte (Inventory byte)
+	LD		BC,&0001									;; will count the number of bits set in 1 byte (Inventory byte)
 	JR		countBits									;; count how many bits are set in the item inventory (Purse+Hooter)
 
 .SavedWorldCount:
@@ -12668,7 +12690,7 @@ edo1:
 	EXX
 	;; Due to the way RoomMask_buffer is bitpacked we could set BC to
 	;; 38 (&26) (RoomMask_buffer should always be null from the 39th byte.)
-	LD		BC,301										;; BC=301 (nb max of bytes to check = rooms (although &0026 (38 bytes) should be fine; see the way RoomMask_buffer is bit packed)
+	LD		BC,NB_ROOMS									;; BC=301 (nb max of bytes to check = rooms (although &0026 (38 bytes) should be fine; see the way RoomMask_buffer is bit packed)
 .countBits:
 	EXX
 	LD		DE,&0000									;; init counter
@@ -12701,11 +12723,11 @@ cbi2:
 ;; -----------------------------------------------------------------------------------------------------------
 .Erase_visited_room:
 	LD		HL,RoomMask_buffer
-	LD		BC,301										;; Erase &012D bytes from addr &4261 (301 rooms)
+	LD		BC,NB_ROOMS									;; Erase &012D bytes from addr &4261 (301 rooms)
 	JP		Erase_forward_Block_RAM						;; continue on Erase_forward_Block_RAM (will have a RET)
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; Gets the score and puts it in HL (BCD).
+;; Calculate the score in HL (BCD).
 ;; Note that a "0" will be appended to make the score 10x when displayed.
 ;; The score in HL (BCD) is:
 ;;     16 * visited rooms (up to 301)
@@ -12714,14 +12736,15 @@ cbi2:
 ;;     + 636 * crowns (up to 5)
 ;;     + 501 if Head is in the Victory room
 ;;     + 501 if Heels is in the Victory room (make sure to enter the last room together!)
-;;    That's 99980 max pts!
+;;    That's 99980 max pts! (again, in that case, HL will be (BCD) &9998 in that case,
+;;    the trailing "0" is cosmetically added while printing the value)
 .GetScore:
 	CALL 	Sub_Check_Victory_Room						;; Zero set if Victory room reached.
 	PUSH 	AF											;; save flags
 	CALL 	RoomCount									;; Count number of visited rooms in DE
 	POP 	AF											;; restore flags
-	LD		HL,&0000									;; score = 0
-	JR		NZ,gs_1										;; if not in victory room, skip to gs_1, else:
+	LD		HL,&0000									;; init score = 0
+	JR		NZ,gs_1										;; if not in Victory room, skip to gs_1, else:
 	LD		HL,&0501									;; points = 501 (BCD)
 	LD		A,(both_in_same_room)						;; get both_in_same_room
 	AND 	A											;; test
@@ -12776,9 +12799,9 @@ gs_1:
 ;; Output in A: the validated direction as described above
 .DirCode_from_LRDU:
 	AND		&0F											;; Only care about 4 lsb : Left,Right,Down,Up
-	ADD 	A,Array_direction_table and &00FF			;; &1A = Array_direction_table & FF
+	ADD 	A,Array_direction_table and WORD_LOW_BYTE	;; &1A = Array_direction_table & FF
 	LD		L,A
-	ADC 	A,Array_direction_table / 256				;; &44 = Array_direction_table >> 8
+	ADC 	A,Array_direction_table / WORD_HIGH_BYTE	;; &44 = Array_direction_table >> 8
 	SUB 	L
 	LD		H,A											;; ... HL = Array_direction_table + A
 	LD		A,(HL)										;; get direction code depending on input direction keys
@@ -12795,9 +12818,9 @@ gs_1:
 	LD		L,A
 	ADD 	A,A											;; *2
 	ADD 	A,L											;; *3 (groups of 3 bytes)
-	ADD 	A,DirTable2 and &00FF						;; &3A = DirTable2 & &00FF
+	ADD 	A,DirTable2 and WORD_LOW_BYTE				;; &3A = DirTable2 & &00FF
 	LD		L,A
-	ADC 	A,DirTable2 / 256							;; &44 = (DirTable2 & &FF00) >> 8 ; &443A+(dir*3) ; DirTable2 addr = &443A
+	ADC 	A,DirTable2 / WORD_HIGH_BYTE				;; &44 = (DirTable2 & &FF00) >> 8 ; &443A+(dir*3) ; DirTable2 addr = &443A
 	SUB 	L
 	LD		H,A											;; HL = DirTable2 + 3*A
 	LD		C,(HL)										;; C = 1st byte = Ydelta
@@ -12828,7 +12851,7 @@ gs_1:
 	PUSH 	HL
 	CALL 	DirDeltas
 	;; Store the bottom 4 bits of A (dir bitmap) in Object + O_IMPACT
-	LD		DE,&000B
+	LD		DE,O_IMPACT
 	POP 	HL
 	ADD 	HL,DE
 	XOR 	(HL)
@@ -12836,7 +12859,7 @@ gs_1:
 	XOR 	(HL)
 	LD		(HL),A
 	;; Update U coordinate with Y delta
-	LD		DE,&FFFA											;;-&06
+	LD		DE,&FFFA									;;-&06
 	ADD 	HL,DE
 	LD		A,(HL)
 	ADD 	A,C
@@ -12849,9 +12872,9 @@ gs_1:
 	RET
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; Takes a pointer in HL to an index which is incremented into a byte
-;; array that follows it. Next item is returned in A. Array is
-;; terminated with 0, at which point we read the first item again.
+;; HL is a pointer to an index, incremented into a byte-array
+;; that follows it. Next item is returned in A. Array is 0-terminated
+;; at which point we read the first item again.
 .Read_Loop_byte:
 	INC 	(HL)										;; next item
 	LD		A,(HL)										;; index_offset = (HL)
@@ -12869,17 +12892,17 @@ gs_1:
 	RET
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; Word version of ReadLoop. Apparently unused?
+;; Word version of ReadLoop. Unused.
 ReadLoopW:
 unused_Read_Loop_word:														;; same than Read_Loop_byte, but for word (NOT USED!)
-	LD		A,(HL)											;; A = (HL)
-	INC 	(HL)											;; (HL)++
-	ADD 	A,A												;; This does...
+	LD		A,(HL)										;; A = (HL)
+	INC 	(HL)										;; (HL)++
+	ADD 	A,A											;; This does...
 	ADD 	A,L
 	LD		E,A
 	ADC 	A,H
 	SUB 	E
-	LD		D,A												;; ... DE = HL + 2*A
+	LD		D,A											;; ... DE = HL + 2*A
 	INC 	DE
 	LD		A,(DE)
 	AND 	A
@@ -12936,7 +12959,7 @@ Rand_seed_2:
 	DEFW 	&216E
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; Pointer to object in HL
+;; HL : Pointer to object to remove
 .RemoveObject:
 	PUSH 	HL
 	PUSH 	HL
@@ -12948,21 +12971,22 @@ Rand_seed_2:
 	POP 	HL
 	CALL 	DrawObject
 	POP 	IX
-	SET 	7,(IX+O_FLAGS)										;; set "ignore object" bit
-	LD		A,(Do_Objects_Phase)								;; get Do_Objects_Phase
-	LD		C,(IX+O_FUNC)										;; phase bit
+	SET 	7,(IX+O_FLAGS)								;; set "ignore object" bit
+	LD		A,(Do_Objects_Phase)						;; get Do_Objects_Phase
+	LD		C,(IX+O_FUNC)								;; phase bit
 	XOR 	C
-	AND 	&80													;; get function and flip the bit7 (phase)
+	AND 	&80											;; get function and flip the bit7 (phase)
 	XOR 	C
 	LD		(IX+O_FUNC),A
 	RET
 
 ;; -----------------------------------------------------------------------------------------------------------
+;; HL : Object pointer
 .DrawObject:
 	PUSH	IY
 	;; Bump to an obj+2 pointer for call to GetObjExtents.
 	INC		HL
-	INC		HL
+	INC		HL											;; now HL points on Object+2 = O_FAR2NEAR_LST (input needed by GetObjExtents)
 	CALL	GetObjExtents
 	;; Move X extent from BC to HL, Y extent from HL to DE.
 	EX		DE,HL
@@ -12992,16 +13016,16 @@ Rand_seed_2:
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; When getting a crown, check that we have all crowns (5).
-;; If so, show the page that shows we are proclaimed Emperor.
+;; If so, show the page that says we are proclaimed Emperor.
 ;; Then show the Worlds/Crowns page.
 .Emperor_Screen_Cont:
 	LD		A,(saved_World_Mask)						;; get saved_World_Mask
 	CP		&1F											;; Got all 5 crowns?
 	JR		NZ,fcsc_skip								;; no then skip to fcsc_skip, else:
-	LD		A,Print_StringID_Wipe_Salute				;; Get proclaimed Emperor! STR_WIN_SCREEN
+	LD		A,Print_Wipe_Salute							;; Proclaimed Emperor! STR_WIN_SCREEN
 	CALL 	Print_String
-	CALL 	Play_HoH_Tune								;; Play Main Theme
-	LD		DE,&040F									;; 4 items (Head, Heels and their crowns); draw all
+	CALL 	Play_HoH_Theme								;; Play Main Theme
+	LD		DE,&04 * WORD_HIGH_BYTE + &0F				;; 4 items (D=4) (Head, Heels and their crowns); draw all (E=&0F)
 	LD		HL,EmperorPageSpriteList					;; pointer on sprite table
 	CALL 	Draw_from_list								;; draw them (must be 3x24)
 	CALL 	WaitKey										;; Wait key and then Wipe Screen
@@ -13014,11 +13038,11 @@ fcsc_skip:
 ;; This is the World/Crowns/Planets screen
 ;; It also provides an function that waits a key press and wipe screen.
 .Show_World_Crowns_screen:
-	LD		A,Print_StringID_Wipe_BTEmpire				;; String ID &C6 STR_EMPIRE_BLURB
+	LD		A,Print_Wipe_BTEmpire						;; String ID &C6 STR_EMPIRE_BLURB
 	CALL 	Print_String
-	CALL 	Play_HoH_Tune								;; Play HoH Theme
+	CALL 	Play_HoH_Theme								;; Play HoH Theme
 	LD		HL,Planet_Sprites_list						;; pointer on Planet_Sprites_list
-	LD		DE,&05FF									;; 5 planets items to draw, FF = draw all
+	LD		DE,&05 * WORD_HIGH_BYTE + &FF				;; 5 planets items to draw, FF = draw all
 	CALL 	Draw_from_list								;; draw them (3x24)
 	LD		HL,Crown_sprites_list						;; pointer on Crown_sprites_list
 	LD		DE,(saved_World_Mask)						;; get saved_World_Mask in E as bitmask indicating it item correspongin to bit n will be draw or not
@@ -13034,11 +13058,13 @@ fcsc_skip:
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Wait a key press to leave the screen shown (crown/worlds screen)
 ;; but leave automatically after a while (about 18-20 sec)
+MAX_DELAY_IF_NO_KEY		EQU		&A800										;; Show the page for a max 18/20 seconds if no key is pressed
+
 .Wait_key_pressed:
-	LD		HL,&A800									;; delay value (show the screen (crown, ..) about 19sec if no key pressed)
+	LD		HL,MAX_DELAY_IF_NO_KEY						;; delay value (show the screen (crown, ..) about 19sec if no key pressed)
 waitkp_loop:
 	PUSH 	HL
-	CALL 	Play_HoH_Tune								;; Play Theme
+	CALL 	Play_HoH_Theme								;; Play Theme
 	CALL 	Test_Enter_Shift_keys						;; output : Carry=1 : no key pressed, else Carry=0 and C=0:Enter, C=1:Shift, C=2:other
 	POP		HL
 	RET 	NC											;; RET if a key was pressed
@@ -13052,17 +13078,17 @@ waitkp_loop:
 ;; Data for the "Crowns/Worlds" screen. Defines the Sprite id and position
 ;; the the planets and crowns sprites on that screen.
 .Planet_Sprites_list:
-	DEFB 	SPR_BALL, &54, &78							;; &4C, pix x,y coordinates : Egyptus
-	DEFB 	SPR_BALL, &A4, &78							;; &4C, pix x,y coordinates : Penitentiary
-	DEFB 	SPR_BALL, &54, &E8							;; &4C, pix x,y coordinates : Safari
-	DEFB 	SPR_BALL, &A4, &E8							;; &4C, pix x,y coordinates : Book World
-	DEFB 	SPR_BALL, &7C, &B0							;; &4C, pix x,y coordinates : Blacktooth
+	DEFB 	SPR_BALL, &54, &78							;; &4C, pix y,x coordinates : Egyptus Planet
+	DEFB 	SPR_BALL, &A4, &78							;; &4C, pix y,x coordinates : Penitentiary Planet
+	DEFB 	SPR_BALL, &54, &E8							;; &4C, pix y,x coordinates : Safari Planet
+	DEFB 	SPR_BALL, &A4, &E8							;; &4C, pix y,x coordinates : Book World Planet
+	DEFB 	SPR_BALL, &7C, &B0							;; &4C, pix y,x coordinates : Blacktooth Planet
 .Crown_sprites_list:
-	DEFB 	SPR_CROWN, &54, &60							;; &2F, pix x,y coordinates : Egyptus
-	DEFB 	SPR_CROWN, &A4, &60							;; &2F, pix x,y coordinates : Penitentiary
-	DEFB 	SPR_CROWN, &54, &D0							;; &2F, pix x,y coordinates : Safari
-	DEFB 	SPR_CROWN, &A4, &D0							;; &2F, pix x,y coordinates : Book World
-	DEFB 	SPR_CROWN, &7C, &98							;; &2F, pix x,y coordinates : Blacktooth
+	DEFB 	SPR_CROWN, &54, &60							;; &2F, pix y,x coordinates : Egyptus Crown
+	DEFB 	SPR_CROWN, &A4, &60							;; &2F, pix y,x coordinates : Penitentiary Crown
+	DEFB 	SPR_CROWN, &54, &D0							;; &2F, pix y,x coordinates : Safari Crown
+	DEFB 	SPR_CROWN, &A4, &D0							;; &2F, pix y,x coordinates : Book World Crown
+	DEFB 	SPR_CROWN, &7C, &98							;; &2F, pix y,x coordinates : Blacktooth Crown
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; This draws the game HUD, called the "Periphery".
@@ -13073,7 +13099,7 @@ waitkp_loop:
 	LD		DE,(Inventory)								;; E = bitmask based on Inventory (which are drawn or not)
 	LD		D,3											;; 3 sprites to draw (Purse, Hooter, Donuts)
 	CALL 	Draw_from_list								;; draw them (3x24)
-	LD		DE,(selected_characters)					;; DE = pointer on selected_characters
+	LD		DE,(selected_characters)					;; DE = pointer on selected_characters so E is the character bitmap
 Draw_sprites_from_list														;; E is the bitmask, HL points to Inventory_sprite_list + index3 * 3 (Heels sprite)
 	LD		D,2											;; nb of sprites to draw: 2 characters, Head and Heels!
 	;; here it does an implicit "JP Draw_from_list" (with the list
@@ -13117,11 +13143,11 @@ dfl_2:
 .Sprite_Flipped 		EQU  	&80
 
 .Inventory_sprite_list:
-	DEFB 	&27, &B0, &F0								;; Sprite_ID_Purse, pix x,y coordinates
-	DEFB 	&28, &44, &F0								;; Sprite_ID_Hooter, pix coordinates
-	DEFB 	&29, &44, &D8								;; Sprite_ID_Donuts, pix coordinates
-	DEFB 	&98, &94, &F0								;; Sprite_ID_Heels1 | Sprite_Flipped, pix coordinates
-	DEFB 	&1E, &60, &F0								;; Sprite_ID_Head1, pix coordinates
+	DEFB 	SPR_PURSE,				&B0, &F0			;; Sprite_ID_Purse, pix x,y coordinates
+	DEFB 	SPR_HOOTER,				&44, &F0			;; Sprite_ID_Hooter, pix x,y coordinates
+	DEFB 	SPR_DONUTS,				&44, &D8			;; Sprite_ID_Donuts, pix x,y coordinates
+	DEFB 	SPR_HEELS1 or SPR_FLIP, &94, &F0			;; Sprite_ID_Heels1 | Sprite_Flipped, pix x,y coordinates
+	DEFB 	SPR_HEAD1,				&60, &F0			;; Sprite_ID_Head1, pix x,y coordinates
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Draw a 3 byte x 24 row sprite on clear background, complete with
@@ -13138,12 +13164,12 @@ dfl_2:
 .Draw_sprite_3x24_and_attribute:
 	LD		(Sprite_Code),A								;; update current Sprite Code
 	LD		A,B											;; Y
-	SUB 	&48											;; minus 3*24 bytes to get the topleft corner
+	SUB 	3*24										;; minus 3*24 bytes to get the topleft corner
 	LD		B,A											;; now BC is the topleft-left point
 	PUSH 	DE
 	PUSH 	BC
 	CALL 	Load_sprite_image_address_into_DE			;; get sprite image pinter in DE, B=height, HL=mask data
-	LD		HL,&180C									;; Size = 24 rows (&18), 24 pix (&0C * 2)
+	LD		HL,&18 * WORD_HIGH_BYTE + &0C				;; Size = 24 rows (&18), 24 pix (&0C * 2)
 	POP 	BC
 	POP 	AF											;; get the attribute code in A
 	AND 	A											;; if 0 set Z
@@ -13152,18 +13178,20 @@ dfl_2:
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Draw a 3-byte * 24 rows sprite on clear background
 ;; BC=bottomleft origin (without attribute)
+;; A has the sprite code
 .Draw_sprite_3x24:
 	LD		L,&01										;; L is 1 on CPC, 0 on Spectrum
 	DEC 	L											;; This inc/dec is to ...
 	INC 	L											;; ... update the Z flag
-	JR		Z,Draw_sprite_3x24_attr3					;; If L = 0 then go to Draw_sprite_3x24_attr3 (it seems it is never on CPC, but always on Spectrum!)
+	JR		Z,Draw_sprite_3x24_attr3					;; If L = 0 then go to Draw_sprite_3x24_attr3 (it seems it is never the case on CPC (no jump), but always on Spectrum! (always jump))
+DS_3x24_CPC:
 	LD		(Sprite_Code),A								;; update Sprite Code
-	CALL 	Calculate_Extents_3x24						;; get min and max for x and y 3x24 sprite
-	CALL 	Clear_view_buffer							;; empty the buffer
+	CALL 	Calculate_Extents_3x24						;; get min and max for x and y 3x24 sprite in HL/ViewXExtent and BC/ViewYExtent
+	CALL 	Clear_Dest_buffer							;; empty the buffer
 	CALL 	Load_sprite_image_address_into_DE			;; DE = image data
 	LD		BC,ViewBuff									;; buffer 6700
 	EXX
-	LD		B,&18										;; height = 24=&18
+	LD		B,24										;; height = 24=&18
 	CALL 	BlitMask3of3								;; blit mask 3of3
 	JP		Blit_screen									;; blit to screen
 
@@ -13171,22 +13199,23 @@ dfl_2:
 ;; Clear a 3x24 area
 .Clear_3x24:
 	CALL 	Calculate_Extents_3x24						;; get min and max for x and y 3x24 sprite
-	CALL 	Clear_view_buffer							;; empty the buffer
+	CALL 	Clear_Dest_buffer							;; empty the buffer
 	JP		Blit_screen									;; blit to erase
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Calculate the X and Y Extent for a 3x24 sprite
 ;; Input: coordinate (bottom left) : y in B, x in C
+;; Output: HL = x, x+12, BC = y, y+24
 .Calculate_Extents_3x24:
 	LD		H,C
 	LD		A,H
-	ADD 	A,&0C										;; +12
-	LD		L,A
-	LD		(ViewXExtent),HL							;; update the ViewXExtent with X,X+&0C
+	ADD 	A,12										;; +12 (img+mask, thus 24 pix wide)
+	LD		L,A											;; H = x, L = x+12
+	LD		(ViewXExtent),HL							;; update the ViewXExtent with X,X+12
 	LD		A,B
-	ADD 	A,&18										;; +24
-	LD		C,A
-	LD		(ViewYExtent),BC							;; update the ViewYExtent with Y+&18,Y
+	ADD 	A,24										;; +24 (height)
+	LD		C,A											;; B = y, C = y+24
+	LD		(ViewYExtent),BC							;; update the ViewYExtent with Y,Y+24
 	RET
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -13197,21 +13226,21 @@ Draw_sprite_3x32:
 	LD		(Sprite_Code),A								;; update sprite code
 	CALL 	Calculate_Extents_3x24						;; update ViewYExtent min and ViewXExtent min and max
 	LD		A,B
-	ADD 	A,&20										;; +32
+	ADD 	A,32										;; +32
 	LD		(ViewYExtent),A								;; update ViewYExtent max with Y+32
-	CALL 	Clear_view_buffer							;; erase buffer
+	CALL 	Clear_Dest_buffer							;; erase buffer
 	LD		A,&02										;; set bit1, reset others in stored SPRFLAGS
 	LD		(SpriteFlags),A								;; sprite flag bit1 set
 	CALL 	Load_sprite_image_address_into_DE			;; DE = image data
 	LD		BC,ViewBuff									;; buffer 6700
 	EXX
-	LD		B,&20										;; Height = 32
+	LD		B,32										;; Height = 32
 	CALL 	BlitMask3of3								;; blit mask 3of3
 	JP		Blit_screen									;; blit screen
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Clear the 6800 buffer
-.Clear_view_buffer:
+.Clear_Dest_buffer:
 	LD		HL,DestBuff
 	LD		BC,&0100									;; erase 256 bytes (&0100) from &6800
 	JP		Erase_forward_Block_RAM						;; Continue on Erase_forward_Block_RAM (will have a RET)
@@ -13225,13 +13254,15 @@ Movement_Facing:
 ;; 0 = staying in the current room
 ;; 1 = Down, 2 = Right, 3 = Up, 4 = Left
 ;; 5 = Below, 6 = Above, 7 = Teleport
-;; 8 = ?? ; &80=??
+;; 8 = ?maybe from a save point? ; &80=??
 access_new_room_code:
 	DEFB 	&00          				;; access_new_room_code
+
 DyingAnimFrameIndex:
 	DEFB 	&00							;; When Dying will count down from &c to 0 while the vape anim is played
 .Dying:
 	DEFB 	&00       					;; Dying ; Mask of the characters who are dying
+
 NR_Direction:
 	DEFB 	&00
 
@@ -13241,7 +13272,7 @@ NR_Direction:
 ;; If collision: Carry set
 .Move:
 	PUSH 	AF
-	CALL 	GetUVZExtents_AdjustLowZ
+	CALL 	GetUVZExtents_AdjustLowZ					;; GetUVZExtents_Near2Far and Z adjust
 	EXX
 	POP 	AF
 	LD		(NR_Direction),A
@@ -13265,9 +13296,9 @@ NR_Direction:
 	ADD		A,A
 	ADD 	A,A
 	ADD 	A,C											;; A*5
-	ADD 	A,MoveTbl and &00FF							;; &B7 = MoveTbl & &FF
+	ADD 	A,MoveTbl and WORD_LOW_BYTE					;; &B7 = MoveTbl & &FF
 	LD		L,A
-	ADC 	A,MoveTbl / 256								;; &47 = MoveTbl >> 8 ; &47B7 + offset
+	ADC 	A,MoveTbl / WORD_HIGH_BYTE					;; &47 = MoveTbl >> 8 ; &47B7 + offset
 	SUB 	L
 	LD		H,A											;; HL = MoveTbl + A*5 (A the dir code 0 to 7)
 	LD		A,(HL)										;; facing LRDU value
@@ -13290,180 +13321,179 @@ NR_Direction:
 ;; The second movement function is in HL', the direction in C'.
 .PostMove:
 	EXX
-	;; Can't move in that direction? Return.
-	RET Z												;; Sets C (collision).
+	RET		Z											;; Can't move in that direction? Return.
 	;; Put the second movement function from MoveTbl into IX.
-	PUSH HL
-	POP IX
+	PUSH	HL
+	POP		IX
 	;; There are two similar loops, based on which direction we
     ;; want to traverse the object list:
-	BIT 2,C
-	JR NZ,PM_Alt
+	BIT		2,C
+	JR		NZ,PM_Alt
     ;; Down or right case. Traverse the object list.
-	LD HL,ObjectLists
+	LD		HL,ObjList_Regular_Far2Near
 .PM_ALoop:
-	LD A,(HL)
-	INC HL
-	LD H,(HL)
-	LD L,A												;; HL = (ObjectLists)
-	OR H												;; test if HL = 0
-	JR Z,PM_ABreak					 					;; if End of list - break.
-	PUSH HL												;; else save HL
-	CALL DoJumpIX				 						;; Call the function in IX ; from MoveTbl.
-	POP HL
-	JR c,PM_AFound										;; Found case
-	JR NZ,PM_ALoop					 					;; Loop case
-	JR PM_ABreak										;; Break case
+	LD		A,(HL)
+	INC		HL
+	LD		H,(HL)
+	LD		L,A											;; HL = (ObjectLists)
+	OR		H											;; test if HL = 0
+	JR		Z,PM_ABreak					 				;; if End of list - break.
+	PUSH	HL											;; else save HL
+	CALL	DoJumpIX				 					;; Call the function in IX ; from MoveTbl.
+	POP		HL
+	JR		c,PM_AFound									;; Found case
+	JR		NZ,PM_ALoop					 				;; Loop case
+	JR		PM_ABreak									;; Break case
 
 ;; Up or left case. Traverse the object list in opposite direction.
 .PM_Alt:
-	LD HL,ObjectLists + 2
+	LD		HL,ObjList_Regular_Near2Far
 .PM_BLoop:
-	LD A,(HL)
-	INC HL
-	LD H,(HL)
-	LD L,A
-	OR H
-	JR Z,PM_BBreak										;; End of list - break.
-	PUSH HL
-	CALL DoJumpIX				 						;; Call the function from MoveTbl.
-	POP HL
-	JR c,PM_BFound					 					;; Other found case
-	JR NZ,PM_BLoop										;; Loop case
+	LD		A,(HL)
+	INC		HL
+	LD		H,(HL)
+	LD		L,A
+	OR		H
+	JR		Z,PM_BBreak									;; End of list - break.
+	PUSH	HL
+	CALL	DoJumpIX				 					;; Call the function from MoveTbl.
+	POP		HL
+	JR		c,PM_BFound					 				;; Other found case
+	JR		NZ,PM_BLoop									;; Loop case
 .PM_BBreak:
-	CALL Get_curr_Char_variables						;; HL = pointer on current selected character's variables
-	LD E,L
-	JR PM_Break
+	CALL	Get_curr_Char_variables						;; HL = pointer on current selected character's variables
+	LD		E,L
+	JR		PM_Break
 
 .PM_ABreak:
-	CALL Get_curr_Char_variables						;; HL = pointer on current selected character's variables
-	LD E,L
-	INC HL
-	INC HL
+	CALL	Get_curr_Char_variables						;; HL = pointer on current selected character's variables
+	LD		E,L
+	INC		HL
+	INC		HL
 ;; Both "Break" cases end up here.
 ;; HL points 2 into object
 ;; TODO: ??? I think it may be checking if the other character
 ;; is relevant? Or the main character???
 .PM_Break:
-	BIT 0,(IY+O_SPRFLAGS)								;; playable char or obj/enemy?
-	JR Z,PM_Break2
-	LD A,IYl											;; IY low byte
-	CP E
-	RET Z
+	BIT		0,(IY+O_SPRFLAGS)							;; playable char or obj/enemy?
+	JR		Z,PM_Break2
+	LD		A,IYl										;; IY low byte
+	CP		E
+	RET		Z
 .PM_Break2:
-	LD A,(Saved_Objects_List_index)						;; get Saved_Objects_List_index
-	AND A
-	RET Z												;; Sets NC (no collision).
-	CALL DoJumpIX
-	RET NC												;; Sets NC (no collision).
+	LD		A,(Saved_Objects_List_index)				;; get Saved_Objects_List_index
+	AND		A
+	RET		Z											;; Sets NC (no collision).
+	CALL	DoJumpIX
+	RET		NC											;; Sets NC (no collision).
 	;; Adjust pointer and fall through...
-	CALL Get_curr_Char_variables						;; HL = pointer on current selected character's variables
-	INC HL
-	INC HL
+	CALL	Get_curr_Char_variables						;; HL = pointer on current selected character's variables
+	INC		HL
+	INC		HL
 .PM_AFound:
-	DEC HL
-	DEC HL
+	DEC		HL
+	DEC		HL
 .PM_BFound:
-	PUSH HL
-	POP IX
-	LD A,(Movement_Facing)								;; (read the saved facing LRDU value)
-	BIT 1,(IX+O_SPRFLAGS)								;; Second part of double-height is character or object?
-	JR Z,PM_Found2
+	PUSH	HL
+	POP		IX
+	LD		A,(Movement_Facing)							;; (read the saved facing LRDU value)
+	BIT		1,(IX+O_SPRFLAGS)							;; Second part of double-height is character or object?
+	JR		Z,PM_Found2
     ;; Adjust first, then.
-	AND (IX-OBJECT_LENGTH+&0C)							;; (IX-&12+&0C) ; -6
-	LD (IX-OBJECT_LENGTH+&0C),A							;; (IX-&12+&0C) ; -6
-	JR PM_Found3
+	AND		(IX-OBJECT_LENGTH+&0C)						;; (IX-&12+&0C) ; -6
+	LD		(IX-OBJECT_LENGTH+&0C),A					;; (IX-&12+&0C) ; -6
+	JR		PM_Found3
 
 ;; Otherwise, adjust it.
 .PM_Found2:
-	AND (IX+&0C)
-	LD (IX+&0C),A
+	AND		(IX+&0C)
+	LD		(IX+&0C),A
 ;; Call "ProcContact" with &FF in A.
 .PM_Found3:
-	XOR A
-	SUB 1												;; A=FF and sets Carry (collided).
+	XOR		A
+	SUB		1											;; A=FF and sets Carry (collided).
 ;; Handle contact between a pair of objects in IX and IY
 .ProcContact:
-	PUSH AF
-	PUSH IX
-	PUSH IY
-	CALL ContactAux
-	POP IY
-	POP IX
-	POP AF
+	PUSH	AF
+	PUSH	IX
+	PUSH	IY
+	CALL	ContactAux
+	POP		IY
+	POP		IX
+	POP		AF
 	RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; IX and IY are both objects, may be characters.
 ;; Something is in A.
 .ContactAux:
-	BIT 0,(IY+O_SPRFLAGS)								;; 1st object: test if playable char or not
-	JR NZ,Contact_Player_Obj							;; yes, jump Contact_Player_Obj, else:
-	BIT 0,(IX+O_SPRFLAGS)								;; 2nd object: test if playable char or not
-	JR Z,Contact_Obj_vs_Obj								;; no? then 2 object collides ; goto Contact_Obj_vs_Obj, else:
-	PUSH IY
-	EX (SP),IX											;; these 3 lines swap IY and IX so we have the player in IY and the obj in IX
-	POP IY
+	BIT		0,(IY+O_SPRFLAGS)							;; 1st object: test if playable char or not
+	JR		NZ,Contact_Player_Obj						;; yes, jump Contact_Player_Obj, else:
+	BIT		0,(IX+O_SPRFLAGS)							;; 2nd object: test if playable char or not
+	JR		Z,Contact_Obj_vs_Obj						;; no? then 2 object collides ; goto Contact_Obj_vs_Obj, else:
+	PUSH	IY
+	EX		(SP),IX										;; these 3 lines swap IY and IX so we have the player in IY and the obj in IX
+	POP		IY
 Contact_Player_Obj:
-	LD C,(IY+O_SPRFLAGS)								;; player sprite flags in C.
-	LD B,(IY+O_FLAGS)									;; player flags in B.
-	BIT 5,(IX+O_FLAGS)									;; test bit5 in obj flags
-	RET Z												;; if bit5=0 then leave, else:
-	BIT 6,(IX+O_FLAGS)									;; if bit6 of obj flags
-	JR NZ,CollectSpecial								;; is set then go CollectSpecial, else:
-	AND A												;; test value in A????
-	JR Z,DeadlyContact									;; if 0 then DeadlyContact (deadly floor or object), else:
-	BIT 4,(IX+O_SPRFLAGS)								;; test bit4 of O_SPRFLAGS = 0:object is deadly, 1:object harmless
-	RET NZ												;; leave if set, else:
+	LD		C,(IY+O_SPRFLAGS)							;; player sprite flags in C.
+	LD		B,(IY+O_FLAGS)								;; player flags in B.
+	BIT		5,(IX+O_FLAGS)								;; test bit5 in obj flags
+	RET		Z											;; if bit5=0 then leave, else:
+	BIT		6,(IX+O_FLAGS)								;; if bit6 of obj flags
+	JR		NZ,CollectSpecial							;; is set then go CollectSpecial, else:
+	AND		A											;; test value in A????
+	JR		Z,DeadlyContact								;; if 0 then DeadlyContact (deadly floor or object), else:
+	BIT		4,(IX+O_SPRFLAGS)							;; test bit4 of O_SPRFLAGS = 0:object is deadly, 1:object harmless
+	RET		NZ											;; leave if set, else:
 ;; IY holds character sprite. We've hit a deadly floor or object.
 ;; C is character's sprite flags (IY offset 9)
 ;; B is character's other flags (IY offset 4)
 .DeadlyContact:
-	BIT 3,B												;; test char flag if bit3=00 : joined Heels+Head
-	LD B,&03											;; B[1:0] = 2b11
-	JR NZ,dco_1											;; not joined, jump over this, else do:
-	DEC B												;; B[1:0] = 2b10
-	BIT 2,C												;; test sprite flag bit 2
-	JR NZ,dco_1											;; if bit2=1, then only Head
-	DEC B												;; else we are Heels, so B[1:0]=2b01
+	BIT		3,B											;; test char flag if bit3=00 : joined Heels+Head
+	LD		B,&03										;; B[1:0] = 2b11
+	JR		NZ,dco_1									;; not joined, jump over this, else do:
+	DEC		B											;; B[1:0] = 2b10
+	BIT		2,C											;; test sprite flag bit 2
+	JR		NZ,dco_1									;; if bit2=1, then only Head
+	DEC		B											;; else we are Heels, so B[1:0]=2b01
 dco_1:																		;; updating flag bits based on invulnerability...
-	XOR A												;; A=0
-	LD HL,Heels_invulnerability							;; a &C9 (RET) here make invulnerable!
-	CP (HL)												;; compare Heels' invul with 0 (active low)
-	JR Z,dco_2											;; if it is 0 (Heels is invuln), don't do the RES below, else do
-	RES 0,B												;; char flag bit 0=Heels invul (0=invul)
+	XOR		A											;; A=0
+	LD		HL,Heels_invulnerability					;; a &C9 (RET) here make invulnerable!
+	CP		(HL)										;; compare Heels' invul with 0 (active low)
+	JR		Z,dco_2										;; if it is 0 (Heels is invuln), don't do the RES below, else do
+	RES		0,B											;; char flag bit 0=Heels invul (0=invul)
 dco_2:
-	INC HL												;; Head_s_invulnerability
-	CP (HL)												;; compare Head's invul with 0 (active low)
-	JR Z,dco_3											;; if it is 0 (Head is invuln), don't do the RES below, else do
-	RES 1,B												;; char flag bit 1=Head invul (0=invul)
+	INC		HL											;; Head_s_invulnerability
+	CP		(HL)										;; compare Head's invul with 0 (active low)
+	JR		Z,dco_3										;; if it is 0 (Head is invuln), don't do the RES below, else do
+	RES		1,B											;; char flag bit 1=Head invul (0=invul)
 dco_3:
-	LD A,B												;; final invul setting in A
-	AND A												;; test it
-	RET Z												;; if 0, then invulnerability is active, so leave. Else, death!
-	LD HL,Dying											;; point on Dying mask (which char is dying)
-	OR (HL)												;; based on the value of B (invulnerabilities)...
-	LD (HL),A											;; ...refresh mask value at 'Dying'
-	DEC HL												;; points on DyingAnimFrameIndex (frame of Vape animation effect when dying)
-	LD A,(HL)											;; get value
-	AND A												;; test if 0
-	RET NZ												;; if not 0 (dying anim) return, else:
-	LD A,(saved_World_Mask)								;; get saved_World_Mask
-	CP &1F												;; if all worlds saved (then we are Emperor)
-	RET Z												;; then Return (invulnerable as Emperor), else
-	LD (HL),&0C											;; Set value of DyingAnimFrameIndex to &0C (dying, will count down to 0 while the vape/dying anim is played)
-	LD A,(access_new_room_code)							;; get access_new_room_code
-	AND A												;; test if 0 (stay same room)
-	CALL NZ,BoostInvuln2								;; ??? if merged HnH, then heels boost invuln ??? ; call BoostInvuln2 if access_new_room_code not 0 (changing room)
-	LD B,Sound_ID_Death									;; Sound_ID &C6 ; Death noise
-	JP Play_Sound										;; will RET
+	LD		A,B											;; final invul setting in A
+	AND		A											;; test it
+	RET		Z											;; if 0, then invulnerability is active, so leave. Else, death!
+	LD		HL,Dying									;; point on Dying mask (which char is dying)
+	OR		(HL)										;; based on the value of B (invulnerabilities)...
+	LD		(HL),A										;; ...refresh mask value at 'Dying'
+	DEC		HL											;; points on DyingAnimFrameIndex (frame of Vape animation effect when dying)
+	LD		A,(HL)										;; get value
+	AND		A											;; test if 0
+	RET		NZ											;; if not 0 (dying anim) return, else:
+	LD		A,(saved_World_Mask)						;; get saved_World_Mask
+	CP		&1F											;; if all worlds saved (then we are Emperor!)
+	RET		Z											;; then Return (indeed, we are invulnerable as Emperor), else
+	LD		(HL),&0C									;; Set value of DyingAnimFrameIndex to &0C (dying, will count down to 0 while the vape/dying anim is played)
+	LD		A,(access_new_room_code)					;; get access_new_room_code
+	AND		A											;; test if 0 (stay same room)
+	CALL	NZ,BoostInvuln2								;; ??? if merged HnH, then heels boost invuln ??? ; call BoostInvuln2 if access_new_room_code not 0 (changing room)
+	LD		B,Sound_ID_Death							;; Sound_ID &C6 ; Death noise
+	JP		Play_Sound									;; will RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Make the special object disappear when picking it up
 ;; and call the associated function.
 .CollectSpecial:
     ;; Set flags etc. for fading
-	LD		(IX+O_ANIM),&08								;; anim code [7:3] = 1 (index0 in AnimTable = ANIM_VAPE1), frame = 0 ([2:0])
+	LD		(IX+O_ANIM),ANIM_VAPE1_code					;; anim code [7:3] = 1 (index0 in AnimTable = ANIM_VAPE1), frame = 0 ([2:0])
 	LD		(IX+O_FLAGS),&80
 	LD		A,(IX+O_FUNC)								;; get func code
 	AND 	&80											;; keep phase bit
@@ -13489,7 +13519,7 @@ dco_3:
 cnc_1:																		;; get the first (or only) part of the object:
 	BIT 	1,(IX+O_SPRFLAGS)							;; IX obj bit1 : if 0:1st part of a double sprite object; if 1:2nd part of a double sprite object
 	JR		Z,cnc_2										;; if 1st part then skip to cnc_2, else get 1st part
-	LD		DE,-18										;; adding &FFEE is substracting 18 (the length of an object variables array)
+	LD		DE,-OBJECT_LENGTH							;; adding &FFEE is substracting 18 (the length of an object variables array)
 	ADD 	IX,DE										;; Take the object before in the list (1st part of a double height sprite)
 cnc_2:
 	BIT 	7,(IX+O_SPRFLAGS)							;; test HUNGRY flag : if set, turn off the object function (movement) and impact.
@@ -13505,24 +13535,37 @@ cnc_2:
 ;; First element is LRDU bit mask for directions.
 ;; Second is the function to move in that direction.
 ;; Third element is the function to check collisions.
+FACING_DOWN				EQU		&FD				;; bit1 = 0 (active low) in LRDU
+FACING_NEAR				EQU		&F9				;; bits 1&2 = 0 (active low) in LRDU
+FACING_RIGHT			EQU		&FB				;; bit2 = 0 (active low) in LRDU
+FACING_EAST				EQU		&FA				;; bits 0&2 = 0 (active low) in LRDU
+FACING_UP				EQU		&FE				;; bit0 = 0 (active low) in LRDU
+FACING_FAR				EQU		&F6				;; bits 0&3 = 0 (active low) in LRDU
+FACING_LEFT				EQU		&F7				;; bit3 = 0 (active low) in LRDU
+FACING_WEST				EQU		&F5				;; bits 1&3 = 0 (active low) in LRDU
+
 .MoveTbl:
-	DEFB	&FD          					;; dir code 0 : Moving Down (south west)
+	DEFB	FACING_DOWN    					;; dir code 0 : Moving Down (south west)
 	DEFW	MoveT_Down, CollideT_Down  		;; 				MoveT_Down 48FE, CollideT_Down 48C4
 	DEFB	&FF     						;; dir code 1 (diag) : Stop (South = Down/Right)
 	DEFW	MoveT_DownRight, &0000			;; 				MoveT_DownRight 47DF, 0
-	DEFB	&FB           					;; dir code 2 : Moving Right (south east)
+	DEFB	FACING_RIGHT   					;; dir code 2 : Moving Right (south east)
 	DEFW	MoveT_Right, CollideT_Right		;; 				MoveT_Right 4955, CollideT_Right 48E2
 	DEFB	&FF     						;; dir code 3 (diag) : Stop (East = Up/Right)
 	DEFW	MoveT_UpRight, &0000         	;; 				MoveT_UpRight 4800, 0
-	DEFB	&FE        						;; dir code 4 : Moving Up (north east)
+	DEFB	FACING_UP						;; dir code 4 : Moving Up (north east)
 	DEFW	MoveT_Up, CollideT_Up      		;; 				MoveT_Up 49A5, CollideT_Up 4868
 	DEFB	&FF           					;; dir code 5 (diag) : Stop (North = Up/Left)
 	DEFW 	MoveT_UpLeft, &0000        		;; 				MoveT_UpLeft 4824, 0
-	DEFB	&F7           					;; dir code 6 : Moving Left (north west)
+	DEFB	FACING_LEFT    					;; dir code 6 : Moving Left (north west)
 	DEFW	MoveT_Left, CollideT_Left		;; 				MoveT_Left 49ED, CollideT_Left 48A9
 	DEFB	&FF           					;; dir code 7 (diag) : Stop (West = Down/Left)
 	DEFW	MoveT_DownLeft, &0000           ;; 				MoveT_DownLeft 4847, 0
 
+DOOR_LOW				EQU		&24
+DOOR_HIGH				EQU		&2C
+
+;; -----------------------------------------------------------------------------------------------------------
 ;; The diagonal movement functions rearrange things:
 ;; * They remove two elements of the stack, removing the call to
 ;;   PostMove and the return into DoMove (which puts (Direction) into A).
@@ -13536,132 +13579,132 @@ cnc_2:
 MoveT_DownRight:
 	EXX
 	;; Remove original return path, hit DoMove again.
-	POP HL
-	POP DE
-	XOR A
+	POP		HL
+	POP		DE
+	XOR		A
 	;; Call Down
-	CALL DoMove
-	JR c,drght_1
+	CALL	DoMove
+	JR		c,drght_1
 	;; Update extents in DE
 	EXX
-	DEC D
-	DEC E
+	DEC		D
+	DEC		E
 	EXX
 	;; Call Right
-	LD A,&02
-	CALL DoMove
-	LD A,&01
-	RET NC
-	XOR A
+	LD		A,&02
+	CALL	DoMove
+	LD		A,&01
+	RET		NC
+	XOR		A
 	RET
 
 ;; Call Right
 drght_1:
-	LD A,&02
-	CALL DoMove
-	RET c
-	AND A
-	LD A,&02
+	LD		A,&02
+	CALL	DoMove
+	RET		c
+	AND		A
+	LD		A,&02
 	RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 .MoveT_UpRight:
 	EXX
 	;; Remove original return path, hit DoMove again.
-	POP HL
-	POP DE
+	POP		HL
+	POP		DE
 	;; Call Up
-	LD A,&04
-	CALL DoMove
-	JR c,urght_1
+	LD		A,&04
+	CALL	DoMove
+	JR		c,urght_1
 	;; Update extents in DE
 	EXX
-	INC D
-	INC E
+	INC		D
+	INC		E
 	EXX
 	;; Call Right
-	LD A,&02
-	CALL DoMove
-	LD A,&03
-	RET NC
-	LD A,&04
-	AND A
+	LD		A,&02
+	CALL	DoMove
+	LD		A,&03
+	RET		NC
+	LD		A,&04
+	AND		A
 	RET
 
 ;; Call Right
 urght_1:
-	LD A,&02
-	CALL DoMove
-	RET c
-	AND A
-	LD A,&02
+	LD		A,&02
+	CALL	DoMove
+	RET		c
+	AND		A
+	LD		A,&02
 	RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 .MoveT_UpLeft:
 	EXX
 	;; Remove original return path, hit DoMove again.
-	POP HL
-	POP DE
-	LD A,&04
-	CALL DoMove
-	JR c,ulft_1
+	POP		HL
+	POP		DE
+	LD		A,&04
+	CALL	DoMove
+	JR		c,ulft_1
 	;; Update extents in DE
 	EXX
-	INC D
-	INC E
+	INC		D
+	INC		E
 	EXX
 	;; Call Left
-	LD A,&06
-	CALL DoMove
-	LD A,&05
-	RET NC
-	LD A,&04
-	AND A
+	LD		A,&06
+	CALL	DoMove
+	LD		A,&05
+	RET		NC
+	LD		A,&04
+	AND		A
 	RET
 
 ;; Call Left
 ulft_1:
-	LD A,&06
-	CALL DoMove
-	RET c
-	LD A,&06
+	LD		A,&06
+	CALL	DoMove
+	RET		c
+	LD		A,&06
 	RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 .MoveT_DownLeft:
 	EXX
 	;; Remove original return path, hit DoMove again.
-	POP HL
-	POP DE
+	POP		HL
+	POP		DE
 	;; Call Down
-	XOR A
-	CALL DoMove
-	JR c,dlft_1
+	XOR		A
+	CALL	DoMove
+	JR		c,dlft_1
 	;; Update extents in DE
 	EXX
-	DEC D
-	DEC E
+	DEC		D
+	DEC		E
 	EXX
 	;; Call Left
-	LD A,&06
-	CALL DoMove
-	LD A,&07
-	RET NC
-	XOR A
+	LD		A,&06
+	CALL	DoMove
+	LD		A,&07
+	RET		NC
+	XOR		A
 	RET
 
 ;; Call Left
 dlft_1:
-	LD A,&06
-	CALL DoMove
-	RET c
-	AND A
-	LD A,&06
+	LD		A,&06
+	CALL	DoMove
+	RET		c
+	AND		A
+	LD		A,&06
 	RET
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; *Collide functions take an object in HL, and check it against the
+;; Collide functions. Object in HL, check it against the
 ;; character whose extents are in DE' and HL'
 ;;
 ;; Returned flags are:
@@ -13669,45 +13712,45 @@ dlft_1:
 ;;  NZ = No collision, but further collisions are possible.
 ;;  Z = Stop now, no further collisions possible.
 .CollideT_Up:
-	INC HL
-	INC HL
-	CALL GetSimpleSize
+	INC		HL
+	INC		HL
+	CALL	GetSimpleSize
 	;; Check U coordinate
-	LD A,(HL)
-	SUB C
+	LD		A,(HL)
+	SUB		C
 	EXX
-	CP D
+	CP		D
 	EXX
-	JR c,CollideContinue 								;; Too far? Skip.
-	JR NZ,ChkBack										;; Are we done yet?
+	JR		c,CollideContinue 							;; Too far? Skip.
+	JR		NZ,ChkBack									;; Are we done yet?
 	;; U coordinate matches.
-	INC HL
+	INC		HL
 ;; U coordinate matches. Check V overlaps.
 .ChkVCollide:
-	LD A,(HL)
-	SUB B
+	LD		A,(HL)
+	SUB		B
 	EXX
-	CP H
-	LD A,L
+	CP		H
+	LD		A,L
 	EXX
-	JR NC,CollideContinue
-	SUB B
-	CP (HL)
-	JR NC,CollideContinue
+	JR		NC,CollideContinue
+	SUB		B
+	CP		(HL)
+	JR		NC,CollideContinue
 	;; If we reached here, there's a V overlap.
 .ChkZCollide:
-	INC HL
+	INC		HL
 	EXX
-	LD A,C
+	LD		A,C
 	EXX
-	CP (HL)
-	JR NC,CollideContinue
-	LD A,(HL)
-	SUB E
+	CP		(HL)
+	JR		NC,CollideContinue
+	LD		A,(HL)
+	SUB		E
 	EXX
-	CP B
+	CP		B
 	EXX
-	JR NC,CollideContinue
+	JR		NC,CollideContinue
 	;; If we reached here, there's a Z overlap.
 	SCF
 	RET
@@ -13715,172 +13758,170 @@ dlft_1:
 ;; -----------------------------------------------------------------------------------------------------------
 .ChkBack:
     ;; Check V coordinate
-	INC HL
-	LD A,(HL)
-	SUB B
+	INC		HL
+	LD		A,(HL)
+	SUB		B
 	EXX
-	CP H
+	CP		H
 	EXX
-	JR c,CollideContinue
+	JR		c,CollideContinue
 	;; Check Z coordinate
-	INC HL
-	LD A,(HL)
-	SUB E
+	INC		HL
+	LD		A,(HL)
+	SUB		E
 	EXX
-	CP B
+	CP		B
 	EXX
-	JR c,CollideContinue
+	JR		c,CollideContinue
 	;; Passed our object, can stop now.
-	XOR A
+	XOR		A
 	RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; No carry = no collision, non-zero = keep searching.
 ;; return -1, no Z and no Carry
 .CollideContinue:
-	LD A,&FF
-	AND A
+	LD		A,&FF
+	AND		A
 	RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 .CollideT_Left:
-	INC HL
-	INC HL
-	CALL GetSimpleSize
+	INC		HL
+	INC		HL
+	CALL	GetSimpleSize
 	;; Check U coordinates overlap...
-	LD A,(HL)
-	SUB C
+	LD		A,(HL)
+	SUB		C
 	EXX
-	CP D
-	LD A,E
+	CP		D
+	LD		A,E
 	EXX
-	JR NC,ChkBack
-	SUB C
-	CP (HL)
-	JR NC,CollideContinue
+	JR		NC,ChkBack
+	SUB		C
+	CP		(HL)
+	JR		NC,CollideContinue
 	;; U overlaps, check V for contact.
-	INC HL
-	LD A,(HL)
-	SUB B
+	INC		HL
+	LD		A,(HL)
+	SUB		B
 	EXX
-	CP H
+	CP		H
 	EXX
-	JR Z,ChkZCollide   									;; U and V match.
-	JR CollideContinue 									;; Not a collision.
+	JR		Z,ChkZCollide   							;; U and V match.
+	JR		CollideContinue 							;; Not a collision.
 
 ;; -----------------------------------------------------------------------------------------------------------
 .CollideT_Down:
-	CALL GetSimpleSize
+	CALL	GetSimpleSize
 	;; Check U coordinate.
 	EXX
-	LD A,E
+	LD		A,E
 	EXX
-	SUB C
-	CP (HL)
-	JR c,CollideContinue 								;; Past it? Skip
-	INC HL
-	JR Z,ChkVCollide    								;; Are we done yet?
+	SUB		C
+	CP		(HL)
+	JR		c,CollideContinue 							;; Past it? Skip
+	INC		HL
+	JR		Z,ChkVCollide    							;; Are we done yet?
 	;; U coordinate matches.
 .ChkFront:
     ;; Check U coordinate.
 	EXX
-	LD A,L
+	LD		A,L
 	EXX
-	SUB B
-	CP (HL)
-	JR c,CollideContinue
+	SUB		B
+	CP		(HL)
+	JR		c,CollideContinue
 	;; Check Z coordinate.
-	INC HL
-	LD A,(HL)
-	ADD A,E
+	INC		HL
+	LD		A,(HL)
+	ADD		A,E
 	EXX
-	CP B
+	CP		B
 	EXX
-	JR NC,CollideContinue
+	JR		NC,CollideContinue
 	;; Passed our object, can stop now.
-	XOR A
+	XOR		A
 	RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 .CollideT_Right:
-	CALL GetSimpleSize
+	CALL	GetSimpleSize
 	;; Check U coordinate overlap...
 	EXX
-	LD A,E
+	LD		A,E
 	EXX
-	SUB C
-	CP (HL)
-	INC HL
-	JR NC,ChkFront
-	DEC HL
-	LD A,(HL)
-	SUB C
+	SUB		C
+	CP		(HL)
+	INC		HL
+	JR		NC,ChkFront
+	DEC		HL
+	LD		A,(HL)
+	SUB		C
 	EXX
-	CP D
-	LD A,L
+	CP		D
+	LD		A,L
 	EXX
-	JR NC,CollideContinue
+	JR		NC,CollideContinue
 	;; U overlaps, checks V for contact.
-	INC HL
-	SUB B
-	CP (HL)
-	JP Z,ChkZCollide						   			;; U and V match.
-	JR CollideContinue
+	INC		HL
+	SUB		B
+	CP		(HL)
+	JP		Z,ChkZCollide						   		;; U and V match.
+	JR		CollideContinue
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Up, Down, Left and Right
 ;;
 ;; Takes U extent in DE, V extent in HL.
 ;; U/D work in U direction, L/R work in V direction. ???????Check if this is right?????????TODO
-;;
-;; Sets NZ and C if you can move in a direction.
-;; Sets Z and C if you cannot.
-;; Leaving room sets direction in NextRoom, sets C and Z.
+;; IX points on the Max_min_UV_Table. IX-1 is the Has_Door variable, IX-2 is the Has_no_wall variable.
+;; Sets NZ and Carry if you can move in a direction.
+;; Sets Zero and Carry if you cannot.
+;; Leaving room sets direction in NextRoom, sets Carry and Zero.
 .MoveT_Down:
-	CALL ChkCantLeave
-	JR Z,D_NoExit
+	CALL	ChkCantLeave
+	JR		Z,D_NoExit
 	;; Inside the door frame to the side? Check a limited extent, then.
-	CALL UD_InOtherDoor
-	LD A,&24											;; DOOR_LOW
-	JR c,D_NoExit2
-	;; If the wall has a door, and
-    ;; we're the right height to fit through, and
-    ;; we're lined up to go through the frame,
-    ;; set 'A' to be the far side of the door.
-	BIT 0,(IX-1)										;; Has_Door?
-	JR Z,D_NoDoor
-	LD A,(DoorHeights+3)								;; sw door
-	CALL DoorHeightCheck
-	JR c,D_NoExit
-	CALL UD_InFrame
-	JR c,D_NearDoor
-	LD A,(Max_min_UV_Table)								;; MinU
-	SUB 4
-	JR D_Exit
+	CALL	UD_InOtherDoor
+	LD		A,DOOR_LOW
+	JR		c,D_NoExit2
+	;; If the wall has a door, and we're the right height
+    ;; to fit through, and we're lined up to go through
+    ;; the door frame, set 'A' to be the far side of the door.
+	BIT		0,(IX-1)									;; Has_Door? (Max_min_UV_Table-1)
+	JR		Z,D_NoDoor
+	LD		A,(DoorHeights+3)							;; sw door
+	CALL	DoorHeightCheck
+	JR		c,D_NoExit
+	CALL	UD_InFrame
+	JR		c,D_NearDoor
+	LD		A,(MinU)
+	SUB		4
+	JR		D_Exit
 
 ;; If there's no wall, put the room end coordinate into 'A'...
 .D_NoDoor
-	BIT 0,(IX-2)										;; Has_no_vall
-	JR Z,D_NoExit
-	LD A,(Max_min_UV_Table)								;; MinU
+	BIT		0,(IX-2)									;; Has_no_vall (Max_min_UV_Table-2)
+	JR		Z,D_NoExit
+	LD		A,(MinU)
 ;; Case where we can exit the room.
 .D_Exit:
-	CP E
-	RET NZ
-	LD A,&01
+	CP		E
+	RET		NZ
+	LD		A,&01
 .LeaveRoom:
-	LD (access_new_room_code),A							;; update access_new_room_code
+	LD		(access_new_room_code),A					;; update access_new_room_code
 	SCF													;; set Carry
 	RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; The case where we can't exit the room, but may hit the wall.
 .D_NoExit:
-	LD A,(Max_min_UV_Table)								;; MinU
-;; (or some other value given in A).
-.D_NoExit2:
-	CP E
-	RET NZ
+	LD		A,(MinU)
+.D_NoExit2:		;; Need to provide A if branching here directly
+	CP		E
+	RET		NZ
 	SCF
 	RET
 
@@ -13889,127 +13930,128 @@ dlft_1:
 ;; we do the normal "not door" case. Otherwise, we do that and
 ;; then nudge into the door.
 .D_NearDoor:
-	CALL UD_InFrameW
-	JR c,D_NoExit
-	CALL D_NoExit
+	CALL	UD_InFrameW
+	JR		c,D_NoExit
+	CALL	D_NoExit
 	;; Choose a direction to move based on which side of the door
     ;; we're trying to get through.
 .UD_Nudge:
-	RET NZ
-	LD A,L
-	CP &25												;; DOOR_LOW + 1
-	LD A,&F7											;; ~&08
-	JR c,Nudge
-	LD A,&FB											;; ~&04
+	RET		NZ
+	LD		A,L
+	CP		DOOR_LOW + 1
+	LD		A,FACING_LEFT
+	JR		c,Nudge
+	LD		A,FACING_RIGHT
 ;; Update the direction with they way to go to get through the door.
 .Nudge:
-	LD (Movement),A
-	XOR A
+	LD		(Movement),A
+	XOR		A
 	SCF
 	RET
 
 ;; -----------------------------------------------------------------------------------------------------------
+;; IX points on the Max_min_UV_Table. IX-1 is the Has_Door variable, IX-2 is the Has_no_wall variable.
 .MoveT_Right:
-	CALL ChkCantLeave
-	JR Z,R_NoExit
+	CALL	ChkCantLeave
+	JR		Z,R_NoExit
 	;; Inside the door frame to the side? Check a limited extent, then.
-	CALL LR_InOtherDoor
-	LD A,&24											;; DOOR_LOW
-	JR c,R_NoExit2
-	;; If the wall has a door, and
-    ;; we're the right height to fit through, and
-    ;; we're lined up to go through the frame,
-    ;; set 'A' to be the far side of the door.
-	BIT 1,(IX-1)										;; Has_Door
-	JR Z,R_NoDoor
-	LD A,(DoorHeights+2)								;; se door
-	CALL DoorHeightCheck
-	JR c,R_NoExit
-	CALL LR_InFrame
-	JR c,R_NearDoor
-	LD A,(Max_min_UV_Table+1)							;; MinV
-	SUB 4
-	JR R_Exit
+	CALL	LR_InOtherDoor
+	LD		A,DOOR_LOW
+	JR		c,R_NoExit2
+	;; If the wall has a door, and we're the right height to fit through,
+    ;; and we're lined up to go through the frame, set 'A' to be the far
+	;; side of the door.
+	BIT		1,(IX-1)									;; Has_Door (Max_min_UV_Table-1)
+	JR		Z,R_NoDoor
+	LD		A,(DoorHeights+2)							;; se door
+	CALL	DoorHeightCheck
+	JR		c,R_NoExit
+	CALL	LR_InFrame
+	JR		c,R_NearDoor
+	LD		A,(MinV)
+	SUB		4
+	JR		R_Exit
 
 ;; If there's no wall, put the room end coordinate into 'A'...
 .R_NoDoor:
-	BIT 1,(IX-2)										;; (IX-&02) ; Has_no_vall
-	JR Z,R_NoExit
-	LD A,(Max_min_UV_Table+1)							;; MinV
+	BIT		1,(IX-2)									;; Has_no_vall (Max_min_UV_Table-2)
+	JR		Z,R_NoExit
+	LD		A,(MinV)
 ;; Case where we can exit the room.
 .R_Exit:
-	CP L
-	RET NZ
-	LD A,&02
-	JR LeaveRoom
+	CP		L
+	RET		NZ
+	LD		A,&02
+	JR		LeaveRoom
 
 .R_NoExit:
-	LD A,(Max_min_UV_Table+1)							;; MinV
+	LD		A,(MinV)
 ;; (or some other value given in A).
 .R_NoExit2:
-	CP L
-	RET NZ
+	CP		L
+	RET		NZ
 	SCF
 	RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; The case where we can't exit the room, but may hit the wall.
 .R_NearDoor:
-	CALL LR_InFrameW
-	JR c,R_NoExit
-	CALL R_NoExit
+	CALL	LR_InFrameW
+	JR		c,R_NoExit
+	CALL	R_NoExit
 ;; Choose a direction to move based on which side of the door
 ;; we're trying to get through.
 .LR_Nudge:
-	RET NZ
-	LD A,E
-	CP &25
-	LD A,&FE
-	JR c,Nudge
-	LD A,&FD
-	JR Nudge
+	RET		NZ
+	LD		A,E
+	CP		DOOR_LOW + 1
+	LD		A,FACING_UP
+	JR		c,Nudge
+	LD		A,FACING_DOWN
+	JR		Nudge
 
 ;; -----------------------------------------------------------------------------------------------------------
+;; IX points on the Max_min_UV_Table. IX-1 is the Has_Door variable, IX-2 is the Has_no_wall variable.
 .MoveT_Up:
-	CALL ChkCantLeave
-	JR Z,U_NoExit
+	CALL	ChkCantLeave
+	JR		Z,U_NoExit
 	;; Inside the door frame to the side? Check a limited extent, then.
-	CALL UD_InOtherDoor
-	LD A,&2C											;; DOOR_HIGH
-	JR c,U_NoExit2
+	CALL	UD_InOtherDoor
+	LD		A,DOOR_HIGH
+	JR		c,U_NoExit2
 	;; If the wall has a door, and
     ;; we're the right height to fit through, and
     ;; we're lined up to go through the frame,
     ;; set 'A' to be the far side of the door.
-	BIT 2,(IX-1)										;; (IX-&01) ; Has_Door
-	JR Z,U_NoDoor
-	LD A,(DoorHeights+1)								;; ne door
-	CALL DoorHeightCheck
-	JR c,U_NoExit
-	CALL UD_InFrame
-	JR c,U_NearDoor
-	LD A,(Max_min_UV_Table+2)							;; MaxU
-	ADD A,4
-	JR U_Exit
+	BIT		2,(IX-1)									;; Has_Door (Max_min_UV_Table-1)
+	JR		Z,U_NoDoor
+	LD		A,(DoorHeights+1)							;; ne door
+	CALL	DoorHeightCheck
+	JR		c,U_NoExit
+	CALL	UD_InFrame
+	JR		c,U_NearDoor
+	LD		A,(MaxU)
+	ADD		A,4
+	JR		U_Exit
 
 ;; If there's no wall, put the room end coordinate into 'A'...
 .U_NoDoor:
-	BIT 2,(IX-2)										;; Has_no_vall
-	JR Z,U_NoExit
-	LD A,(Max_min_UV_Table+2)							;; MaxU
+	BIT		2,(IX-2)									;; Has_no_vall (Max_min_UV_Table-2)
+	JR		Z,U_NoExit
+	LD		A,(MaxU)
 ;; Case where we can exit the room.
 .U_Exit:
-	CP D
-	RET NZ
-	LD A,&03
-	JP LeaveRoom
+	CP		D
+	RET		NZ
+	LD		A,&03
+	JP		LeaveRoom
 
 ;; The case where we can't exit the room, but may hit the wall.
 .U_NoExit:
-	LD A,(Max_min_UV_Table+2)							;; MaxU
+	LD		A,(MaxU)
 .U_NoExit2
-	CP D												;; (or some other value given in A).
-	RET NZ
+	CP		D											;; (or some other value given in A).
+	RET		NZ
 	SCF
 	RET
 
@@ -14018,53 +14060,54 @@ dlft_1:
 ;; we do the normal "not door" case. Otherwise, we do that and
 ;; then nudge into the door.
 .U_NearDoor:
-	CALL UD_InFrameW
-	JR c,U_NoExit
-	CALL U_NoExit
-	JP UD_Nudge
+	CALL	UD_InFrameW
+	JR		c,U_NoExit
+	CALL	U_NoExit
+	JP		UD_Nudge
 
 ;; -----------------------------------------------------------------------------------------------------------
+;; IX points on the Max_min_UV_Table. IX-1 is the Has_Door variable, IX-2 is the Has_no_wall variable.
 .MoveT_Left:
-	CALL ChkCantLeave
-	JR Z,L_NoExit
+	CALL	ChkCantLeave
+	JR		Z,L_NoExit
 	;; Inside the door frame to the side? Check a limited extent, then.
-	CALL LR_InOtherDoor
-	LD A,&2C											;; DOOR_HIGH
-	JR c,L_NoExit2
+	CALL	LR_InOtherDoor
+	LD		A,DOOR_HIGH
+	JR		c,L_NoExit2
 	;; If the wall has a door, and
     ;; we're the right height to fit through, and
     ;; we're lined up to go through the frame,
     ;; set 'A' to be the far side of the door.
-	BIT 3,(IX-1)										;; (IX-&01) ; Has_Door
-	JR Z,L_NoDoor
-	LD A,(DoorHeights)									;; nw door
-	CALL DoorHeightCheck
-	JR c,L_NoExit
-	CALL LR_InFrame
-	JR c,L_NearDoor
-	LD A,(Max_min_UV_Table+3)							;; MaxV
-	ADD A,4
-	JR L_Exit
+	BIT		3,(IX-1)									;; Has_Door (Max_min_UV_Table-1)
+	JR		Z,L_NoDoor
+	LD		A,(DoorHeights)								;; nw door
+	CALL	DoorHeightCheck
+	JR		c,L_NoExit
+	CALL	LR_InFrame
+	JR		c,L_NearDoor
+	LD		A,(MaxV)
+	ADD		A,4
+	JR		L_Exit
 
 ;; If there's no wall, put the room end coordinate into 'A'...
 .L_NoDoor:
-	BIT 3,(IX-2)										;; (IX-&02) ; Has_no_vall
-	JR Z,L_NoExit
-	LD A,(Max_min_UV_Table+3)							;; MaxV
+	BIT		3,(IX-2)									;; Has_no_vall (Max_min_UV_Table-2)
+	JR		Z,L_NoExit
+	LD		A,(MaxV)
 ;; Case where we can exit the room.
 .L_Exit:
-	CP H
-	RET NZ
-	LD A,&04
-	JP LeaveRoom
+	CP		H
+	RET		NZ
+	LD		A,&04
+	JP		LeaveRoom
 
 ;; The case where we can't exit the room, but may hit the wall.
 .L_NoExit
-	LD A,(Max_min_UV_Table+3)							;; MaxV
+	LD		A,(MaxV)
 	;; (or some other value given in A).
 .L_NoExit2:
-	CP H
-	RET NZ
+	CP		H
+	RET		NZ
 	SCF
 	RET
 
@@ -14073,73 +14116,75 @@ dlft_1:
 ;; we do the normal "not door" case. Otherwise, we do that and
 ;; then nudge into the door.
 .L_NearDoor:
-	CALL LR_InFrameW
-	JR c,L_NoExit
-	CALL L_NoExit
-	JP LR_Nudge
+	CALL	LR_InFrameW
+	JR		c,L_NoExit
+	CALL	L_NoExit
+	JP		LR_Nudge
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; If we're not inside the V extent, we must be in the doorframes to
-;; the side. Set C if this is the case.
+;; the side. Set Carry if this is the case.
+;; IX points on the Max_min_UV_Table.
 .UD_InOtherDoor:
-	LD A,(Max_min_UV_Table+3)							;; MaxV
-	CP H
-	RET c
-	LD A,L
-	CP (IX+1)											;; (IX+&01) ; MinV
+	LD		A,(MaxV)
+	CP		H
+	RET		c
+	LD		A,L
+	CP		(IX+1)										;; MinV ; (Max_min_UV_Table+&01)
 	RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; If we're not inside the U extent, we must be in the doorframes to
-;; the side. Set C if this is the case.
+;; the side. Set Carry if this is the case.
+;; IX points on the Max_min_UV_Table.
 .LR_InOtherDoor:
-	LD A,(Max_min_UV_Table+2)							;; MaxU
-	CP D
-	RET c
-	LD A,E
-	CP (IX+0)											;; (IX+&00) ; MinU
+	LD		A,(MaxU)
+	CP		D
+	RET		c
+	LD		A,E
+	CP		(IX+0)										;; MinU ; (Max_min_UV_Table+&00)
 	RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Return NC if within the interval associated with the door.
 ;; Specifically, returns NC if D <= DOOR_HIGH and E >= DOOR_LOW
 .LR_InFrame:
-	LD A,&2C											;; DOOR_HIGH
-	CP D
-	RET c
-	LD A,E
-	CP &24												;; DOOR_LOW
+	LD		A,DOOR_HIGH
+	CP		D
+	RET		c
+	LD		A,E
+	CP		DOOR_LOW
 	RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Same, but for the whole door, not just the inner arch
 .LR_InFrameW:
-	LD A,&30											;; DOOR_HIGH + 4
-	CP D
-	RET c
-	LD A,E
-	CP &20												;; DOOR_LOW - 4
+	LD		A,DOOR_HIGH + 4
+	CP		D
+	RET		c
+	LD		A,E
+	CP		DOOR_LOW - 4
 	RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Return NC if within the interval associated with the door.
 ;; Specifically, returns NC if H <= DOOR_HIGH and L >= DOOR_LOW
 .UD_InFrame:
-	LD A,&2C											;; DOOR_HIGH
-	CP H
-	RET c
-	LD A,L
-	CP &24												;; DOOR_LOW
+	LD		A,DOOR_HIGH
+	CP		H
+	RET		c
+	LD		A,L
+	CP		DOOR_LOW
 	RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Same, but for the whole door, not just the inner arch
 .UD_InFrameW:
-	LD A,&30											;; DOOR_HIGH + 4
-	CP H
-	RET c
-	LD A,L
-	CP &20												;; DOOR_LOW - 4
+	LD		A,DOOR_HIGH + 4
+	CP		H
+	RET		c
+	LD		A,L
+	CP		DOOR_LOW - 4
 	RET
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -14150,19 +14195,19 @@ dlft_1:
 ;; and heels currently). Returns NC if the character is in the right
 ;; height range to go through door.
 .DoorHeightCheck:
-	SUB B
-	RET c
-	PUSH AF
-	LD A,(selected_characters)							;; get selected_characters
-	CP &03
-	JR NZ,dhc_1
-	POP AF
-	CP &03
+	SUB		B
+	RET		c
+	PUSH	AF
+	LD		A,(selected_characters)						;; get selected_characters
+	CP		BOTH_SELECTED
+	JR		NZ,dhc_1
+	POP		AF
+	CP		&03
 	CCF
 	RET
 dhc_1:
-	POP AF
-	CP &09
+	POP		AF
+	CP		&09
 	CCF
 	RET
 
@@ -14177,13 +14222,13 @@ dhc_1:
 ;; TODO: Can't leave room if it's a not a player, or the object
 ;; function is zero'd.
 .ChkCantLeave:
-	LD		IX,Max_min_UV_Table							;; MinU
+	LD		IX,Max_min_UV_Table							;; Min/Max U/V Table
 	BIT 	0,(IY+O_SPRFLAGS)							;; Is it a player?
 	RET 	Z											;; If it's not the player, can't leave room.
 	LD		A,(IY+O_FUNC)								;; else, Check the object function...
 	AND 	&7F											;; don't look phase bit
 	SUB 	1											;; test if function was 0
-	RET 	c											;; If func was 0, C set, leave with FF
+	RET 	c											;; If func was 0, Carry set, leave with FF
 	XOR 	A											;; else leave with 0
 	RET													;; in other cases, can.
 
@@ -14194,30 +14239,30 @@ dhc_1:
 ;; Returns V extent in B, U extent in C.
 ;; Leaves HL pointing at the U coordinate.
 .GetSimpleSize:
-	INC HL
-	INC HL
-	LD A,(HL)											 ;; Load flags into A.
-	INC HL
-	LD E,&06											 ;; Fixed height of 6.
-	BIT 1,A
-	JR NZ,GSS_1
+	INC		HL
+	INC		HL
+	LD		A,(HL)										 ;; Load flags into A.
+	INC		HL
+	LD		E,&06										 ;; Fixed height of 6.
+	BIT		1,A
+	JR		NZ,GSS_1
 	;; Cases 0, 1:
 	RRA
-	LD A,&03
-	ADC A,&00
-	LD B,A
-	LD C,A
+	LD		A,&03
+	ADC		A,&00
+	LD		B,A
+	LD		C,A
 	RET													;; Either 3x3 or 4x4.
 
-GSS_1:																		;; Cases 2, 3:
+GSS_1:
 	RRA
-	JR c,GSS_2
+	JR		c,GSS_2
 	;; Case 2:
-	LD BC,&0104
+	LD		BC,&01 * WORD_HIGH_BYTE + &04
 	RET													;; 1x4
-
+	;; Case 3:
 GSS_2:
-	LD BC,&0401
+	LD		BC,&04 * WORD_HIGH_BYTE + &01
 	RET													;; 4x1
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -14228,7 +14273,7 @@ GSS_2:
 .current_pen_number:
 	DEFB 	&02							;; (02 by default)
 .Char_cursor_pixel_position:
-	DEFW 	&8040 						;; low byte = x(col) ; high byte = y(row)
+	DEFW 	&80 * WORD_HIGH_BYTE + &40 	;; low byte = x(col) ; high byte = y(row)
 .text_size:
 	DEFB 	&00     					;; Text height size variable (0:single; none-0:double)
 .rainbow_mode:
@@ -14286,7 +14331,7 @@ smc_print_string_routine:
 	SUB 	&20											;; to test if was below or above &20
 	JR		c,Control_Codes								;; if code was below 20 go to Control_Codes; will RET
 	CALL 	Char_code_to_Addr							;; else it is a plain char, go to Char_code_to_Addr addr in DE (reminder: a "SUB 20" was done)
-	LD		HL,&0804									;; sprite size : x=2x4 (2 pix per byte) ; y=8
+	LD		HL,&08 * WORD_HIGH_BYTE + &04				;; sprite size : x=2x4 (2 pix per byte) ; y=8
 	LD		A,(text_size)								;; get Text height size (0:single (Z=1) or 1:double (NZ=1))
 	AND 	A											;; check if size was 0 or 1
 	CALL 	NZ,Double_sized_char						;; if Double size, then call Double_sized_char input:DE=symbol data, output:DE=buffer where the zoomed sprite is, HL=new size
@@ -14329,7 +14374,7 @@ print_char_until_delimiter
 ;;   03 : Text_single_size (double height Off)
 ;;   04 : Text_double_size (double height On)
 ;;   05 xx : Color attribute
-;;			xx = 00 : Rainbow (each letter changes the color)
+;;			xx = 00 : Rainbow (each letter changes the current color (cycle 1 to 3))
 ;;				 else : color (1, 2 or 3)
 ;; 	 06 xx yy : Set_Text_Position col xx, row yy
 ;; 	 07 xx : Color scheme
@@ -14342,7 +14387,7 @@ print_char_until_delimiter
 	JR		NC,Control_Codes_more						;; jump Control_Codes_more if A >= 5
 	AND 	A											;; A == 0?
 	JP		Z,Draw_wipe_and_Clear_Screen				;; if Code 0 jump Draw_wipe_and_Clear_Screen ; will RET
-	SUB 	2											;; Test codes 1 (C set) and 2 (Z set)
+	SUB 	2											;; Test codes 1 (Carry set) and 2 (Zero set)
 	JR		c,Control_Code_new_line						;; if Code = 1 jump Control_Code_new_line; will RET; else:
 	JR		Z,Control_Code_space_erase_end				;; if Code = 2 jump Control_Code_space_erase_end; will RET, else:
 	DEC 	A											;; Test if codes 3 (A=0) or 4 (A=1)
@@ -14355,9 +14400,9 @@ print_char_until_delimiter
 ;; remain when text has changed)
 Control_Code_space_erase_end:
 	LD		A,(Char_cursor_pixel_position)				;; Char cursor addr position
-	CP		&C0											;; has reached right border?
+	CP		&C0											;; has reached right text border?
 	RET 	NC											;; if yes, RET
-	LD		A,&20										;; else : String " "
+	LD		A,SPACE_CHAR								;; else : String " "
 	CALL 	Print_String
 	JR		Control_Code_space_erase_end				;; loop
 
@@ -14425,7 +14470,7 @@ ccnewln_single:
 ;; Input: BC is the position;
 ;; Output: HL = pointer on Cursor_position_code string attribute.
 .Set_Cursor_position:
-	LD		(Cursor_position_code+1),BC					;; Update Cursor_position_code position from BC
+	LD		(Cursor_position_code_pos),BC				;; Update Cursor_position_code position from BC
 	LD		HL,Cursor_position_code						;; point Cursor_position_code
 	JP		print_char_until_delimiter					;; (will end up with a RET)
 
@@ -14433,8 +14478,9 @@ ccnewln_single:
 ;; This produce a "String" attribute code 06 (position).
 ;; the position is set by Set_Cursor_position
 .Cursor_position_code:
-	DEFB	&06											;; cursor_position code
-	DEFW	&0000										;; Will be updated at address 4B7C
+	DEFB	Print_SetPos								;; cursor_position code
+Cursor_position_code_pos:
+	DEFW	&0000										;; x,y pos : Will be updated at address 4B7C
 	DEFB	Delimiter									;; delimiter code
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -14464,7 +14510,7 @@ loop_search_nth_Delimiter
 ;; This creates a zoomed char sprite from the original char
 ;; Output: DE will point on the double sized char buffer
 .Double_sized_char:
-	LD		B,&08										;; 8 original lines in char symbol
+	LD		B,8											;; 8 original lines in char symbol
 	LD		HL,Double_size_char_buffer					;; Double_size_char_buffer
 dsc_loop:
 	LD		A,(DE)										;; get char symbol byte
@@ -14490,9 +14536,14 @@ dsc_loop:
 ;;		  B = bitmap used if the corresponding bit in C is 0;
 ;;			  In that bitmap, a "1" means print a Space instead of the corresponding 0 or as a padding;
 ;;                            a "0" means break (no leading 0, so do not need to continue parsing); RET with NC
+JUSTIF_2LEFT_NOLEAD0	EQU		&00 * WORD_HIGH_BYTE + &FE				;; 2 digits Left aligned, No leading "0" (but if 0 print "0 ")
+JUSTIF_2RIGHT_NOLEAD0	EQU		&FF * WORD_HIGH_BYTE + &FE				;; 2 digits Right aligned (Pad with spaces), No leading "0" (but if 0 print " 0")
+JUSTIF_4LEFT_NOLEAD0	EQU		&00 * WORD_HIGH_BYTE + &F8				;; 4 digits Left aligned, No leading "0" (but if 0 print "0 ")
+DIGIT2ASCII				EQU		&30
+SPACE_CHAR				EQU		&20										;; " "
+
 .Print_4Digits_LeftAligned:
-	;; Left align, no leading zero.
-	LD		BC,&00F8									;; 4 digits Left aligned, No leading "0" (but if 0 print "0 ")
+	LD		BC,JUSTIF_4LEFT_NOLEAD0						;; 4 digits Left aligned, No leading "0" (but if 0 print "0 ")
 	PUSH 	DE
 	LD		A,D
 	CALL 	print_2Digits								;; print higher digits
@@ -14501,10 +14552,10 @@ dsc_loop:
 	JR		print_2Digits								;; print lower digits
 
 .Print_2Digits_RightAligned:
-	LD		BC,&FFFE									;; Right aligned (Pad with spaces), No leading "0" (but if 0 print " 0")
+	LD		BC,JUSTIF_2RIGHT_NOLEAD0					;; Right aligned (Pad with spaces), No leading "0" (but if 0 print " 0")
 	JR		print_2Digits
 .Print_2Digits_LeftAligned:
-	LD		BC,&00FE									;; Left aligned, No leading "0" (but if 0 print "0 ")
+	LD		BC,JUSTIF_2LEFT_NOLEAD0						;; Left aligned, No leading "0" (but if 0 print "0 ")
 .print_2Digits:
 	PUSH 	AF											;; save A
 	RRA
@@ -14522,8 +14573,8 @@ dsc_loop:
 	RET 	NC											;; if Carry=0, leave with Carry reset, else print out a "Space"
 	LD		A,&F0										;; A = &F0 (after the add 30, it'll become &20 = " ")
 print_it:
-	LD		C,&FF										;; if Sub_PrintDigit recalled, we will print the "0"s from now ()
-	ADD 	A,&30										;; Convert number (0 to 9) to corresponding ASCII, and &F0 to " "so if value is "00" we will always at least print "0"
+	LD		C,&FF										;; if Sub_PrintDigit recalled, we will print the "0"s from now
+	ADD 	A,DIGIT2ASCII								;; Convert number (0 to 9) to corresponding ASCII, and &F0 to " " so if value is "00" we will always at least print "0"
 	PUSH 	BC
 	CALL 	Print_String								;; Print it!
 	POP 	BC
@@ -14685,6 +14736,7 @@ ObjFnEnd2:
 ObjDraw2:
 	JP		ObjDraw
 
+;; -----------------------------------------------------------------------------------------------------------
 ObjFnEnd4:
 	PUSH	IY
 	CALL	ObjFnPushable
@@ -14692,13 +14744,14 @@ ObjFnEnd4:
 	LD		(IY+O_IMPACT),&FF
 	RET
 
+;; -----------------------------------------------------------------------------------------------------------
 ObjFnSub:
 	LD		A,(ObjDir)
 	AND		(IY+&0C)
 	CALL 	DirCode_from_LRDU							;; get dir code (0 to 7 or FF), from LRDU
 	CP		&FF
 	SCF
-	RET		Z
+	RET		Z											;; Leave with Carry set if not moving
 	CALL	MoveCurrent									;; move current object in HL
 	RET		c
 	PUSH	AF
@@ -14725,11 +14778,12 @@ ObjFnSub:
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Switch button object.
-;; It'll turn on/off the movement and flip the function disable bit (O_SPRFLAGS bit6)
-;; of all objects in the room.
-;; (eg. a Dissolve2 object will become undissolvable if in the same room)
+;; It'll turn on/off the movement and flip the function disable bit
+;; (O_SPRFLAGS bit6) of ALL objects in the room.
+;; (eg. a Dissolve2 object will become undissolvable if in the same
+;; room even if the goal of the switch was to stop a Beacon)
 ObjFnSwitch:
-    ;; First check if we're touched. If not, clear &11 and return.
+    ;; First check if we're touched. If not, clear O_SPECIAL and return.
 	LD		A,(IY+&0C)
 	OR		&C0
 	INC		A
@@ -14737,8 +14791,7 @@ ObjFnSwitch:
 	LD		(IY+O_SPECIAL),A
 	RET
 
-;; Otherwise, check if there was a previous touch.
-;; If so, clear &0C and return.
+;; Otherwise, check if there was a previous touch. If so, clear &0C and return.
 objfnsw_1:
 	LD		A,(IY+O_SPECIAL)
 	AND		A
@@ -14751,7 +14804,7 @@ objfnsw_2:
 	DEC		(IY+O_SPECIAL)
 	CALL	ObjAgain7
 	;; Call PerObj on each object in the main object list...
-	LD		HL,ObjectLists + 2
+	LD		HL,ObjList_Regular_Near2Far
 objfnsw_loop:
 	LD		A,(HL)
 	INC		HL
@@ -14762,7 +14815,7 @@ objfnsw_loop:
 	PUSH	HL
 	PUSH	HL
 	POP		IX
-	CALL	PerObjSwitch							   	;; Call with the object in HL and IX
+	CALL	PerObjSwitch							   	;; Call with the object in HL and also put in IX
 	POP		HL
 	JR		objfnsw_loop
 
@@ -14774,8 +14827,10 @@ objfnsw_3:
 	LD		(IY+O_FLAGS),A
 	JP		ObjDraw
 
-;; for each object in the room (ObjectLists + 2 list), that is not
-;; the switch itself, neither is fading, apply the switch if needed
+;; -----------------------------------------------------------------------------------------------------------
+;; Apply the switch (if needed) for every object in the room
+;; (ObjList_Regular_Near2Far list), that is not the switch itself,
+;; neither is fading,
 .PerObjSwitch:
 	LD		A,(IX+O_FUNC)								;; get function code
 	AND 	%01111111									;; ignore phase bit
@@ -14797,8 +14852,9 @@ objfnsw_3:
 ;; Heliplat are used to lift the player upwards.
 ;; Peculiarity: If comming from ObjFnHeliplat, the LD A,&52 is done.
 ;; But if coming from ObjFnHeliplat2, the 01 at 4D30 will take the "3E 52"
-;; as data in a dummy instruction "LD BC,&523E" to cancel the "LD A,&52".
-ObjFnHeliplat2: ;; room 616
+;; as data in a dummy instruction "LD BC,&523E" to cancel the "LD A,&52"
+;; hence letting the "LD A,&90" take over.
+ObjFnHeliplat2: 															;; eg. room 616
 	LD		A,&90										;; low limit = 0, high limit = 9, dir = 0 (decent)
 	DEFB 	&01		;;LD BC,...							; LD BC,nnnn, to cancel the next instruction "LD,&52"!
 ObjFnHeliplat:
@@ -14811,8 +14867,8 @@ ObjFnHeliplat:
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; This makes an elevated object - on which the player stands - gently
-;; colapse to the ground (in other words it loses altitude as pressure is applied on it).
-;; It does not go back up when pressure is released.
+;; colapse to the ground (in other words it loses altitude as pressure is
+;; applied on it). It does not go back up when pressure is released.
 ;; The cushions around the room &ABD (all but the ones under the doors)
 ;; use this feature.
 ObjFnColapse:
@@ -14824,16 +14880,16 @@ ObjFnColapse:
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Rollers in the various LRDU directions (bits are active low)
 ObjFnRollers1
-	LD		A,&FE										;; Moving Up
+	LD		A,FACING_UP									;; Moving Up
 	JR		writeRollerDir
 ObjFnRollers2:
-	LD		A,&FD										;; Moving Down
+	LD		A,FACING_DOWN								;; Moving Down
 	JR		writeRollerDir
 ObjFnRollers3:
-	LD		A,&F7										;; Moving Left
+	LD		A,FACING_LEFT								;; Moving Left
 	JR		writeRollerDir
 ObjFnRollers4:
-	LD		A,&FB										;; Moving Right
+	LD		A,FACING_RIGHT								;; Moving Right
 .writeRollerDir:
 	LD		(IY+O_IMPACT),A								;; Rollers direction in &0B, will impact the direction of who or what is on the rollers
 	LD		(IY+O_FUNC),0								;; reset function
@@ -14843,12 +14899,13 @@ ObjFnRollers4:
 ;; HushPuppies disappear if Head is in the room
 ObjFnHushPuppy:
 	LD		A,(selected_characters)						;; get selected_characters
-	AND 	&02											;; Test bit1 if we have Head (TestAndFade returns early if not)
+	AND 	HEAD_SELECTED								;; Test bit1 if we have Head (TestAndFade returns early if not)
 	JR		TestAndFade
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; Make an object dissolve upon contact
-;; * ObjFnDissolve: : dissolving grating (eg. room 476)
+;; Make an object dissolve upon contact or presence in the room:
+;; * ObjFnDissolve: : dissolving grating (eg. room 476).
+;;      Note: The &01 at &4D45 will cancel the "LD A,&CF" at 4D66.
 ;; * ObjFnDissolve2: : dissolving cushion, pad, book and rollers
 ;;		Note: 2 cushions in the room 526 are set as Dissolve2, but when
 ;;	 	the switch in the room is turned off, it freezes the Beacon, but
@@ -14857,22 +14914,22 @@ ObjFnHushPuppy:
 ObjFnDissolve:
 	LD		A,&C0
 	DEFB 	&01 	;;LD BC,...
-ObjFnDissolve2: ;; dissolving cushion, pad, book and rollers
+ObjFnDissolve2:																;; dissolving cushion, pad, book and rollers
 	;; if comming from ObjFnDissolve, the "LD A,&CF" does not exist
 	;; as it became a dummy "LD BC,&CF3E"
-	LD		A,&CF										;; LD BC,nn , NOPs next instruction! ; ObjFnDissolve2: LD	A,&CF
+	LD		A,&CF										;; ObjFnDissolve2: A=&CF, ObjFnDissolve: A=&C0
 	OR		(IY+&0C)
 	INC 	A											;; test and leave if bits 5&4 (if coming from ObjFnDissolve2) or bits 5:0 (if from ObjFnDissolve) were all 1s
 .TestAndFade:
 	RET 	Z											;; if comming from ObjFnHushPuppy if it is Heels, then nothing to do, else:
-Fadeify:																	;; Make the HushPuppies disappear if Head enters the room
+Fadeify:																	;; else (Head) : Make the HushPuppies disappear if Head enters the room
 	LD		A,Sound_ID_BeepCannon						;; cannon sound
 	CALL 	SetSound
 	LD		A,(IY+O_FUNC)								;; get object function code but...
 	AND 	&80											;; ...keep phase bit (only)
 	OR		OBJFN_FADE									;; set function as Fade
 	LD		(IY+O_FUNC),A
-	LD		(IY+O_ANIM),&08								;; ANIM_VAPE1 : anim code [7:3] = 1 (index0 in AnimTable = ANIM_VAPE1); frame [2:0]=0
+	LD		(IY+O_ANIM),ANIM_VAPE1_code					;; ANIM_VAPE1 : anim code [7:3] = 1 (index0 in AnimTable = ANIM_VAPE1); frame [2:0]=0
 ObjFnFade:
 	LD		(IY+O_FLAGS),&80
 	CALL 	UpdateObjExtents
@@ -14893,33 +14950,36 @@ ObjFnSpring:
 	LD		A,SPR_SPRUNG
 	JR		Z,ofn_spring_end							;; if previous bit5 was 0, jump to ofn_spring_end
 	LD		A,(IY+O_ANIM)								;; else : [7:3] = anim code, [2:0] = frame
-	AND		A
+	AND		A											;; test
 	JR		NZ,br_4DBD
 	LD		A,SPR_SPRUNG
 	CP		B
 	JR		NZ,ObjFnPushable
-	LD		(IY+O_ANIM),&50								;; [7:3] = anim code = &0A (index9 in AnimTable = ANIM_SPRING), [2:0] = frame = 0
-	LD		A,&04										;; noise when we land on the spring?
+	LD		(IY+O_ANIM),ANIM_SPRING_code				;; [7:3] = anim code = &0A = id &8A : ANIM_SPRING (in AnimTable), [2:0] = frame = 0
+	LD		A,&04										;; noise when we land on the spring
 	CALL	SetSound
-	JR		ObjFnStuff
+	JR		ObjFnLoadSpring
 
 br_4DBD
 	AND		&07
-	JR		NZ,ObjFnStuff
+	JR		NZ,ObjFnLoadSpring
 	LD		A,SPR_SPRING
 ofn_spring_end
 	LD		(IY+O_SPRITE),A
-	LD		(IY+O_ANIM),0								;; reset [7:3] = anim code = 0, [2:0] = frame = 0
+	LD		(IY+O_ANIM),NO_ANIM_code					;; reset [7:3] = anim code = 0 (no anim), [2:0] = frame = 0
 	CP		B
 	JR		Z,ObjFnPushable
-	JR		ObjFnStuff
+	JR		ObjFnLoadSpring
 
 ;; -----------------------------------------------------------------------------------------------------------
+;; ObjFnSpecial : Picking up special item
+;; ObjFnLoadSpring : Update the Spring stool when standing on it.
+;; ObjFnPushable: Pushing item
 ObjFnSpecial:
 	LD		A,(IY+O_ANIM)								;; [7:3] = anim code, [2:0] = frame
-	AND		&F0
-	JR		Z,ObjFnPushable
-ObjFnStuff:
+	AND		&F0											;; ignore frame and hide 'B'(backward)/not'B" info
+	JR		Z,ObjFnPushable								;; if 0, no Anim, jump ObjFnPushable
+ObjFnLoadSpring:
 	CALL	UpdateObjExtents
 	CALL	AnimateMe
 .ObjFnPushable:		;; can be pushed
@@ -14933,10 +14993,11 @@ ObjFnStuff:
 ;; Will define in HL the addr of the function to be used to move the enemy.
 ObjFnLinePatrol:	;; used by the Anvil : Moves formard until an obstacle, then turns around (180° turn), and starts advancing again.
 	LD		HL,HalfTurn
-	JP		ObjFnStuff2
+	JP		ObjFnUpdatePatroller
 ObjFnSquarePatrol:	;; used by sandwich room &240 : it moves forward clockwise until an obstacle, then makes a 90° turn clockwise and starts advancing again.
 	LD		HL,Clockwise
-	JP		ObjFnStuff2
+	JP		ObjFnUpdatePatroller
+
 ObjFnVisor1: 		;; ObjFnLinePatrol but ???? TODO ; eg. robot in room &786, it moves back and forth on one lane.
 	LD		HL,HalfTurn
 	JR		TurnOnCollision
@@ -14949,7 +15010,8 @@ ObjFnAnticlock:		;; ObjFnMonocat but in the other direction
 ObjFnBee			;; used by bee (eg. room 476), move to any random direction
 	LD		HL,DirAny
 	JR		TurnOnCollision
-ObjFnRandQ:			;; Random direction change (any like a Chess King)
+
+ObjFnRandK:			;; Random direction change (any like a Chess King)
 	LD		HL,DirAny
 	JR		TurnRandomly
 ObjFnRandR:			;; Random direction change, axially (like a Chess Rook).
@@ -14958,6 +15020,7 @@ ObjFnRandR:			;; Random direction change, axially (like a Chess Rook).
 ObjFnRandB:			;; Random direction change, in diagonal (like a Chess Bishop). ; eg. Beacon room 516
 	LD		HL,DirDiag
 	JR		TurnRandomly
+
 ObjFnHomeIn:		;; Home in, like a robomouse (attracted by the player if close enough, but can also go in lines, like a rook).
 	LD		HL,HomeIn
 	JR		GoThatWay
@@ -14969,7 +15032,7 @@ ObjFnHomeIn:		;; Home in, like a robomouse (attracted by the player if close eno
 ;; the Emperor's guard moves out of our way (MoveAway).
 ObjFnRespectful:
 	LD		A,(saved_World_Mask)						;; get saved_World_Mask
-	OR		&F0											;; look at the 4 first crowns only
+	OR		&F0											;; look at the 4 first crowns only (all but BlackTooth)
 	INC 	A											;; if &0F then become 0
 	LD		HL,MoveAway
 	JR		Z,respect_1									;; if we have 4 crowns then make it MoveAway
@@ -14978,11 +15041,11 @@ respect_1:
 	JR		GoThatWay									;; move it the selected way
 
 ;; -----------------------------------------------------------------------------------------------------------
-;;
-ObjFnStuff2:
+;; Update the Patroller objects (anim)
+ObjFnUpdatePatroller:
 	PUSH 	HL
 	CALL 	FaceAndAnimate
-	JR		ObjFnStuff5
+	JR		ObjFnWalk
 
 ;; -----------------------------------------------------------------------------------------------------------
 .TurnOnCollision:
@@ -14991,10 +15054,10 @@ ObjFnStuff2:
 	CALL 	FaceAndAnimate
 	CALL 	ObjAgain8
 	LD		A,&FF
-	JR		c,ObjFnStuff6
-ObjFnStuff5:
+	JR		c,ObjFnBounce
+ObjFnWalk:
 	CALL 	DirCode_to_LRDU
-ObjFnStuff6:
+ObjFnBounce:
 	CALL 	TestCollisions
 	POP 	HL											;; recover the turn function
 	LD		A,(Collided)								;; Collided=&FF no collision, else yes
@@ -15003,8 +15066,8 @@ ObjFnStuff6:
 	CALL 	DoTurn										;; else turn and
 	JP		ObjDraw										;; draw
 
-;; -----------------------------------------------------------------------------------------------------------
-;; Call the turning function provided earlier.
+;; =-----------------------------------------------------------------------------------------------------------
+;; Call the turning function provided earlier in HL.
 .DoTurn:
 	JP		(HL)										;; Call the chosen movement function; will RET
 
@@ -15112,7 +15175,7 @@ hp3_do_descent
 ofn_h3_draw_end
 	JP		ObjDraw
 
-;; -----------------------------------------------------------------------------------------------------------
+;; =-----------------------------------------------------------------------------------------------------------
 ;; Go to a NEW axial direction (different to the current one).
 ;; Axial direction is the Up-Down (V axis) and Left-Right (U axis) directions.
 DirAxes:
@@ -15123,7 +15186,7 @@ DirAxes:
 	JR		Z,DirAxes									;; if same then pick another one
 	JR		MoveDir										;; else move to new dir
 
-;; -----------------------------------------------------------------------------------------------------------
+;; =-----------------------------------------------------------------------------------------------------------
 ;; Go to a NEW diagonal direction (different to the current one).
 ;; Diagonal are the axis North-South and West-East
 .DirDiag:
@@ -15135,7 +15198,7 @@ DirAxes:
 	JR		Z,DirDiag									;; if same then pick another one
 	JR		MoveDir										;; else move to new dir
 
-;; -----------------------------------------------------------------------------------------------------------
+;; =-----------------------------------------------------------------------------------------------------------
 ;; Turn to any NEW direction.
 .DirAny:
 	CALL 	Random_gen									;; rnd value in HL
@@ -15145,7 +15208,7 @@ DirAxes:
 	JR		Z,DirAny									;; if same, then choose another one
 	JR		MoveDir										;; else move to new dir
 
-;; -----------------------------------------------------------------------------------------------------------
+;; =-----------------------------------------------------------------------------------------------------------
 ;; Turn 90 degrees clockwise.
 ;; 		0 (Down), 1 (South), 2 (Right), 3 (East),  4 (Up),    5 (North), 6 (Left), 7 (West)
 ;; -2 : 6 (Left), 7 (West),  0 (Down),  1 (South), 2 (Right), 3 (East),  4 (Up),   5 (North)
@@ -15154,7 +15217,7 @@ DirAxes:
 	SUB 	2											;; minus 2 if a clockwise 90° turn
 	JR		Mod8MoveDir									;; move to new dir
 
-;; -----------------------------------------------------------------------------------------------------------
+;; =-----------------------------------------------------------------------------------------------------------
 ;; Turn 90 degrees anticlockwise.
 ;; 		0 (Down),  1 (South), 2 (Right), 3 (East),  4 (Up),   5 (North), 6 (Left), 7 (West)
 ;; +2 : 2 (Right), 3 (East),  4 (Up), 	 5 (North), 6 (Left), 7 (West),  0 (Down), 1 (South)
@@ -15167,13 +15230,13 @@ DirAxes:
 	LD		(IY+O_DIRECTION),A							;; update dir : move to new dir
 	RET
 
-;; -----------------------------------------------------------------------------------------------------------
+;; =-----------------------------------------------------------------------------------------------------------
 ;; Turn 180 degree (half-turn).
 ;; 		0 (Down), 1 (South), 2 (Right), 3 (East), 4 (Up), 	5 (North), 6 (Left),  7 (West)
 ;; +4 : 4 (Up),   5 (North), 6 (Left),  7 (West), 0 (Down), 1 (South), 2 (Right), 3 (East)
 .HalfTurn:
 	LD		A,(IY+O_DIRECTION)							;; dir code (0 to 7 or FF)
-	ADD 	A,&04										;; plus 4 gives a 180° turn
+	ADD 	A,4											;; plus 4 gives a 180° turn
 	JR		Mod8MoveDir									;; move to new dir
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -15237,18 +15300,18 @@ hmin_2:
 	JR		MoveToDirMask								;; Move towards
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; From an object/Enemy in IY (rather the ref to its variables)
+;; From an object/Enemy in IY (rather the ref to its variables/object instance)
 ;; get the direction vector to the current character.
 ;; Return: A is of type LRDU (Left/Right/Down/Up) active low
 ;; Return: DE has the distance (deltaV in D, deltaU in E)
 .CharDistAndDir:
 	CALL 	Get_curr_Char_variables						;; HL = pointer on current selected character's variables
-	LD		DE,&0005
+	LD		DE,O_U
 	ADD 	HL,DE										;; Curr Char O_U
 	LD		A,(HL)
 	INC 	HL											;; Curr Char O_V
 	LD		H,(HL)
-	LD		L,A											;; HL = char V and U
+	LD		L,A											;; HL = current character V and U
 	;; this will prepare the Left/Right info (active low)
 	;; that will end up in bits 3 and 2 resp.
 	LD		C,&FF
@@ -15297,8 +15360,8 @@ hmin_2:
 	LD		A,(DrawFlags)								;; get DrawFlags
 	BIT 	0,A											;; test bit 0 (object extent set or to be set)
 	RET 	NZ											;; if 1 (already set, leave)
-	OR		&01											;; else set it
-	LD		(DrawFlags),A								;; update DrawFlags bit0
+	OR		&01											;; else set it (bit0)
+	LD		(DrawFlags),A								;; update DrawFlags
 	LD		HL,(CurrObject)								;; get current object
 	JP		StoreObjExtents								;; store object extents
 
@@ -15325,7 +15388,7 @@ hmin_2:
 	RET 	NC
 .MarkToDraw:
 	LD		A,(DrawFlags)
-	OR		&02											;; Sets bit 1 of DrawFlags (needs redraw)
+	OR		&02											;; Sets bit1 of DrawFlags (= needs redraw)
 	LD		(DrawFlags),A
 	RET
 
@@ -15420,27 +15483,28 @@ br_5072
 	SCF                            					    ;; leave with Carry set
 	RET
 
-;; -----------------------------------------------------------------------------------------------------------
+;; =-----------------------------------------------------------------------------------------------------------
 ;; From direction code in O_DIRECTION (0 to 7 or FF), returns               Up   east
 ;; the coresponding LRDU (Left/Right/Down/Up) value (active low)   north __________> U              Up
 ;;             															|05 04 03         	     F6 FE FA
 ;;                                                                 Left |06 FF 02 Right     Left F7    FB Right
 ;; This is pretty much the reverse of DirCode_from_LRDU					|07 00 01         	     F5 FD F9
-;; Note : "Up/Left" is the far corner, "DownRigth"                 west |  Down  south     	       Down
-;;  the near corner                                                   V Y
+;; Note : "Up/Left" is the far corner, "DownRight"                 west |  Down  south     	       Down
+;;        the near corner                                             V Y
 DirCode_to_LRDU:
 	LD		A,(IY+O_DIRECTION)							;; dir code (0 to 7 or FF)
-	ADD 	A,DirCode2LRDU_table and &00FF				;; &86 = DirCode2LRDU_table low byte + drection_offset
+	ADD 	A,DirCode2LRDU_table and WORD_LOW_BYTE		;; &86 = DirCode2LRDU_table low byte + drection_offset
 	LD		L,A
-	ADC 	A,DirCode2LRDU_table / 256					;; &50 = DirCode2LRDU_table high byte
+	ADC 	A,DirCode2LRDU_table / WORD_HIGH_BYTE		;; &50 = DirCode2LRDU_table high byte
 	SUB 	L
 	LD		H,A											;; HL = DirCode2LRDU_table + direction_offset
 	LD		A,(HL)
 	RET
 
 .DirCode2LRDU_table:
-	;;       					Down south Rght east  Up north left west
-	DEFB 	&FD, &F9, &FB, &FA, &FE, &F6, &F7, &F5
+	;;       					Down south Rght east / Up north left west
+	DEFB 	FACING_DOWN, FACING_NEAR, FACING_RIGHT, FACING_EAST
+	DEFB	FACING_UP, FACING_FAR, FACING_LEFT, FACING_WEST
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; This will keep or flip the anim sprite to the forward/backward sprite
@@ -15458,12 +15522,12 @@ DirCode_to_LRDU:
 	RET 	Z											;; Return if not animated
 	BIT 	2,C											;; Heading roughly away (Up,North,Left,West) if 1; or towards us (Down,South,Right,East) if 0
 	LD		C,A											;; anim code [7:3] + frame [2:0] in C
-	JR		Z,sfd_2										;; if Front towards us, goto sfd_2
-	BIT 	3,C											;; anim code bit 3 if 0: forward sprite, if 1: backward version
+	JR		Z,sfd_tw									;; if Front towards us, goto sfd_tw
+	BIT 	3,C											;; anim code bit3 = if 0: forward sprite, if 1: backward version
 	RET 	NZ											;; leave if backward
-	LD		A,&08										;; else (if forward sprite) A = 8
+	LD		A,ANIM_VAPE1_code							;; else (if forward sprite) bit3 indicates Forward/Backward
 	JR		sfd_1										;; skip to sfd_1
-sfd_2:
+sfd_tw:
 	BIT 	3,C											;; test bit3 of anim code if 0: forward sprite, if 1: backward version
 	RET 	Z											;; leave if forward
 	XOR 	A											;; else (backward sprite) A = 0
@@ -15502,13 +15566,14 @@ sfd_1:
 						org		&50D0
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; These macros are used when processing the Room_list1 and 2 data to build a room
-;; They define groups of objects that can be imported as a block. See algo in Room_list1 below.
-Room_Macro_data: 														;; MacroID &C0 to &DB
+;; These macros (MacroID &C0 to &DB) are used when processing the Room_list1 and 2 data to
+;; build a room. They define groups of objects that can be imported as a block.
+;; See algo in Room_list1 below.
+Room_Macro_data:
 	;; <Length> <macroID> <Macro data N bytes>
 	;; note: the length includes the MacroID byte but not the length byte
-	DEFB &0C, &C0, &02, &CE, &77, &33, &96, &4F, &26, &92, &FE, &3F, &C0					;; Macro C0: 2*3 Gratings
-	DEFB &07, &C1, &C0, &43, &E0, &01, &FF, &C0											;; Macro C1: 4*3 Gratings
+	DEFB &0C, &C0, &02, &CE, &77, &33, &96, &4F, &26, &92, &FE, &3F, &C0			;; Macro C0: 2*3 Gratings
+	DEFB &07, &C1, &C0, &43, &E0, &01, &FF, &C0									;; Macro C1: 4*3 Gratings
 	DEFB &12, &C2, &16, &D2, &FB, &3C, &7D, &CF, &27, &FC, &0A, &69, &75, &9A, &3C, &E6, &FC, &7F, &80	;; etc.
 	DEFB &08, &C3, &16, &CA, &77, &3C, &9F, &F1, &FE
 	DEFB &0B, &C4, &C3, &23, &E1, &E1, &C5, &B6, &9F, &CF, &F8, &FF
@@ -15539,7 +15604,9 @@ Room_Macro_data: 														;; MacroID &C0 to &DB
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Room_list1 + Room_list2 = 230 + 71 rooms = 301 rooms
-;; 		Note that the victory room is in fact composed of 2 rooms : &8D30 and &8E30.
+;; 		Note that the victory room is in fact "composed" of 2 rooms : &8D30 and &8E30.
+;;      The 8D3 has no far wall, hence we load and see 8E3, therefore counts as 2 even
+;;		though we cannot enter 8E3.
 ;; Format:
 ;; <length> <high_id> <low_id in [7:4]; data in [3:0]> <data n bytes>
 ;; until length = 0. (Note that the room ID is in Big-Endian format)
@@ -15598,7 +15665,7 @@ Room_list1: ;; 230 rooms
 	;; <length> <high_id> <low_id in [7:4]; data in [3:0]> <next data N bytes>
 	;; until length = 0
 	DEFB &1A, &12, &01, &61, &FC, &05, &92, &07, &20, &CA, &FA, &BF, &E0, &93, &0F, &CF, &CB, &D7, &E7, &33, &A9, &DC, &E7, &73, &FF, &1F, &E0		;; RoomID "120"
-	DEFB &0B, &1D, &01, &E1, &08, &05, &B0, &07, &CB, &03, &FF, &80													;; RoomID "1D0"
+	DEFB &0B, &1D, &01, &E1, &08, &05, &B0, &07, &CB, &03, &FF, &80								;; RoomID "1D0"
 	DEFB &0C, &22, &05, &21, &08, &24, &4B, &95, &F1, &7D, &7F, &E3, &FC
 	DEFB &1D, &24, &00, &E1, &10, &3C, &3F, &38, &E2, &73, &FC, &03, &3C, &F8, &57, &72, &1D, &16, &87, &11, &FF, &FF, &81, &6D, &17, &0F, &89, &FF, &1F, &E0
 	DEFB &08, &26, &0F, &A1, &08, &05, &96, &07, &FF
@@ -15617,20 +15684,20 @@ Room_list1: ;; 230 rooms
 	DEFB &0D, &4E, &0F, &21, &00, &25, &B2, &17, &DA, &17, &E5, &81, &FF, &C0
 	DEFB &08, &81, &0F, &61, &40, &05, &96, &07, &FF
 	DEFB &10, &82, &01, &E1, &1F, &8C, &1F, &38, &24, &9B, &85, &C4, &F2, &31, &3F, &1F, &E0
-	DEFB &0D, &84, &03, &E1, &08, &05, &AF, &0F, &D7, &9B, &E5, &81, &FF, &C0									;; Room ID "840" Moon Base Teleporters to Penitentiary "B10"
-	DEFB &0B, &85, &01, &A1, &08, &05, &B0, &07, &CB, &0F, &FF, &80											;; Room ID "850" Moon Base Teleporters to Book World "EF2"
+	DEFB &0D, &84, &03, &E1, &08, &05, &AF, &0F, &D7, &9B, &E5, &81, &FF, &C0						;; Room ID "840" Moon Base Teleporters to Penitentiary "B10"
+	DEFB &0B, &85, &01, &A1, &08, &05, &B0, &07, &CB, &0F, &FF, &80								;; Room ID "850" Moon Base Teleporters to Book World "EF2"
 	DEFB &06, &87, &0F, &E1, &48, &05, &FE
 	DEFB &08, &88, &0F, &A1, &01, &05, &96, &07, &FF
 	DEFB &06, &92, &07, &61, &48, &25, &FE
 	DEFB &08, &93, &0C, &61, &41, &05, &AF, &C7, &FF
-	DEFB &08, &94, &00, &A1, &49, &25, &9E, &47, &FF															;; Room ID "940" first Moon Base "Arrow" room (access to rooms 840 and A40)
-	DEFB &08, &95, &00, &E1, &49, &25, &9E, &47, &FF															;; Room ID "950" 2nd Moon Base "Arrow" room (access to rooms 850 and A50)
+	DEFB &08, &94, &00, &A1, &49, &25, &9E, &47, &FF												;; Room ID "940" first Moon Base "Arrow" room (access to rooms 840 and A40)
+	DEFB &08, &95, &00, &E1, &49, &25, &9E, &47, &FF												;; Room ID "950" 2nd Moon Base "Arrow" room (access to rooms 850 and A50)
 	DEFB &0B, &96, &0D, &21, &41, &04, &1F, &1A, &FA, &FC, &7F, &F0
 	DEFB &06, &97, &07, &61, &09, &25, &FE
 	DEFB &08, &A1, &0F, &61, &40, &05, &96, &07, &FF
 	DEFB &0D, &A2, &00, &21, &03, &25, &86, &24, &CC, &9E, &67, &45, &FF, &C0
-	DEFB &0D, &A4, &02, &61, &00, &25, &AC, &CF, &D6, &7B, &E5, &81, &FF, &C0									;; Room ID "A40" Moon Base Teleporters to Safari "00F"
-	DEFB &0B, &A5, &01, &61, &00, &25, &B0, &07, &CB, &03, &FF, &80											;; Room ID "A50" Moon Base Teleporters to Egyptus "88D"
+	DEFB &0D, &A4, &02, &61, &00, &25, &AC, &CF, &D6, &7B, &E5, &81, &FF, &C0						;; Room ID "A40" Moon Base Teleporters to Safari "00F"
+	DEFB &0B, &A5, &01, &61, &00, &25, &B0, &07, &CB, &03, &FF, &80								;; Room ID "A50" Moon Base Teleporters to Egyptus "88D"
 	DEFB &0B, &A7, &0E, &21, &C0, &24, &19, &31, &F9, &C0, &FF, &F0
 	DEFB &0B, &A8, &00, &61, &01, &05, &B0, &07, &CB, &03, &FF, &80
 	DEFB &08, &B1, &02, &5B, &08, &07, &96, &07, &FF
@@ -15639,10 +15706,10 @@ Room_list1: ;; 230 rooms
 	DEFB &14, &C3, &0F, &1B, &01, &06, &43, &A6, &EF, &7F, &C1, &26, &38, &3C, &4E, &6B, &5D, &76, &D7, &F1, &FE
 	DEFB &1E, &D1, &0B, &DB, &00, &26, &03, &2A, &01, &F9, &2E, &8F, &B3, &FE, &08, &F2, &59, &1D, &65, &B7, &7E, &09, &35, &46, &85, &4B, &BF, &D7, &3F, &1F, &E0
 	DEFB &19, &89, &41, &78, &40, &02, &1D, &38, &E0, &10, &0F, &82, &47, &C1, &A3, &83, &68, &3E, &1E, &8E, &C7, &43, &91, &FF, &1F, &E0			;; Heels' 1st room, id &8940
-	DEFB &10, &8A, &43, &F8, &01, &02, &01, &3E, &E0, &58, &62, &33, &1A, &8D, &FF, &1F, &E0							;; Head's 1st room, id &8A40
-	DEFB &0B, &61, &59, &38, &14, &0E, &2D, &B3, &FA, &7F, &C7, &F8													;; Head's 3rd room, id &6150
+	DEFB &10, &8A, &43, &F8, &01, &02, &01, &3E, &E0, &58, &62, &33, &1A, &8D, &FF, &1F, &E0			;; Head's 1st room, id &8A40
+	DEFB &0B, &61, &59, &38, &14, &0E, &2D, &B3, &FA, &7F, &C7, &F8									;; Head's 3rd room, id &6150
 	DEFB &0E, &64, &51, &78, &10, &0E, &2D, &3B, &E2, &F3, &DE, &09, &3F, &FF, &E0
-	DEFB &09, &71, &53, &40, &00, &22, &01, &3E, &FF, &E0																;; Head's 2nd room, id &7150
+	DEFB &09, &71, &53, &40, &00, &22, &01, &3E, &FF, &E0												;; Head's 2nd room, id &7150
 	DEFB &11, &74, &54, &80, &04, &3C, &03, &A3, &E9, &FF, &C0, &B6, &CF, &F7, &C3, &FF, &8F, &F0
 	DEFB &0F, &84, &54, &80, &80, &1C, &2F, &13, &E2, &DA, &5F, &1F, &0F, &FE, &3F, &C0
 	DEFB &06, &85, &5E, &00, &09, &03, &FE
@@ -15916,7 +15983,7 @@ Room_List2:   ;; 71 more rooms
 ;; This block is not generated by DEFS, but instead by moving data 6600-AD8F to 70D8-B897 at init
 ;; hence leaving this memory area available for buffering:
 BlitBuff:
-	DEFS 	256				;; Table of values used by the blit routines
+	DEFS 	256				;; Table of values used by the blit routines (BlitScreen)
 ViewBuff:
 	DEFS 	256				;; buffer
 DestBuff:
@@ -15926,11 +15993,12 @@ RevTable:
 BackgrdBuff:
 	DEFS 	64				;; data???
 .SaveRestore_Block4:					;; Save/Restore Block 4 : &3F0 bytes (1008 = 56 x 18, each Object is 18 byte-long)
-Objects:
+ObjectsBuffer:
 	DEFS 	&3F0			;; Objects buffer
 .SaveRestore_Block4_end
 TODO_6E30:
 	DEFS 	&190 			;; ???
+BlitRot_Buffer:
 KeyScanningBuffer:
 	DEFS 	10				;; Buffer (key scanning)
 	DEFS 	&10E
@@ -15942,8 +16010,19 @@ KeyScanningBuffer:
 
 .PanelFlips:
 	DEFS	8, &00
-.SpriteFlips_buffer:														;; flipped sprite
+.SpriteFlips_buffer:													;; flipped sprite ; Bitmap of whether the nth sprite is store in flipped format.
 	DEFS 	16, &00
+
+;; -----------------------------------------------------------------------------------------------------------
+;; Sprites Data : Size, start addr
+;; 4x56	: 70F0 : Walls
+;; 3x56 : 8270 : Doorways
+;; 3x32 : 8A50 : Visor robot, sprite codes #10 to #13
+;; 3x24 : 8BD0 : main Sprites, codes #18 to #4D
+;; 4x28 : AA30 : Big Sprites, codes #54 to #5F
+;; 2x24 : B4B0 : Floor tiles
+;; 1x8  : B630 : text character symbols
+;; 4xH  : B800 : Pillars, top (4x9), mid (4x6), bottom (4x8)
 
 ;; -----------------------------------------------------------------------------------------------------------
 img_wall_deco:
@@ -17484,63 +17563,6 @@ img_doorway_L_type_0:				;; SPR_DOORL:      EQU &00
 	DEFB &3E, &5F, &00, &3F, &67, &00, &4F, &7B, &00, &63, &7B, &00, &38, &74, &00, &0E
 	DEFB &70, &00, &03, &40, &00, &00, &00, &00
 
-	;;	................@@..@@..
-	;;	..............@@@@@@..@@
-	;;	............@@..@@..@@.@
-	;;	..........@@@@@@..@@@@.@
-	;;	.........@..@@..@@.@@@@.
-	;;	........@@@@..@@@@.@@..@
-	;;	.......@@@@.@@.@@@@..@@.
-	;;	....@@.@@@.@@@.@@..@@@..
-	;;	..@@@.@.@.@@@@@..@@.@@@@
-	;;	.@..@.@@.@@@@..@@...@@@.
-	;;	..@@...@.@@..@@.@.@@@...
-	;;	...@@@.....@@...@@@..@..
-	;;	.@@@@@@@.@@@@.@@@..@@@@.
-	;;	..@@@@.....@@@@...@@@@@@
-	;;	....@@@...@@@..@.@@@..@@
-	;;	......@@.@@...@@.@@@@.@@
-	;;	..@@@......@.@....@@.@@.
-	;;	...@@@@.@@@@..@@@...@@@.
-	;;	..@.@@@.@@@..@@@@@.@@@..
-	;;	.@@@..@.@@@.@@..@@.@@...
-	;;	..@.@@..@@@.@@.@@.@@....
-	;;	....@.@.@@..@@@..@@.....
-	;;	.@@...@.@@.@.@@@@@@.....
-	;;	.@@@@...@@.@@.@@@@......
-	;;	..@@@@@.@.@@..@@@@......
-	;;	..@@@@@@..@.@@@@@.......
-	;;	.@..@@@@...@@@@@@.......
-	;;	.@@@..@@.@.@@@@@@.......
-	;;	..@.@@...@.@..@@........
-	;;	....@.@@.@@.@.@@........
-	;;	.@@...@..@@@@.@@........
-	;;	.@@@@..@.@@@@.@@........
-	;;	..@@@@@..@@@@.@@........
-	;;	..@@@@@@.@@.@.@@........
-	;;	.@..@@@@.@.@..@@........
-	;;	.@@@..@@.@.@@@@@........
-	;;	..@.@@...@.@@@@@........
-	;;	....@.@@.@@..@@@........
-	;;	.@@...@..@.@@@@@........
-	;;	.@@@@..@.@.@@@@@........
-	;;	..@@@@@..@.@..@@........
-	;;	..@@@@@@.@@.@.@@........
-	;;	.@..@@@@.@@@@.@@........
-	;;	.@@@..@@.@@@@.@@........
-	;;	..@.@@...@@@@.@@........
-	;;	....@.@@.@@.@.@@........
-	;;	.@@...@..@.@..@@........
-	;;	.@@@@..@.@.@@@@@........
-	;;	..@@@@@..@.@@@@@........
-	;;	..@@@@@@.@@..@@@........
-	;;	.@..@@@@.@@@@.@@........
-	;;	.@@...@@.@@@@.@@........
-	;;	..@@@....@@@.@..........
-	;;	....@@@..@@@............
-	;;	......@@.@..............
-	;;	........................
-
 	DEFB &FF, &FC, &C0, &FF, &F3, &F3, &FF, &C0
 	DEFB &C1, &FF, &80, &01, &FF, &40, &C0, &FC, &F3, &C1, &F1, &E1, &E6, &CD, &C1, &9C
 	DEFB &B8, &80, &6F, &48, &01, &8E, &B0, &06, &B8, &9C, &18, &E4, &7F, &7B, &9E, &BC
@@ -17553,62 +17575,62 @@ img_doorway_L_type_0:				;; SPR_DOORL:      EQU &00
 	DEFB &03, &7F, &60, &13, &7F, &78, &1F, &7F, &BE, &1F, &7F, &BF, &07, &7F, &0F, &03
 	DEFB &7F, &03, &03, &7F, &80, &04, &FF, &C0, &03, &FF, &F0, &0F, &FF, &FC, &BF, &FF
 
-	;;	@@@@@@@@@@@@@@..@@......
-	;;	@@@@@@@@@@@@..@@@@@@..@@
-	;;	@@@@@@@@@@......@@.....@
-	;;	@@@@@@@@@..............@
-	;;	@@@@@@@@.@......@@......
-	;;	@@@@@@..@@@@..@@@@.....@
-	;;	@@@@...@@@@....@@@@..@@.
-	;;	@@..@@.@@@.....@@..@@@..
-	;;	@.@@@...@........@@.@@@@
-	;;	.@..@..........@@...@@@.
-	;;	@.@@.........@@.@.@@@...
-	;;	@..@@@.....@@...@@@..@..
-	;;	.@@@@@@@.@@@@.@@@..@@@@.
-	;;	@.@@@@.....@@@@...@@@@@@
-	;;	@@..@@@...@@@....@@@..@@
-	;;	@@....@@.@@......@@@@.@@
-	;;	@.@@@......@......@@.@@.
-	;;	@@.@@@@.@@@@..@@@...@@@.
-	;;	@...@@@.@@@..@@@@@.@@@.@
-	;;	......@.@@@.@@..@@.@@.@@
-	;;	........@@@.@@.@@.@@.@@@
-	;;	@.......@@..@@@..@@.@@@@
-	;;	.@@.....@@...@@@@@@.@@@@
-	;;	.@@@@...@@....@@@@.@@@@@
-	;;	@.@@@@@.@.....@@@@.@@@@@
-	;;	@.@@@@@@....@@@@@.@@@@@@
-	;;	....@@@@...@@@@@@.@@@@@@
-	;;	......@@...@@@@@@.@@@@@@
-	;;	...........@..@@.@@@@@@@
-	;;	@.............@@.@@@@@@@
-	;;	.@@...........@@.@@@@@@@
-	;;	.@@@@.........@@.@@@@@@@
-	;;	@.@@@@@.......@@.@@@@@@@
-	;;	@.@@@@@@......@@.@@@@@@@
-	;;	....@@@@...@..@@.@@@@@@@
-	;;	......@@...@@@@@.@@@@@@@
-	;;	...........@@@@@.@@@@@@@
-	;;	@............@@@.@@@@@@@
-	;;	.@@........@@@@@.@@@@@@@
-	;;	.@@@@......@@@@@.@@@@@@@
-	;;	@.@@@@@....@..@@.@@@@@@@
-	;;	@.@@@@@@......@@.@@@@@@@
-	;;	....@@@@......@@.@@@@@@@
-	;;	......@@......@@.@@@@@@@
-	;;	..............@@.@@@@@@@
-	;;	@.............@@.@@@@@@@
-	;;	.@@........@..@@.@@@@@@@
-	;;	.@@@@......@@@@@.@@@@@@@
-	;;	@.@@@@@....@@@@@.@@@@@@@
-	;;	@.@@@@@@.....@@@.@@@@@@@
-	;;	....@@@@......@@.@@@@@@@
-	;;	......@@......@@.@@@@@@@
-	;;	@............@..@@@@@@@@
-	;;	@@............@@@@@@@@@@
-	;;	@@@@........@@@@@@@@@@@@
-	;;	@@@@@@..@.@@@@@@@@@@@@@@
+	;;	................@@..@@..	@@@@@@@@@@@@@@..@@......
+	;;	..............@@@@@@..@@	@@@@@@@@@@@@..@@@@@@..@@
+	;;	............@@..@@..@@.@	@@@@@@@@@@......@@.....@
+	;;	..........@@@@@@..@@@@.@	@@@@@@@@@..............@
+	;;	.........@..@@..@@.@@@@.	@@@@@@@@.@......@@......
+	;;	........@@@@..@@@@.@@..@	@@@@@@..@@@@..@@@@.....@
+	;;	.......@@@@.@@.@@@@..@@.	@@@@...@@@@....@@@@..@@.
+	;;	....@@.@@@.@@@.@@..@@@..	@@..@@.@@@.....@@..@@@..
+	;;	..@@@.@.@.@@@@@..@@.@@@@	@.@@@...@........@@.@@@@
+	;;	.@..@.@@.@@@@..@@...@@@.	.@..@..........@@...@@@.
+	;;	..@@...@.@@..@@.@.@@@...	@.@@.........@@.@.@@@...
+	;;	...@@@.....@@...@@@..@..	@..@@@.....@@...@@@..@..
+	;;	.@@@@@@@.@@@@.@@@..@@@@.	.@@@@@@@.@@@@.@@@..@@@@.
+	;;	..@@@@.....@@@@...@@@@@@	@.@@@@.....@@@@...@@@@@@
+	;;	....@@@...@@@..@.@@@..@@	@@..@@@...@@@....@@@..@@
+	;;	......@@.@@...@@.@@@@.@@	@@....@@.@@......@@@@.@@
+	;;	..@@@......@.@....@@.@@.	@.@@@......@......@@.@@.
+	;;	...@@@@.@@@@..@@@...@@@.	@@.@@@@.@@@@..@@@...@@@.
+	;;	..@.@@@.@@@..@@@@@.@@@..	@...@@@.@@@..@@@@@.@@@.@
+	;;	.@@@..@.@@@.@@..@@.@@...	......@.@@@.@@..@@.@@.@@
+	;;	..@.@@..@@@.@@.@@.@@....	........@@@.@@.@@.@@.@@@
+	;;	....@.@.@@..@@@..@@.....	@.......@@..@@@..@@.@@@@
+	;;	.@@...@.@@.@.@@@@@@.....	.@@.....@@...@@@@@@.@@@@
+	;;	.@@@@...@@.@@.@@@@......	.@@@@...@@....@@@@.@@@@@
+	;;	..@@@@@.@.@@..@@@@......	@.@@@@@.@.....@@@@.@@@@@
+	;;	..@@@@@@..@.@@@@@.......	@.@@@@@@....@@@@@.@@@@@@
+	;;	.@..@@@@...@@@@@@.......	....@@@@...@@@@@@.@@@@@@
+	;;	.@@@..@@.@.@@@@@@.......	......@@...@@@@@@.@@@@@@
+	;;	..@.@@...@.@..@@........	...........@..@@.@@@@@@@
+	;;	....@.@@.@@.@.@@........	@.............@@.@@@@@@@
+	;;	.@@...@..@@@@.@@........	.@@...........@@.@@@@@@@
+	;;	.@@@@..@.@@@@.@@........	.@@@@.........@@.@@@@@@@
+	;;	..@@@@@..@@@@.@@........	@.@@@@@.......@@.@@@@@@@
+	;;	..@@@@@@.@@.@.@@........	@.@@@@@@......@@.@@@@@@@
+	;;	.@..@@@@.@.@..@@........	....@@@@...@..@@.@@@@@@@
+	;;	.@@@..@@.@.@@@@@........	......@@...@@@@@.@@@@@@@
+	;;	..@.@@...@.@@@@@........	...........@@@@@.@@@@@@@
+	;;	....@.@@.@@..@@@........	@............@@@.@@@@@@@
+	;;	.@@...@..@.@@@@@........	.@@........@@@@@.@@@@@@@
+	;;	.@@@@..@.@.@@@@@........	.@@@@......@@@@@.@@@@@@@
+	;;	..@@@@@..@.@..@@........	@.@@@@@....@..@@.@@@@@@@
+	;;	..@@@@@@.@@.@.@@........	@.@@@@@@......@@.@@@@@@@
+	;;	.@..@@@@.@@@@.@@........	....@@@@......@@.@@@@@@@
+	;;	.@@@..@@.@@@@.@@........	......@@......@@.@@@@@@@
+	;;	..@.@@...@@@@.@@........	..............@@.@@@@@@@
+	;;	....@.@@.@@.@.@@........	@.............@@.@@@@@@@
+	;;	.@@...@..@.@..@@........	.@@........@..@@.@@@@@@@
+	;;	.@@@@..@.@.@@@@@........	.@@@@......@@@@@.@@@@@@@
+	;;	..@@@@@..@.@@@@@........	@.@@@@@....@@@@@.@@@@@@@
+	;;	..@@@@@@.@@..@@@........	@.@@@@@@.....@@@.@@@@@@@
+	;;	.@..@@@@.@@@@.@@........	....@@@@......@@.@@@@@@@
+	;;	.@@...@@.@@@@.@@........	......@@......@@.@@@@@@@
+	;;	..@@@....@@@.@..........	@............@..@@@@@@@@
+	;;	....@@@..@@@............	@@............@@@@@@@@@@
+	;;	......@@.@..............	@@@@........@@@@@@@@@@@@
+	;;	........................	@@@@@@..@.@@@@@@@@@@@@@@
 
 img_doorway_R_type_0: 		;; SPR_DOORR:      EQU &01
 	DEFB &00, &00, &00, &00, &03, &C0, &00, &0C, &D0, &00, &3F, &38, &00, &CC, &DC, &03
@@ -17623,63 +17645,6 @@ img_doorway_R_type_0: 		;; SPR_DOORR:      EQU &01
 	DEFB &00, &38, &6C, &00, &0E, &70, &00, &03, &40, &00, &00, &00, &00, &00, &00, &00
 	DEFB &00, &00, &00, &00, &00, &00, &00, &00
 
-	;;	........................
-	;;	..............@@@@......
-	;;	............@@..@@.@....
-	;;	..........@@@@@@..@@@...
-	;;	........@@..@@..@@.@@@..
-	;;	......@@@@@@..@@@@.@@...
-	;;	....@@..@@..@@.@@@@..@..
-	;;	..@@..@@..@@@@.@@..@@...
-	;;	.@@@@@..@@.@@@@..@@@....
-	;;	@@@@..@@.@.@@..@@.@@@@..
-	;;	@@..@@@@.@@..@@...@@@...
-	;;	...@@@@@@..@@.@.@@@..@..
-	;;	...@@@@..@@...@@@..@@@..
-	;;	...@@..@@@@.@@@..@@@@@..
-	;;	.....@@...@@@..@..@@@@..
-	;;	...@@@...@@...@@@@.@@@..
-	;;	.@@@@@@@@..@@@.@@@..@@..
-	;;	@@@@@@@..@@@@@@.@@@@.@..
-	;;	........@@@..@@....@....
-	;;	........@@.@@@@.@@@.@@..
-	;;	........@@.@@@.@@@@@.@..
-	;;	.........@@....@@.@@.@@.
-	;;	.........@@@@@.@@.@@.@@.
-	;;	...........@@@@..@@@.@@.
-	;;	..........@..@@@@@@.@@@.
-	;;	............@..@@@@..@@.
-	;;	.........@@...@.@@@@@.@.
-	;;	.........@@@@...@@@@@.@.
-	;;	..........@@@@@..@@.@.@.
-	;;	..........@@@@@@.@@..@@.
-	;;	.........@..@@@@.@@.@@@.
-	;;	.........@@@..@@.@@..@@.
-	;;	..........@.@@...@@.@.@.
-	;;	............@.@@.@@.@@..
-	;;	.........@@...@..@@@@@..
-	;;	.........@@@@..@.@@@@.@.
-	;;	..........@@@@@..@@@@@..
-	;;	..........@@@@@@.@@.@@..
-	;;	.........@..@@@@.@@.@.@.
-	;;	.........@@@..@@.@@..@@.
-	;;	..........@.@@...@@.@@@.
-	;;	............@.@@.@@..@@.
-	;;	.........@@...@..@@.@.@.
-	;;	.........@@@@..@.@@@@.@.
-	;;	..........@@@@@..@@@@.@.
-	;;	..........@@@@@@.@@..@@.
-	;;	.........@..@@@@.@@.@@@.
-	;;	.........@@...@@.@@.@@@.
-	;;	..........@@@....@@.@@..
-	;;	............@@@..@@@....
-	;;	..............@@.@......
-	;;	........................
-	;;	........................
-	;;	........................
-	;;	........................
-	;;	........................
-
 	DEFB &FF, &FC, &3F, &FF, &F0, &0F, &FF, &CC
 	DEFB &17, &FF, &3F, &3B, &FC, &0C, &1D, &F0, &00, &19, &CC, &0C, &05, &03, &3C, &1B
 	DEFB &70, &1E, &71, &F3, &19, &BD, &C1, &06, &39, &01, &1A, &E5, &00, &63, &9D, &01
@@ -17692,62 +17657,62 @@ img_doorway_R_type_0: 		;; SPR_DOORR:      EQU &01
 	DEFB &BF, &60, &FF, &0F, &60, &FF, &03, &60, &FF, &80, &61, &FF, &C0, &73, &FF, &F0
 	DEFB &4F, &FF, &FC, &BF, &FF, &FF, &FF, &FF, &FF, &FF, &FF, &FF, &FF, &FF, &FF, &FF
 
-	;;	@@@@@@@@@@@@@@....@@@@@@
-	;;	@@@@@@@@@@@@........@@@@
-	;;	@@@@@@@@@@..@@.....@.@@@
-	;;	@@@@@@@@..@@@@@@..@@@.@@
-	;;	@@@@@@......@@.....@@@.@
-	;;	@@@@...............@@..@
-	;;	@@..@@......@@.......@.@
-	;;	......@@..@@@@.....@@.@@
-	;;	.@@@.......@@@@..@@@...@
-	;;	@@@@..@@...@@..@@.@@@@.@
-	;;	@@.....@.....@@...@@@..@
-	;;	.......@...@@.@.@@@..@.@
-	;;	.........@@...@@@..@@@.@
-	;;	.......@@@@.@@@..@@@@@.@
-	;;	.....@@...@@@.....@@@@.@
-	;;	...@@@...@@........@@@.@
-	;;	.@@@@@@@@..@@@......@@.@
-	;;	@@@@@@@..@@@@@@......@.@
-	;;	........@@@..@@........@
-	;;	@@@@@@@.@@.@@@@.@@@....@
-	;;	@@@@@@@.@@.@@@.@@@@@...@
-	;;	@@@@@@@@.@@....@@.@@....
-	;;	@@@@@@@@.@@@@@.@@.@@....
-	;;	@@@@@@@@...@@@@..@@@....
-	;;	@@@@@@@@@....@@@@@@.....
-	;;	@@@@@@@@@......@@@@.....
-	;;	@@@@@@@@.@@.....@@@@@...
-	;;	@@@@@@@@.@@@@...@@@@@...
-	;;	@@@@@@@@@.@@@@@..@@.@...
-	;;	@@@@@@@@@.@@@@@@.@@.....
-	;;	@@@@@@@@....@@@@.@@.....
-	;;	@@@@@@@@......@@.@@.....
-	;;	@@@@@@@@@........@@.@...
-	;;	@@@@@@@@@........@@.@@..
-	;;	@@@@@@@@.@@......@@@@@..
-	;;	@@@@@@@@.@@@@....@@@@...
-	;;	@@@@@@@@@.@@@@@..@@@@@..
-	;;	@@@@@@@@@.@@@@@@.@@.@@..
-	;;	@@@@@@@@....@@@@.@@.@...
-	;;	@@@@@@@@......@@.@@.....
-	;;	@@@@@@@@@........@@.....
-	;;	@@@@@@@@@........@@.....
-	;;	@@@@@@@@.@@......@@.@...
-	;;	@@@@@@@@.@@@@....@@@@...
-	;;	@@@@@@@@@.@@@@@..@@@@...
-	;;	@@@@@@@@@.@@@@@@.@@.....
-	;;	@@@@@@@@....@@@@.@@.....
-	;;	@@@@@@@@......@@.@@.....
-	;;	@@@@@@@@@........@@....@
-	;;	@@@@@@@@@@.......@@@..@@
-	;;	@@@@@@@@@@@@.....@..@@@@
-	;;	@@@@@@@@@@@@@@..@.@@@@@@
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@....@@@@@@
+	;;	..............@@@@......	@@@@@@@@@@@@........@@@@
+	;;	............@@..@@.@....	@@@@@@@@@@..@@.....@.@@@
+	;;	..........@@@@@@..@@@...	@@@@@@@@..@@@@@@..@@@.@@
+	;;	........@@..@@..@@.@@@..	@@@@@@......@@.....@@@.@
+	;;	......@@@@@@..@@@@.@@...	@@@@...............@@..@
+	;;	....@@..@@..@@.@@@@..@..	@@..@@......@@.......@.@
+	;;	..@@..@@..@@@@.@@..@@...	......@@..@@@@.....@@.@@
+	;;	.@@@@@..@@.@@@@..@@@....	.@@@.......@@@@..@@@...@
+	;;	@@@@..@@.@.@@..@@.@@@@..	@@@@..@@...@@..@@.@@@@.@
+	;;	@@..@@@@.@@..@@...@@@...	@@.....@.....@@...@@@..@
+	;;	...@@@@@@..@@.@.@@@..@..	.......@...@@.@.@@@..@.@
+	;;	...@@@@..@@...@@@..@@@..	.........@@...@@@..@@@.@
+	;;	...@@..@@@@.@@@..@@@@@..	.......@@@@.@@@..@@@@@.@
+	;;	.....@@...@@@..@..@@@@..	.....@@...@@@.....@@@@.@
+	;;	...@@@...@@...@@@@.@@@..	...@@@...@@........@@@.@
+	;;	.@@@@@@@@..@@@.@@@..@@..	.@@@@@@@@..@@@......@@.@
+	;;	@@@@@@@..@@@@@@.@@@@.@..	@@@@@@@..@@@@@@......@.@
+	;;	........@@@..@@....@....	........@@@..@@........@
+	;;	........@@.@@@@.@@@.@@..	@@@@@@@.@@.@@@@.@@@....@
+	;;	........@@.@@@.@@@@@.@..	@@@@@@@.@@.@@@.@@@@@...@
+	;;	.........@@....@@.@@.@@.	@@@@@@@@.@@....@@.@@....
+	;;	.........@@@@@.@@.@@.@@.	@@@@@@@@.@@@@@.@@.@@....
+	;;	...........@@@@..@@@.@@.	@@@@@@@@...@@@@..@@@....
+	;;	..........@..@@@@@@.@@@.	@@@@@@@@@....@@@@@@.....
+	;;	............@..@@@@..@@.	@@@@@@@@@......@@@@.....
+	;;	.........@@...@.@@@@@.@.	@@@@@@@@.@@.....@@@@@...
+	;;	.........@@@@...@@@@@.@.	@@@@@@@@.@@@@...@@@@@...
+	;;	..........@@@@@..@@.@.@.	@@@@@@@@@.@@@@@..@@.@...
+	;;	..........@@@@@@.@@..@@.	@@@@@@@@@.@@@@@@.@@.....
+	;;	.........@..@@@@.@@.@@@.	@@@@@@@@....@@@@.@@.....
+	;;	.........@@@..@@.@@..@@.	@@@@@@@@......@@.@@.....
+	;;	..........@.@@...@@.@.@.	@@@@@@@@@........@@.@...
+	;;	............@.@@.@@.@@..	@@@@@@@@@........@@.@@..
+	;;	.........@@...@..@@@@@..	@@@@@@@@.@@......@@@@@..
+	;;	.........@@@@..@.@@@@.@.	@@@@@@@@.@@@@....@@@@...
+	;;	..........@@@@@..@@@@@..	@@@@@@@@@.@@@@@..@@@@@..
+	;;	..........@@@@@@.@@.@@..	@@@@@@@@@.@@@@@@.@@.@@..
+	;;	.........@..@@@@.@@.@.@.	@@@@@@@@....@@@@.@@.@...
+	;;	.........@@@..@@.@@..@@.	@@@@@@@@......@@.@@.....
+	;;	..........@.@@...@@.@@@.	@@@@@@@@@........@@.....
+	;;	............@.@@.@@..@@.	@@@@@@@@@........@@.....
+	;;	.........@@...@..@@.@.@.	@@@@@@@@.@@......@@.@...
+	;;	.........@@@@..@.@@@@.@.	@@@@@@@@.@@@@....@@@@...
+	;;	..........@@@@@..@@@@.@.	@@@@@@@@@.@@@@@..@@@@...
+	;;	..........@@@@@@.@@..@@.	@@@@@@@@@.@@@@@@.@@.....
+	;;	.........@..@@@@.@@.@@@.	@@@@@@@@....@@@@.@@.....
+	;;	.........@@...@@.@@.@@@.	@@@@@@@@......@@.@@.....
+	;;	..........@@@....@@.@@..	@@@@@@@@@........@@....@
+	;;	............@@@..@@@....	@@@@@@@@@@.......@@@..@@
+	;;	..............@@.@......	@@@@@@@@@@@@.....@..@@@@
+	;;	........................	@@@@@@@@@@@@@@..@.@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
 
 img_doorway_L_type_1:				;; Doorways (Moon base)
 	DEFB &00, &00, &0E, &00, &00, &38, &00, &00, &E2, &00, &03, &9B, &00, &0E, &3B, &00
@@ -17762,63 +17727,6 @@ img_doorway_L_type_1:				;; Doorways (Moon base)
 	DEFB &5E, &BC, &00, &5E, &B8, &00, &5E, &B4, &00, &4E, &A6, &00, &32, &8C, &00, &0C
 	DEFB &B0, &00, &03, &C0, &00, &00, &00, &00
 
-	;;	....................@@@.
-	;;	..................@@@...
-	;;	................@@@...@.
-	;;	..............@@@..@@.@@
-	;;	............@@@...@@@.@@
-	;;	..........@@@..@@.@@@.@@
-	;;	........@@@@..@@@.@@@.@@
-	;;	......@@.@@.@.@@@.@@@...
-	;;	....@@...@.@@.@@@.@@..@@
-	;;	...@...@.@.@@.@@@...@@..
-	;;	..@..@@@.@.@@.@@..@@..@@
-	;;	..@.@@@@.@.@@...@@..@.@.
-	;;	.@@@..@@.@.@..@@..@@@...
-	;;	.@..@@...@..@@..@@.@....
-	;;	.@....@@.@@@..@@@@@.....
-	;;	.@...@..@@..@@..@@......
-	;;	.@...@@.@.@@@@@@........
-	;;	.@..@.@.@...@@@@........
-	;;	.@..@@..@.@@..@.........
-	;;	.@..@@@.@.@@@@..........
-	;;	.@.@..@.@...@@.@........
-	;;	.@..@@..@.@@....@@......
-	;;	.@.@..@.@....@@@..@.....
-	;;	.@..@@..@.@@@...@@@.....
-	;;	.@.@..@.@....@@@@@......
-	;;	.@.@@@..@.@@@@@@@.......
-	;;	.@.@@@@.@.@@@@@@........
-	;;	.@.@@@@.@.@@@@@.........
-	;;	.@.@@@@.@.@@@@..........
-	;;	.@.@@@@.@.@@@...........
-	;;	.@.@@@@.@.@@..@@........
-	;;	.@.@@@@.@.@.@...@@......
-	;;	.@.@@@@.@....@@@..@.....
-	;;	.@..@@@.@.@@@...@@@.....
-	;;	.@.@....@....@@@@@......
-	;;	.@.@@@..@.@@@@@@@.......
-	;;	.@.@@@@.@.@@@@@@........
-	;;	.@.@@@@.@.@@@@@.........
-	;;	.@.@@@@.@.@@@@..........
-	;;	.@.@@@@.@.@@@...........
-	;;	.@.@@@@.@.@@..@@........
-	;;	.@.@@@@.@.@.@...@@......
-	;;	.@.@@@@.@....@@@..@.....
-	;;	.@..@@@.@.@@@...@@@.....
-	;;	.@.@....@....@@@@@......
-	;;	.@.@@@..@.@@@@@@@.......
-	;;	.@.@@@@.@.@@@@@@........
-	;;	.@.@@@@.@.@@@@@.........
-	;;	.@.@@@@.@.@@@@..........
-	;;	.@.@@@@.@.@@@...........
-	;;	.@.@@@@.@.@@.@..........
-	;;	.@..@@@.@.@..@@.........
-	;;	..@@..@.@...@@..........
-	;;	....@@..@.@@............
-	;;	......@@@@..............
-	;;	........................
-
 	DEFB &FF, &FF, &CE, &FF, &FF, &38, &FF, &FC
 	DEFB &E0, &FF, &F3, &98, &FF, &CE, &38, &FF, &38, &38, &FC, &F0, &38, &F3, &68, &38
 	DEFB &EC, &58, &33, &D0, &58, &0C, &A0, &58, &30, &A0, &58, &C0, &70, &53, &01, &4C
@@ -17831,62 +17739,62 @@ img_doorway_L_type_1:				;; Doorways (Moon base)
 	DEFB &BF, &BF, &5E, &BF, &7F, &5E, &BE, &FF, &5E, &BD, &FF, &5E, &BB, &FF, &5E, &B5
 	DEFB &FF, &4E, &A6, &FF, &B2, &8D, &FF, &CC, &B3, &FF, &F3, &CF, &FF, &FC, &3F, &FF
 
-	;;	@@@@@@@@@@@@@@@@@@..@@@.
-	;;	@@@@@@@@@@@@@@@@..@@@...
-	;;	@@@@@@@@@@@@@@..@@@.....
-	;;	@@@@@@@@@@@@..@@@..@@...
-	;;	@@@@@@@@@@..@@@...@@@...
-	;;	@@@@@@@@..@@@.....@@@...
-	;;	@@@@@@..@@@@......@@@...
-	;;	@@@@..@@.@@.@.....@@@...
-	;;	@@@.@@...@.@@.....@@..@@
-	;;	@@.@.....@.@@.......@@..
-	;;	@.@......@.@@.....@@....
-	;;	@.@......@.@@...@@......
-	;;	.@@@.....@.@..@@.......@
-	;;	.@..@@...@..@@.......@@@
-	;;	.@.@..@@.@@@........@@@@
-	;;	.@.@....@@.........@@@@@
-	;;	.@.@....@.........@@@@@@
-	;;	.@......@........@@@@@@@
-	;;	.@......@.......@@@@@@@@
-	;;	.@......@.......@@@@@@@@
-	;;	.@......@......@..@@@@@@
-	;;	.@......@.......@@.@@@@@
-	;;	.@.@....@....@@@..@.@@@@
-	;;	.@..@@..@.@@@...@@@.@@@@
-	;;	.@.@..@.@....@@@@@.@@@@@
-	;;	.@.@@@..@.@@@@@@@.@@@@@@
-	;;	.@.@@@@.@.@@@@@@.@@@@@@@
-	;;	.@.@@@@.@.@@@@@.@@@@@@@@
-	;;	.@.@@@@.@.@@@@.@@@@@@@@@
-	;;	.@.@@@@.@.@@@...@@@@@@@@
-	;;	.@.@@@@.@.@@..@@..@@@@@@
-	;;	.@.@@@@.@.@.....@@.@@@@@
-	;;	.@.@@@@.@....@@@..@.@@@@
-	;;	.@..@@@.@.@@@...@@@.@@@@
-	;;	.@.@....@....@@@@@.@@@@@
-	;;	.@.@@@..@.@@@@@@@.@@@@@@
-	;;	.@.@@@@.@.@@@@@@.@@@@@@@
-	;;	.@.@@@@.@.@@@@@.@@@@@@@@
-	;;	.@.@@@@.@.@@@@.@@@@@@@@@
-	;;	.@.@@@@.@.@@@...@@@@@@@@
-	;;	.@.@@@@.@.@@..@@..@@@@@@
-	;;	.@.@@@@.@.@.....@@.@@@@@
-	;;	.@.@@@@.@....@@@..@.@@@@
-	;;	.@..@@@.@.@@@...@@@.@@@@
-	;;	.@.@....@....@@@@@.@@@@@
-	;;	.@.@@@..@.@@@@@@@.@@@@@@
-	;;	.@.@@@@.@.@@@@@@.@@@@@@@
-	;;	.@.@@@@.@.@@@@@.@@@@@@@@
-	;;	.@.@@@@.@.@@@@.@@@@@@@@@
-	;;	.@.@@@@.@.@@@.@@@@@@@@@@
-	;;	.@.@@@@.@.@@.@.@@@@@@@@@
-	;;	.@..@@@.@.@..@@.@@@@@@@@
-	;;	@.@@..@.@...@@.@@@@@@@@@
-	;;	@@..@@..@.@@..@@@@@@@@@@
-	;;	@@@@..@@@@..@@@@@@@@@@@@
-	;;	@@@@@@....@@@@@@@@@@@@@@
+	;;	....................@@@.	@@@@@@@@@@@@@@@@@@..@@@.
+	;;	..................@@@...	@@@@@@@@@@@@@@@@..@@@...
+	;;	................@@@...@.	@@@@@@@@@@@@@@..@@@.....
+	;;	..............@@@..@@.@@	@@@@@@@@@@@@..@@@..@@...
+	;;	............@@@...@@@.@@	@@@@@@@@@@..@@@...@@@...
+	;;	..........@@@..@@.@@@.@@	@@@@@@@@..@@@.....@@@...
+	;;	........@@@@..@@@.@@@.@@	@@@@@@..@@@@......@@@...
+	;;	......@@.@@.@.@@@.@@@...	@@@@..@@.@@.@.....@@@...
+	;;	....@@...@.@@.@@@.@@..@@	@@@.@@...@.@@.....@@..@@
+	;;	...@...@.@.@@.@@@...@@..	@@.@.....@.@@.......@@..
+	;;	..@..@@@.@.@@.@@..@@..@@	@.@......@.@@.....@@....
+	;;	..@.@@@@.@.@@...@@..@.@.	@.@......@.@@...@@......
+	;;	.@@@..@@.@.@..@@..@@@...	.@@@.....@.@..@@.......@
+	;;	.@..@@...@..@@..@@.@....	.@..@@...@..@@.......@@@
+	;;	.@....@@.@@@..@@@@@.....	.@.@..@@.@@@........@@@@
+	;;	.@...@..@@..@@..@@......	.@.@....@@.........@@@@@
+	;;	.@...@@.@.@@@@@@........	.@.@....@.........@@@@@@
+	;;	.@..@.@.@...@@@@........	.@......@........@@@@@@@
+	;;	.@..@@..@.@@..@.........	.@......@.......@@@@@@@@
+	;;	.@..@@@.@.@@@@..........	.@......@.......@@@@@@@@
+	;;	.@.@..@.@...@@.@........	.@......@......@..@@@@@@
+	;;	.@..@@..@.@@....@@......	.@......@.......@@.@@@@@
+	;;	.@.@..@.@....@@@..@.....	.@.@....@....@@@..@.@@@@
+	;;	.@..@@..@.@@@...@@@.....	.@..@@..@.@@@...@@@.@@@@
+	;;	.@.@..@.@....@@@@@......	.@.@..@.@....@@@@@.@@@@@
+	;;	.@.@@@..@.@@@@@@@.......	.@.@@@..@.@@@@@@@.@@@@@@
+	;;	.@.@@@@.@.@@@@@@........	.@.@@@@.@.@@@@@@.@@@@@@@
+	;;	.@.@@@@.@.@@@@@.........	.@.@@@@.@.@@@@@.@@@@@@@@
+	;;	.@.@@@@.@.@@@@..........	.@.@@@@.@.@@@@.@@@@@@@@@
+	;;	.@.@@@@.@.@@@...........	.@.@@@@.@.@@@...@@@@@@@@
+	;;	.@.@@@@.@.@@..@@........	.@.@@@@.@.@@..@@..@@@@@@
+	;;	.@.@@@@.@.@.@...@@......	.@.@@@@.@.@.....@@.@@@@@
+	;;	.@.@@@@.@....@@@..@.....	.@.@@@@.@....@@@..@.@@@@
+	;;	.@..@@@.@.@@@...@@@.....	.@..@@@.@.@@@...@@@.@@@@
+	;;	.@.@....@....@@@@@......	.@.@....@....@@@@@.@@@@@
+	;;	.@.@@@..@.@@@@@@@.......	.@.@@@..@.@@@@@@@.@@@@@@
+	;;	.@.@@@@.@.@@@@@@........	.@.@@@@.@.@@@@@@.@@@@@@@
+	;;	.@.@@@@.@.@@@@@.........	.@.@@@@.@.@@@@@.@@@@@@@@
+	;;	.@.@@@@.@.@@@@..........	.@.@@@@.@.@@@@.@@@@@@@@@
+	;;	.@.@@@@.@.@@@...........	.@.@@@@.@.@@@...@@@@@@@@
+	;;	.@.@@@@.@.@@..@@........	.@.@@@@.@.@@..@@..@@@@@@
+	;;	.@.@@@@.@.@.@...@@......	.@.@@@@.@.@.....@@.@@@@@
+	;;	.@.@@@@.@....@@@..@.....	.@.@@@@.@....@@@..@.@@@@
+	;;	.@..@@@.@.@@@...@@@.....	.@..@@@.@.@@@...@@@.@@@@
+	;;	.@.@....@....@@@@@......	.@.@....@....@@@@@.@@@@@
+	;;	.@.@@@..@.@@@@@@@.......	.@.@@@..@.@@@@@@@.@@@@@@
+	;;	.@.@@@@.@.@@@@@@........	.@.@@@@.@.@@@@@@.@@@@@@@
+	;;	.@.@@@@.@.@@@@@.........	.@.@@@@.@.@@@@@.@@@@@@@@
+	;;	.@.@@@@.@.@@@@..........	.@.@@@@.@.@@@@.@@@@@@@@@
+	;;	.@.@@@@.@.@@@...........	.@.@@@@.@.@@@.@@@@@@@@@@
+	;;	.@.@@@@.@.@@.@..........	.@.@@@@.@.@@.@.@@@@@@@@@
+	;;	.@..@@@.@.@..@@.........	.@..@@@.@.@..@@.@@@@@@@@
+	;;	..@@..@.@...@@..........	@.@@..@.@...@@.@@@@@@@@@
+	;;	....@@..@.@@............	@@..@@..@.@@..@@@@@@@@@@
+	;;	......@@@@..............	@@@@..@@@@..@@@@@@@@@@@@
+	;;	........................	@@@@@@....@@@@@@@@@@@@@@
 
 img_doorway_R_type_1:
 	DEFB &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &03, &C0, &00, &0E, &30, &00
@@ -17901,63 +17809,6 @@ img_doorway_R_type_1:
 	DEFB &00, &18, &0C, &00, &06, &B0, &00, &01, &C0, &00, &00, &00, &00, &00, &00, &00
 	DEFB &00, &00, &00, &00, &00, &00, &00, &00
 
-	;;	........................
-	;;	........................
-	;;	........................
-	;;	..............@@@@......
-	;;	............@@@...@@....
-	;;	..........@@@...@@..@...
-	;;	........@@@..@@..@@@.@..
-	;;	......@@@...@@@@..@@@.@.
-	;;	....@@@..@@..@@@@..@..@.
-	;;	..@@@...@@@@..@@@@..@@@.
-	;;	.@@..@@..@@@@..@..@@..@.
-	;;	...@@@@@..@@@@..@@....@.
-	;;	....@@@@@..@..@@......@.
-	;;	.....@@@@@..@@...@@...@.
-	;;	...@..@@..@@..@@.@@@..@.
-	;;	...@@...@@...@@.@@@.@.@.
-	;;	.@@..@@@..@.@@@.@@.@@.@.
-	;;	@@@@@@...@@.@@.@@@.@@.@.
-	;;	.........@.@@@.@@.@@..@.
-	;;	..............@@.@..@.@.
-	;;	..........@.@.....@@..@.
-	;;	.........@.@@@..@@..@.@.
-	;;	........@.@@..@@..@@@.@.
-	;;	........@@..@@..@@@@@.@.
-	;;	..........@@..@@@@@@@.@.
-	;;	............@@@@@@@@@.@.
-	;;	..............@@@@@@@.@.
-	;;	.............@..@@@@@.@.
-	;;	............@.....@@..@.
-	;;	...........@.@..@...@.@.
-	;;	..........@.@@.@..@@..@.
-	;;	.........@.@@@..@@..@.@.
-	;;	........@.@@..@@..@@@.@.
-	;;	........@@..@@..@@@@@.@.
-	;;	..........@@..@@@@@@@.@.
-	;;	............@@@@@@@@@.@.
-	;;	..............@@@@@@@.@.
-	;;	.............@..@@@@@.@.
-	;;	............@.....@@..@.
-	;;	...........@.@..@...@.@.
-	;;	..........@.@@.@..@@..@.
-	;;	.........@.@@@..@@..@.@.
-	;;	........@.@@..@@..@@@.@.
-	;;	........@@..@@..@@@@@.@.
-	;;	..........@@..@@@@@@@.@.
-	;;	............@@@@@@@@@.@.
-	;;	..............@@@@@@@.@.
-	;;	............@...@@@@..@.
-	;;	...........@@.......@@..
-	;;	.............@@.@.@@....
-	;;	...............@@@......
-	;;	........................
-	;;	........................
-	;;	........................
-	;;	........................
-	;;	........................
-
 	DEFB &FF, &FF, &FF, &FF, &FF, &FF, &FF, &FC
 	DEFB &3F, &FF, &F3, &CF, &FF, &CE, &37, &FF, &38, &CB, &FC, &E0, &75, &F3, &80, &3A
 	DEFB &CE, &60, &12, &38, &F0, &0E, &60, &78, &32, &00, &3C, &CA, &00, &13, &1A, &00
@@ -17970,62 +17821,62 @@ img_doorway_R_type_1:
 	DEFB &CF, &FA, &FF, &F3, &FA, &FF, &E8, &F2, &FF, &D8, &0D, &FF, &E6, &B3, &FF, &F9
 	DEFB &CF, &FF, &FE, &3F, &FF, &FF, &FF, &FF, &FF, &FF, &FF, &FF, &FF, &FF, &FF, &FF
 
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@....@@@@@@
-	;;	@@@@@@@@@@@@..@@@@..@@@@
-	;;	@@@@@@@@@@..@@@...@@.@@@
-	;;	@@@@@@@@..@@@...@@..@.@@
-	;;	@@@@@@..@@@......@@@.@.@
-	;;	@@@@..@@@.........@@@.@.
-	;;	@@..@@@..@@........@..@.
-	;;	..@@@...@@@@........@@@.
-	;;	.@@......@@@@.....@@..@.
-	;;	..........@@@@..@@..@.@.
-	;;	...........@..@@...@@.@.
-	;;	............@@......@.@.
-	;;	...@......@@..........@.
-	;;	...@@...@@............@.
-	;;	.@@..@@@..............@.
-	;;	@@@@@@................@.
-	;;	......................@.
-	;;	@@@@@@@@@...........@.@.
-	;;	@@@@@@@@@.@.@.....@@..@.
-	;;	@@@@@@@@.@.@@@..@@..@.@.
-	;;	@@@@@@@.@.@@..@@..@@@.@.
-	;;	@@@@@@@.@@..@@..@@@@@.@.
-	;;	@@@@@@@@..@@..@@@@@@@.@.
-	;;	@@@@@@@@@@..@@@@@@@@@.@.
-	;;	@@@@@@@@@@@@..@@@@@@@.@.
-	;;	@@@@@@@@@@@@.@..@@@@@.@.
-	;;	@@@@@@@@@@@.@.....@@..@.
-	;;	@@@@@@@@@@.@.@......@.@.
-	;;	@@@@@@@@@.@.@@....@@..@.
-	;;	@@@@@@@@.@.@@@..@@..@.@.
-	;;	@@@@@@@.@.@@..@@..@@@.@.
-	;;	@@@@@@@.@@..@@..@@@@@.@.
-	;;	@@@@@@@@..@@..@@@@@@@.@.
-	;;	@@@@@@@@@@..@@@@@@@@@.@.
-	;;	@@@@@@@@@@@@..@@@@@@@.@.
-	;;	@@@@@@@@@@@@.@..@@@@@.@.
-	;;	@@@@@@@@@@@.@.....@@..@.
-	;;	@@@@@@@@@@.@.@......@.@.
-	;;	@@@@@@@@@.@.@@....@@..@.
-	;;	@@@@@@@@.@.@@@..@@..@.@.
-	;;	@@@@@@@.@.@@..@@..@@@.@.
-	;;	@@@@@@@.@@..@@..@@@@@.@.
-	;;	@@@@@@@@..@@..@@@@@@@.@.
-	;;	@@@@@@@@@@..@@@@@@@@@.@.
-	;;	@@@@@@@@@@@@..@@@@@@@.@.
-	;;	@@@@@@@@@@@.@...@@@@..@.
-	;;	@@@@@@@@@@.@@.......@@.@
-	;;	@@@@@@@@@@@..@@.@.@@..@@
-	;;	@@@@@@@@@@@@@..@@@..@@@@
-	;;	@@@@@@@@@@@@@@@...@@@@@@
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@....@@@@@@
+	;;	..............@@@@......	@@@@@@@@@@@@..@@@@..@@@@
+	;;	............@@@...@@....	@@@@@@@@@@..@@@...@@.@@@
+	;;	..........@@@...@@..@...	@@@@@@@@..@@@...@@..@.@@
+	;;	........@@@..@@..@@@.@..	@@@@@@..@@@......@@@.@.@
+	;;	......@@@...@@@@..@@@.@.	@@@@..@@@.........@@@.@.
+	;;	....@@@..@@..@@@@..@..@.	@@..@@@..@@........@..@.
+	;;	..@@@...@@@@..@@@@..@@@.	..@@@...@@@@........@@@.
+	;;	.@@..@@..@@@@..@..@@..@.	.@@......@@@@.....@@..@.
+	;;	...@@@@@..@@@@..@@....@.	..........@@@@..@@..@.@.
+	;;	....@@@@@..@..@@......@.	...........@..@@...@@.@.
+	;;	.....@@@@@..@@...@@...@.	............@@......@.@.
+	;;	...@..@@..@@..@@.@@@..@.	...@......@@..........@.
+	;;	...@@...@@...@@.@@@.@.@.	...@@...@@............@.
+	;;	.@@..@@@..@.@@@.@@.@@.@.	.@@..@@@..............@.
+	;;	@@@@@@...@@.@@.@@@.@@.@.	@@@@@@................@.
+	;;	.........@.@@@.@@.@@..@.	......................@.
+	;;	..............@@.@..@.@.	@@@@@@@@@...........@.@.
+	;;	..........@.@.....@@..@.	@@@@@@@@@.@.@.....@@..@.
+	;;	.........@.@@@..@@..@.@.	@@@@@@@@.@.@@@..@@..@.@.
+	;;	........@.@@..@@..@@@.@.	@@@@@@@.@.@@..@@..@@@.@.
+	;;	........@@..@@..@@@@@.@.	@@@@@@@.@@..@@..@@@@@.@.
+	;;	..........@@..@@@@@@@.@.	@@@@@@@@..@@..@@@@@@@.@.
+	;;	............@@@@@@@@@.@.	@@@@@@@@@@..@@@@@@@@@.@.
+	;;	..............@@@@@@@.@.	@@@@@@@@@@@@..@@@@@@@.@.
+	;;	.............@..@@@@@.@.	@@@@@@@@@@@@.@..@@@@@.@.
+	;;	............@.....@@..@.	@@@@@@@@@@@.@.....@@..@.
+	;;	...........@.@..@...@.@.	@@@@@@@@@@.@.@......@.@.
+	;;	..........@.@@.@..@@..@.	@@@@@@@@@.@.@@....@@..@.
+	;;	.........@.@@@..@@..@.@.	@@@@@@@@.@.@@@..@@..@.@.
+	;;	........@.@@..@@..@@@.@.	@@@@@@@.@.@@..@@..@@@.@.
+	;;	........@@..@@..@@@@@.@.	@@@@@@@.@@..@@..@@@@@.@.
+	;;	..........@@..@@@@@@@.@.	@@@@@@@@..@@..@@@@@@@.@.
+	;;	............@@@@@@@@@.@.	@@@@@@@@@@..@@@@@@@@@.@.
+	;;	..............@@@@@@@.@.	@@@@@@@@@@@@..@@@@@@@.@.
+	;;	.............@..@@@@@.@.	@@@@@@@@@@@@.@..@@@@@.@.
+	;;	............@.....@@..@.	@@@@@@@@@@@.@.....@@..@.
+	;;	...........@.@..@...@.@.	@@@@@@@@@@.@.@......@.@.
+	;;	..........@.@@.@..@@..@.	@@@@@@@@@.@.@@....@@..@.
+	;;	.........@.@@@..@@..@.@.	@@@@@@@@.@.@@@..@@..@.@.
+	;;	........@.@@..@@..@@@.@.	@@@@@@@.@.@@..@@..@@@.@.
+	;;	........@@..@@..@@@@@.@.	@@@@@@@.@@..@@..@@@@@.@.
+	;;	..........@@..@@@@@@@.@.	@@@@@@@@..@@..@@@@@@@.@.
+	;;	............@@@@@@@@@.@.	@@@@@@@@@@..@@@@@@@@@.@.
+	;;	..............@@@@@@@.@.	@@@@@@@@@@@@..@@@@@@@.@.
+	;;	............@...@@@@..@.	@@@@@@@@@@@.@...@@@@..@.
+	;;	...........@@.......@@..	@@@@@@@@@@.@@.......@@.@
+	;;	.............@@.@.@@....	@@@@@@@@@@@..@@.@.@@..@@
+	;;	...............@@@......	@@@@@@@@@@@@@..@@@..@@@@
+	;;	........................	@@@@@@@@@@@@@@@...@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
 
 img_doorway_L_type_2:				;; Doorways (Safari + Penitentiary + Egyptus)
 	DEFB &00, &00, &FC, &00, &01, &FA, &00, &0B, &F6, &00, &1B, &E3, &00, &2B, &EC, &00
@@ -18040,63 +17891,6 @@ img_doorway_L_type_2:				;; Doorways (Safari + Penitentiary + Egyptus)
 	DEFB &56, &E5, &00, &6F, &9A, &00, &38, &6D, &00, &06, &D6, &00, &3D, &6C, &00, &0E
 	DEFB &F0, &00, &01, &80, &00, &00, &00, &00
 
-	;;	................@@@@@@..
-	;;	...............@@@@@@.@.
-	;;	............@.@@@@@@.@@.
-	;;	...........@@.@@@@@...@@
-	;;	..........@.@.@@@@@.@@..
-	;;	........@@@.@@.@@@@.@...
-	;;	......@@@..@.@@.@@@..@@.
-	;;	....@@@..@@@@.@@.@@@.@.@
-	;;	...@@..@@@@..@.@@.@@@..@
-	;;	..@..@@@@..@@@@....@@@@.
-	;;	...@@@@..@@@@..@@@@....@
-	;;	..@@@..@@@@..@@@...@@@@@
-	;;	.@@..@@@@@.@@@@.@@@@@@@.
-	;;	...@@@@@@.@@@@.@@@...@.@
-	;;	..@@@@....@@@.@@@.@@@.@@
-	;;	......@@.@@@@.@@.@@@@@.@
-	;;	..@@@@@..@@@@.@@.@@@@@.@
-	;;	.@@.@@.@.@@@@.@@@.@@@@@.
-	;;	.@.@.@@.@.@@@@.@@@.@@@@.
-	;;	.@@.@@@@@.@@.@@...@.@@@.
-	;;	..@@@@.....@@@@@@@@@.@@.
-	;;	......@@@@..@@@@@@@@..@.
-	;;	..@@@@@.@@@...@@@@......
-	;;	.@@.@@.@.@@@@...........
-	;;	.@.@.@@.@@@..@.@........
-	;;	.@@.@@@@@..@@.@.........
-	;;	..@@@@...@@.@@.@........
-	;;	......@@@@.@.@@.........
-	;;	..@@@@@.@...............
-	;;	.@@.@@.@.@@@@.@.........
-	;;	.@.@.@@.@@@@@@.@........
-	;;	.@@.@@@@.@@@@@@.........
-	;;	..@@@@..@@@@@@@@@@@@@...
-	;;	......@@.@@@@@.@@@@@....
-	;;	..@@@@@.@..@@@@@@@@@@...
-	;;	.@@.@@.@.@@...@@@@@.@...
-	;;	.@.@.@@.@@@..@.@@@@@....
-	;;	.@@.@@@@@..@@.@.@.@@....
-	;;	..@@@@...@@.@@.@..@.....
-	;;	......@@@@.@.@@.........
-	;;	..@@@@@.@@@.@@..........
-	;;	.@@.@@.@.@@@@.@.........
-	;;	.@.@.@@.@@@..@.@........
-	;;	.@@.@@@@@..@@.@.........
-	;;	..@@@....@@.@@.@........
-	;;	.....@@@@@.@.@@.........
-	;;	..@@@@@.@@@.@@..........
-	;;	.@@.@@.@.@@@@.@.........
-	;;	.@.@.@@.@@@..@.@........
-	;;	.@@.@@@@@..@@.@.........
-	;;	..@@@....@@.@@.@........
-	;;	.....@@.@@.@.@@.........
-	;;	..@@@@.@.@@.@@..........
-	;;	....@@@.@@@@............
-	;;	.......@@...............
-	;;	........................
-
 	DEFB &FF, &FE, &FC, &FF, &F1, &F8, &FF, &E3
 	DEFB &F0, &FF, &C3, &E3, &FF, &03, &E0, &FC, &01, &E0, &F0, &10, &E0, &E0, &78, &70
 	DEFB &C1, &E0, &38, &87, &80, &1E, &DE, &01, &E0, &B8, &07, &00, &60, &1E, &00, &80
@@ -18109,62 +17903,62 @@ img_doorway_L_type_2:				;; Doorways (Safari + Penitentiary + Egyptus)
 	DEFB &10, &FF, &80, &01, &FF, &01, &00, &FF, &10, &00, &7F, &00, &02, &7F, &80, &00
 	DEFB &7F, &C0, &10, &FF, &81, &01, &FF, &C0, &03, &FF, &F0, &0F, &FF, &FE, &7F, &FF
 
-	;;	@@@@@@@@@@@@@@@.@@@@@@..
-	;;	@@@@@@@@@@@@...@@@@@@...
-	;;	@@@@@@@@@@@...@@@@@@....
-	;;	@@@@@@@@@@....@@@@@...@@
-	;;	@@@@@@@@......@@@@@.....
-	;;	@@@@@@.........@@@@.....
-	;;	@@@@.......@....@@@.....
-	;;	@@@......@@@@....@@@....
-	;;	@@.....@@@@.......@@@...
-	;;	@....@@@@..........@@@@.
-	;;	@@.@@@@........@@@@.....
-	;;	@.@@@........@@@........
-	;;	.@@........@@@@.........
-	;;	@.........@@@@.........@
-	;;	@.........@@@.....@@@.@@
-	;;	@@.......@@@@....@@@@@.@
-	;;	@........@@@@....@@@@@.@
-	;;	.......@.@@@@.....@@@@@.
-	;;	...@......@@@@.....@@@@.
-	;;	..........@@.@@...@.@@@.
-	;;	@..........@@@@@@@@@.@@.
-	;;	@@..........@@@@@@@@..@.
-	;;	@.............@@@@..@@.@
-	;;	.......@..........@@@@@@
-	;;	...@.............@@@@@@@
-	;;	..............@..@@@@@@@
-	;;	@................@@@@@@@
-	;;	@@.........@....@@@@@@@@
-	;;	@..............@@@@@@@@@
-	;;	.......@.@@@@...@@@@@@@@
-	;;	...@....@@@@@@...@@@@@@@
-	;;	.........@@@@@@......@@@
-	;;	@.......@@@@@@@@@@@@@.@@
-	;;	@@.......@@@@@.@@@@@.@@@
-	;;	@..........@@@@@@@@@@.@@
-	;;	.......@......@@@@@.@.@@
-	;;	...@...........@@@@@.@@@
-	;;	..............@.@.@@.@@@
-	;;	@.................@.@@@@
-	;;	@@.........@....@@.@@@@@
-	;;	@..............@@@@@@@@@
-	;;	.......@........@@@@@@@@
-	;;	...@.............@@@@@@@
-	;;	..............@..@@@@@@@
-	;;	@................@@@@@@@
-	;;	@@.........@....@@@@@@@@
-	;;	@..............@@@@@@@@@
-	;;	.......@........@@@@@@@@
-	;;	...@.............@@@@@@@
-	;;	..............@..@@@@@@@
-	;;	@................@@@@@@@
-	;;	@@.........@....@@@@@@@@
-	;;	@......@.......@@@@@@@@@
-	;;	@@............@@@@@@@@@@
-	;;	@@@@........@@@@@@@@@@@@
-	;;	@@@@@@@..@@@@@@@@@@@@@@@
+	;;	................@@@@@@..	@@@@@@@@@@@@@@@.@@@@@@..
+	;;	...............@@@@@@.@.	@@@@@@@@@@@@...@@@@@@...
+	;;	............@.@@@@@@.@@.	@@@@@@@@@@@...@@@@@@....
+	;;	...........@@.@@@@@...@@	@@@@@@@@@@....@@@@@...@@
+	;;	..........@.@.@@@@@.@@..	@@@@@@@@......@@@@@.....
+	;;	........@@@.@@.@@@@.@...	@@@@@@.........@@@@.....
+	;;	......@@@..@.@@.@@@..@@.	@@@@.......@....@@@.....
+	;;	....@@@..@@@@.@@.@@@.@.@	@@@......@@@@....@@@....
+	;;	...@@..@@@@..@.@@.@@@..@	@@.....@@@@.......@@@...
+	;;	..@..@@@@..@@@@....@@@@.	@....@@@@..........@@@@.
+	;;	...@@@@..@@@@..@@@@....@	@@.@@@@........@@@@.....
+	;;	..@@@..@@@@..@@@...@@@@@	@.@@@........@@@........
+	;;	.@@..@@@@@.@@@@.@@@@@@@.	.@@........@@@@.........
+	;;	...@@@@@@.@@@@.@@@...@.@	@.........@@@@.........@
+	;;	..@@@@....@@@.@@@.@@@.@@	@.........@@@.....@@@.@@
+	;;	......@@.@@@@.@@.@@@@@.@	@@.......@@@@....@@@@@.@
+	;;	..@@@@@..@@@@.@@.@@@@@.@	@........@@@@....@@@@@.@
+	;;	.@@.@@.@.@@@@.@@@.@@@@@.	.......@.@@@@.....@@@@@.
+	;;	.@.@.@@.@.@@@@.@@@.@@@@.	...@......@@@@.....@@@@.
+	;;	.@@.@@@@@.@@.@@...@.@@@.	..........@@.@@...@.@@@.
+	;;	..@@@@.....@@@@@@@@@.@@.	@..........@@@@@@@@@.@@.
+	;;	......@@@@..@@@@@@@@..@.	@@..........@@@@@@@@..@.
+	;;	..@@@@@.@@@...@@@@......	@.............@@@@..@@.@
+	;;	.@@.@@.@.@@@@...........	.......@..........@@@@@@
+	;;	.@.@.@@.@@@..@.@........	...@.............@@@@@@@
+	;;	.@@.@@@@@..@@.@.........	..............@..@@@@@@@
+	;;	..@@@@...@@.@@.@........	@................@@@@@@@
+	;;	......@@@@.@.@@.........	@@.........@....@@@@@@@@
+	;;	..@@@@@.@...............	@..............@@@@@@@@@
+	;;	.@@.@@.@.@@@@.@.........	.......@.@@@@...@@@@@@@@
+	;;	.@.@.@@.@@@@@@.@........	...@....@@@@@@...@@@@@@@
+	;;	.@@.@@@@.@@@@@@.........	.........@@@@@@......@@@
+	;;	..@@@@..@@@@@@@@@@@@@...	@.......@@@@@@@@@@@@@.@@
+	;;	......@@.@@@@@.@@@@@....	@@.......@@@@@.@@@@@.@@@
+	;;	..@@@@@.@..@@@@@@@@@@...	@..........@@@@@@@@@@.@@
+	;;	.@@.@@.@.@@...@@@@@.@...	.......@......@@@@@.@.@@
+	;;	.@.@.@@.@@@..@.@@@@@....	...@...........@@@@@.@@@
+	;;	.@@.@@@@@..@@.@.@.@@....	..............@.@.@@.@@@
+	;;	..@@@@...@@.@@.@..@.....	@.................@.@@@@
+	;;	......@@@@.@.@@.........	@@.........@....@@.@@@@@
+	;;	..@@@@@.@@@.@@..........	@..............@@@@@@@@@
+	;;	.@@.@@.@.@@@@.@.........	.......@........@@@@@@@@
+	;;	.@.@.@@.@@@..@.@........	...@.............@@@@@@@
+	;;	.@@.@@@@@..@@.@.........	..............@..@@@@@@@
+	;;	..@@@....@@.@@.@........	@................@@@@@@@
+	;;	.....@@@@@.@.@@.........	@@.........@....@@@@@@@@
+	;;	..@@@@@.@@@.@@..........	@..............@@@@@@@@@
+	;;	.@@.@@.@.@@@@.@.........	.......@........@@@@@@@@
+	;;	.@.@.@@.@@@..@.@........	...@.............@@@@@@@
+	;;	.@@.@@@@@..@@.@.........	..............@..@@@@@@@
+	;;	..@@@....@@.@@.@........	@................@@@@@@@
+	;;	.....@@.@@.@.@@.........	@@.........@....@@@@@@@@
+	;;	..@@@@.@.@@.@@..........	@......@.......@@@@@@@@@
+	;;	....@@@.@@@@............	@@............@@@@@@@@@@
+	;;	.......@@...............	@@@@........@@@@@@@@@@@@
+	;;	........................	@@@@@@@..@@@@@@@@@@@@@@@
 
 img_doorway_R_type_2:
 	DEFB &00, &00, &00, &00, &01, &CE, &00, &0F, &3C, &00, &3C, &F0, &00, &CB, &CE, &07
@@ -18179,63 +17973,6 @@ img_doorway_R_type_2:
 	DEFB &00, &0D, &AC, &00, &7A, &D8, &00, &1D, &E0, &00, &03, &00, &00, &00, &00, &00
 	DEFB &00, &00, &00, &00, &00, &00, &00, &00
 
-	;;	........................
-	;;	...............@@@..@@@.
-	;;	............@@@@..@@@@..
-	;;	..........@@@@..@@@@....
-	;;	........@@..@.@@@@..@@@.
-	;;	.....@@@..@@.@@@..@@@@..
-	;;	...@@@@@@@.@@...@@@@@...
-	;;	.@@@@@@@@@@.@@.@@@@..@..
-	;;	..@@@@....@@.@.@@....@@.
-	;;	........@@.@@.@..@@@@.@.
-	;;	........@.@.@.@.@@@@@@..
-	;;	.........@@.@@.@...@@@..
-	;;	...........@.@..@@@.@@@.
-	;;	..........@@.@.@@@@@.@@.
-	;;	.........@.@..@@..@@.@@.
-	;;	.........@@.@@@.@@.@.@@.
-	;;	........@..@@@.@@@@.@@@.
-	;;	.........@@@..@@@@@.@@..
-	;;	........@@@.@@.@@@@@.@..
-	;;	........@@.@@@@.@@@@....
-	;;	..........@@@@@..@@@.@..
-	;;	........@@.@@@@@..@@..@.
-	;;	........@@..@@@@.@.@.@..
-	;;	........@@@...@@.@..@.@.
-	;;	........@@@.@@.@..@.@@..
-	;;	.........@@.@@..@@.@....
-	;;	........@.@.@.@.@@@.@@..
-	;;	........@...@@.@@@.@@.@.
-	;;	........@@.@@@@@...@@@@.
-	;;	.........@@@....@@.@@@@.
-	;;	............@@@@@.@@@@@.
-	;;	.........@@@@@...@@@@@@.
-	;;	........@@.@@..@@@@.@@..
-	;;	........@.@..@@@@@@@@@..
-	;;	........@@.@.@.@@@@@@...
-	;;	.........@@@..@@@@@@@.@.
-	;;	.............@@..@@@@...
-	;;	.........@@@@..@@..@....
-	;;	........@@.@@.@..@@..@..
-	;;	........@.@.@@.@@...@.@.
-	;;	........@@.@@@@@..@@.@..
-	;;	.........@@@....@@.@@.@.
-	;;	............@@@@@.@.@@..
-	;;	.........@@@@@.@@@.@@...
-	;;	........@@.@@.@.@@@@.@..
-	;;	........@.@.@@.@@@..@.@.
-	;;	........@@.@@@@@..@@.@..
-	;;	.........@@@....@@.@@.@.
-	;;	............@@.@@.@.@@..
-	;;	.........@@@@.@.@@.@@...
-	;;	...........@@@.@@@@.....
-	;;	..............@@........
-	;;	........................
-	;;	........................
-	;;	........................
-	;;	........................
-
 	DEFB &FF, &FE, &31, &FF, &F0, &0E, &FF, &C0
 	DEFB &3C, &FF, &00, &F1, &F8, &03, &C0, &E7, &07, &01, &9F, &C0, &03, &7F, &E0, &01
 	DEFB &3C, &30, &00, &00, &18, &78, &00, &08, &FD, &00, &0C, &1D, &00, &04, &0E, &00
@@ -18248,69 +17985,72 @@ img_doorway_R_type_2:
 	DEFB &20, &00, &FE, &00, &04, &FF, &00, &00, &FF, &80, &21, &FF, &02, &03, &FF, &80
 	DEFB &07, &FF, &E0, &1F, &FF, &FC, &FF, &FF, &FF, &FF, &FF, &FF, &FF, &FF, &FF, &FF
 
-	;;	@@@@@@@@@@@@@@@...@@...@
-	;;	@@@@@@@@@@@@........@@@.
-	;;	@@@@@@@@@@........@@@@..
-	;;	@@@@@@@@........@@@@...@
-	;;	@@@@@.........@@@@......
-	;;	@@@..@@@.....@@@.......@
-	;;	@..@@@@@@@............@@
-	;;	.@@@@@@@@@@............@
-	;;	..@@@@....@@............
-	;;	...........@@....@@@@...
-	;;	............@...@@@@@@.@
-	;;	............@@.....@@@.@
-	;;	.............@......@@@.
-	;;	.............@.......@@.
-	;;	.....................@@.
-	;;	................@@...@@.
-	;;	...............@@@@.@@@.
-	;;	..............@@@@@.@@.@
-	;;	............@@.@@@@@.@.@
-	;;	...........@@@@.@@@@..@@
-	;;	..........@@@@@..@@@...@
-	;;	........@@.@@@@@..@@....
-	;;	@@@@@@@.@@..@@@@...@.@..
-	;;	@@@@@@@.@@@...@@........
-	;;	@@@@@@@.@@@....@..@....@
-	;;	@@@@@@@@.@@............@
-	;;	@@@@@@@...@...@.....@@.@
-	;;	@@@@@@@............@@.@.
-	;;	@@@@@@@............@@@@.
-	;;	@@@@@@@@...........@@@@.
-	;;	@@@@@@@@@.........@@@@@.
-	;;	@@@@@@@@.........@@@@@@.
-	;;	@@@@@@@........@@@@.@@.@
-	;;	@@@@@@@...@..@@@@@@@@@..
-	;;	@@@@@@@......@.@@@@@@...
-	;;	@@@@@@@@......@@@@@@@...
-	;;	@@@@@@@@@....@@..@@@@..@
-	;;	@@@@@@@@.......@@..@..@@
-	;;	@@@@@@@.......@..@@....@
-	;;	@@@@@@@...@.............
-	;;	@@@@@@@..............@..
-	;;	@@@@@@@@................
-	;;	@@@@@@@@@.........@....@
-	;;	@@@@@@@@..............@@
-	;;	@@@@@@@.......@........@
-	;;	@@@@@@@...@.............
-	;;	@@@@@@@..............@..
-	;;	@@@@@@@@................
-	;;	@@@@@@@@@.........@....@
-	;;	@@@@@@@@......@.......@@
-	;;	@@@@@@@@@............@@@
-	;;	@@@@@@@@@@@........@@@@@
-	;;	@@@@@@@@@@@@@@..@@@@@@@@
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@...@@...@
+	;;	...............@@@..@@@.	@@@@@@@@@@@@........@@@.
+	;;	............@@@@..@@@@..	@@@@@@@@@@........@@@@..
+	;;	..........@@@@..@@@@....	@@@@@@@@........@@@@...@
+	;;	........@@..@.@@@@..@@@.	@@@@@.........@@@@......
+	;;	.....@@@..@@.@@@..@@@@..	@@@..@@@.....@@@.......@
+	;;	...@@@@@@@.@@...@@@@@...	@..@@@@@@@............@@
+	;;	.@@@@@@@@@@.@@.@@@@..@..	.@@@@@@@@@@............@
+	;;	..@@@@....@@.@.@@....@@.	..@@@@....@@............
+	;;	........@@.@@.@..@@@@.@.	...........@@....@@@@...
+	;;	........@.@.@.@.@@@@@@..	............@...@@@@@@.@
+	;;	.........@@.@@.@...@@@..	............@@.....@@@.@
+	;;	...........@.@..@@@.@@@.	.............@......@@@.
+	;;	..........@@.@.@@@@@.@@.	.............@.......@@.
+	;;	.........@.@..@@..@@.@@.	.....................@@.
+	;;	.........@@.@@@.@@.@.@@.	................@@...@@.
+	;;	........@..@@@.@@@@.@@@.	...............@@@@.@@@.
+	;;	.........@@@..@@@@@.@@..	..............@@@@@.@@.@
+	;;	........@@@.@@.@@@@@.@..	............@@.@@@@@.@.@
+	;;	........@@.@@@@.@@@@....	...........@@@@.@@@@..@@
+	;;	..........@@@@@..@@@.@..	..........@@@@@..@@@...@
+	;;	........@@.@@@@@..@@..@.	........@@.@@@@@..@@....
+	;;	........@@..@@@@.@.@.@..	@@@@@@@.@@..@@@@...@.@..
+	;;	........@@@...@@.@..@.@.	@@@@@@@.@@@...@@........
+	;;	........@@@.@@.@..@.@@..	@@@@@@@.@@@....@..@....@
+	;;	.........@@.@@..@@.@....	@@@@@@@@.@@............@
+	;;	........@.@.@.@.@@@.@@..	@@@@@@@...@...@.....@@.@
+	;;	........@...@@.@@@.@@.@.	@@@@@@@............@@.@.
+	;;	........@@.@@@@@...@@@@.	@@@@@@@............@@@@.
+	;;	.........@@@....@@.@@@@.	@@@@@@@@...........@@@@.
+	;;	............@@@@@.@@@@@.	@@@@@@@@@.........@@@@@.
+	;;	.........@@@@@...@@@@@@.	@@@@@@@@.........@@@@@@.
+	;;	........@@.@@..@@@@.@@..	@@@@@@@........@@@@.@@.@
+	;;	........@.@..@@@@@@@@@..	@@@@@@@...@..@@@@@@@@@..
+	;;	........@@.@.@.@@@@@@...	@@@@@@@......@.@@@@@@...
+	;;	.........@@@..@@@@@@@.@.	@@@@@@@@......@@@@@@@...
+	;;	.............@@..@@@@...	@@@@@@@@@....@@..@@@@..@
+	;;	.........@@@@..@@..@....	@@@@@@@@.......@@..@..@@
+	;;	........@@.@@.@..@@..@..	@@@@@@@.......@..@@....@
+	;;	........@.@.@@.@@...@.@.	@@@@@@@...@.............
+	;;	........@@.@@@@@..@@.@..	@@@@@@@..............@..
+	;;	.........@@@....@@.@@.@.	@@@@@@@@................
+	;;	............@@@@@.@.@@..	@@@@@@@@@.........@....@
+	;;	.........@@@@@.@@@.@@...	@@@@@@@@..............@@
+	;;	........@@.@@.@.@@@@.@..	@@@@@@@.......@........@
+	;;	........@.@.@@.@@@..@.@.	@@@@@@@...@.............
+	;;	........@@.@@@@@..@@.@..	@@@@@@@..............@..
+	;;	.........@@@....@@.@@.@.	@@@@@@@@................
+	;;	............@@.@@.@.@@..	@@@@@@@@@.........@....@
+	;;	.........@@@@.@.@@.@@...	@@@@@@@@......@.......@@
+	;;	...........@@@.@@@@.....	@@@@@@@@@............@@@
+	;;	..............@@........	@@@@@@@@@@@........@@@@@
+	;;	........................	@@@@@@@@@@@@@@..@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
 
 ;; -----------------------------------------------------------------------------------------------------------
 SPR_FLIP			EQU		&80			;; bit7 set = sprite flip (eg. SPR_FLIP | SPR_VAPE1)
+
+;; -----------------------------------------------------------------------------------------------------------
 SPR_VISOROHALF		EQU		&10
 SPR_VISORCHALF		EQU		&11
 SPR_VISORO			EQU		&12
 SPR_VISORC			EQU		&13
+SPR_1st_3x32_sprite	EQU		SPR_VISOROHALF		;; &10
 
 ;; -----------------------------------------------------------------------------------------------------------
 img_3x32_bin:				;; SPR_VISOROHALF: EQU &10
@@ -18532,6 +18272,7 @@ SPR_TRUNKS			EQU		&4A
 SPR_DECK			EQU		&4B
 SPR_BALL			EQU		&4C
 SPR_HEAD_FLYING		EQU		&4D
+SPR_1st_3x24_sprite	EQU		SPR_HEELS1			;; &18
 
 ;; -----------------------------------------------------------------------------------------------------------
 img_3x24_bin:
@@ -18544,63 +18285,12 @@ img_heels_0:			;; SPR_HEELS1:     EQU &18	3x24
 	DEFB &BC, &7F, &83, &DC, &77, &9B, &D4, &0F, &7A, &BC, &09, &FC, &68, &02, &EF, &70
 	DEFB &0F, &FB, &0E, &1F, &6E, &FA, &1F, &B9, &6C, &07, &C7, &B0, &01, &FD, &D0, &00
 	DEFB &76, &C0, &00, &18, &00, &00, &00, &00
-
-	;;	........................
-	;;	..........@@@@@.........
-	;;	.......@@@@@@..@@@......
-	;;	.....@@@@@...@@.@@@@....
-	;;	....@@@@@.@@@@@.@@@@@...
-	;;	....@@@@@@.....@@...@@..
-	;;	...@@@@@@@@@@@.@@.@.@@..
-	;;	...@@.@@@@..@@@@.@@@.@@.
-	;;	.....@@@@..@.@@@.@...@@.
-	;;	..@@@@@@@.@@@.@.....@.@.
-	;;	..@@@@@@@.@....@@.@@@@..
-	;;	.@@@@@@@@.....@@@@.@@@..
-	;;	.@@@.@@@@..@@.@@@@.@.@..
-	;;	....@@@@.@@@@.@.@.@@@@..
-	;;	....@..@@@@@@@...@@.@...
-	;;	......@.@@@.@@@@.@@@....
-	;;	....@@@@@@@@@.@@....@@@.
-	;;	...@@@@@.@@.@@@.@@@@@.@.
-	;;	...@@@@@@.@@@..@.@@.@@..
-	;;	.....@@@@@...@@@@.@@....
-	;;	.......@@@@@@@.@@@.@....
-	;;	.........@@@.@@.@@......
-	;;	...........@@...........
-	;;	........................
-
 img_3x24_0_mask:
 	DEFB &FF, &C1, &FF, &FE, &3E, &3F, &F9, &F9, &CF, &F7, &C0, &F7, &EF, &80, &FB, &EF
 	DEFB &C1, &8D, &DF, &FD, &8D, &DB, &CF, &36, &C7, &87, &06, &BF, &9A, &0A, &BF, &80
 	DEFB &3D, &7F, &80, &1D, &77, &98, &15, &8F, &78, &3D, &E9, &FC, &6B, &F2, &EF, &71
 	DEFB &EF, &FB, &0E, &DF, &6E, &FA, &DF, &B9, &6D, &E7, &C7, &B3, &F9, &FD, &D7, &FE
 	DEFB &76, &CF, &FF, &99, &3F, &FF, &E7, &FF
-
-	;;	@@@@@@@@@@.....@@@@@@@@@
-	;;	@@@@@@@...@@@@@...@@@@@@
-	;;	@@@@@..@@@@@@..@@@..@@@@
-	;;	@@@@.@@@@@......@@@@.@@@
-	;;	@@@.@@@@@.......@@@@@.@@
-	;;	@@@.@@@@@@.....@@...@@.@
-	;;	@@.@@@@@@@@@@@.@@...@@.@
-	;;	@@.@@.@@@@..@@@@..@@.@@.
-	;;	@@...@@@@....@@@.....@@.
-	;;	@.@@@@@@@..@@.@.....@.@.
-	;;	@.@@@@@@@.........@@@@.@
-	;;	.@@@@@@@@..........@@@.@
-	;;	.@@@.@@@@..@@......@.@.@
-	;;	@...@@@@.@@@@.....@@@@.@
-	;;	@@@.@..@@@@@@@...@@.@.@@
-	;;	@@@@..@.@@@.@@@@.@@@...@
-	;;	@@@.@@@@@@@@@.@@....@@@.
-	;;	@@.@@@@@.@@.@@@.@@@@@.@.
-	;;	@@.@@@@@@.@@@..@.@@.@@.@
-	;;	@@@..@@@@@...@@@@.@@..@@
-	;;	@@@@@..@@@@@@@.@@@.@.@@@
-	;;	@@@@@@@..@@@.@@.@@..@@@@
-	;;	@@@@@@@@@..@@..@..@@@@@@
-	;;	@@@@@@@@@@@..@@@@@@@@@@@
 	;;
 	;;	 bit	 bit
 	;;	image	mask	result
@@ -18641,32 +18331,6 @@ img_3x24_1:			;; SPR_HEELS2:     EQU &19	3x24
 	DEFB &BC, &37, &83, &DC, &0F, &9B, &D4, &0F, &7A, &BC, &09, &FC, &68, &02, &EF, &74
 	DEFB &07, &FB, &08, &0F, &6E, &60, &0F, &B9, &80, &03, &C7, &C0, &00, &FE, &E0, &00
 	DEFB &3B, &60, &00, &0C, &00, &00, &00, &00
-
-	;;	........................
-	;;	..........@@@@@.........
-	;;	.......@@@@@@..@@@......
-	;;	.....@@@@@...@@.@@@@....
-	;;	....@@@@@.@@@@@.@@@@@...
-	;;	....@@@@@@.....@@...@@..
-	;;	...@@@@@@@@@@@.@@.@.@@..
-	;;	....@.@@@@..@@@@.@@@.@@.
-	;;	..@@.@@@@..@.@@@.@...@@.
-	;;	.@@@@@@@@.@@@.@.....@.@.
-	;;	.@@@@@@@@.@....@@.@@@@..
-	;;	..@@.@@@@.....@@@@.@@@..
-	;;	....@@@@@..@@.@@@@.@.@..
-	;;	....@@@@.@@@@.@.@.@@@@..
-	;;	....@..@@@@@@@...@@.@...
-	;;	......@.@@@.@@@@.@@@.@..
-	;;	.....@@@@@@@@.@@....@...
-	;;	....@@@@.@@.@@@..@@.....
-	;;	....@@@@@.@@@..@@.......
-	;;	......@@@@...@@@@@......
-	;;	........@@@@@@@.@@@.....
-	;;	..........@@@.@@.@@.....
-	;;	............@@..........
-	;;	........................
-
 img_3x24_1_mask:
 	DEFB &FF, &C1, &FF, &FE, &3E, &3F, &F9, &F9
 	DEFB &CF, &F7, &C0, &F7, &EF, &80, &FB, &EF, &C1, &8D, &DF, &FD, &8D, &CB, &CF, &36
@@ -18674,30 +18338,30 @@ img_3x24_1_mask:
 	DEFB &78, &3D, &E9, &FC, &6B, &F2, &EF, &75, &F7, &FB, &0B, &EF, &6E, &67, &EF, &B9
 	DEFB &9F, &F3, &C7, &DF, &FC, &FE, &EF, &FF, &3B, &6F, &FF, &CC, &9F, &FF, &F3, &FF
 
-	;;	@@@@@@@@@@.....@@@@@@@@@
-	;;	@@@@@@@...@@@@@...@@@@@@
-	;;	@@@@@..@@@@@@..@@@..@@@@
-	;;	@@@@.@@@@@......@@@@.@@@
-	;;	@@@.@@@@@.......@@@@@.@@
-	;;	@@@.@@@@@@.....@@...@@.@
-	;;	@@.@@@@@@@@@@@.@@...@@.@
-	;;	@@..@.@@@@..@@@@..@@.@@.
-	;;	@.@@.@@@@....@@@.....@@.
-	;;	.@@@@@@@@..@@.@.....@.@.
-	;;	.@@@@@@@@.........@@@@.@
-	;;	@.@@.@@@@..........@@@.@
-	;;	@@..@@@@@..@@......@.@.@
-	;;	@@@.@@@@.@@@@.....@@@@.@
-	;;	@@@.@..@@@@@@@...@@.@.@@
-	;;	@@@@..@.@@@.@@@@.@@@.@.@
-	;;	@@@@.@@@@@@@@.@@....@.@@
-	;;	@@@.@@@@.@@.@@@..@@..@@@
-	;;	@@@.@@@@@.@@@..@@..@@@@@
-	;;	@@@@..@@@@...@@@@@.@@@@@
-	;;	@@@@@@..@@@@@@@.@@@.@@@@
-	;;	@@@@@@@@..@@@.@@.@@.@@@@
-	;;	@@@@@@@@@@..@@..@..@@@@@
-	;;	@@@@@@@@@@@@..@@@@@@@@@@
+	;;	........................	@@@@@@@@@@.....@@@@@@@@@
+	;;	..........@@@@@.........	@@@@@@@...@@@@@...@@@@@@
+	;;	.......@@@@@@..@@@......	@@@@@..@@@@@@..@@@..@@@@
+	;;	.....@@@@@...@@.@@@@....	@@@@.@@@@@......@@@@.@@@
+	;;	....@@@@@.@@@@@.@@@@@...	@@@.@@@@@.......@@@@@.@@
+	;;	....@@@@@@.....@@...@@..	@@@.@@@@@@.....@@...@@.@
+	;;	...@@@@@@@@@@@.@@.@.@@..	@@.@@@@@@@@@@@.@@...@@.@
+	;;	....@.@@@@..@@@@.@@@.@@.	@@..@.@@@@..@@@@..@@.@@.
+	;;	..@@.@@@@..@.@@@.@...@@.	@.@@.@@@@....@@@.....@@.
+	;;	.@@@@@@@@.@@@.@.....@.@.	.@@@@@@@@..@@.@.....@.@.
+	;;	.@@@@@@@@.@....@@.@@@@..	.@@@@@@@@.........@@@@.@
+	;;	..@@.@@@@.....@@@@.@@@..	@.@@.@@@@..........@@@.@
+	;;	....@@@@@..@@.@@@@.@.@..	@@..@@@@@..@@......@.@.@
+	;;	....@@@@.@@@@.@.@.@@@@..	@@@.@@@@.@@@@.....@@@@.@
+	;;	....@..@@@@@@@...@@.@...	@@@.@..@@@@@@@...@@.@.@@
+	;;	......@.@@@.@@@@.@@@.@..	@@@@..@.@@@.@@@@.@@@.@.@
+	;;	.....@@@@@@@@.@@....@...	@@@@.@@@@@@@@.@@....@.@@
+	;;	....@@@@.@@.@@@..@@.....	@@@.@@@@.@@.@@@..@@..@@@
+	;;	....@@@@@.@@@..@@.......	@@@.@@@@@.@@@..@@..@@@@@
+	;;	......@@@@...@@@@@......	@@@@..@@@@...@@@@@.@@@@@
+	;;	........@@@@@@@.@@@.....	@@@@@@..@@@@@@@.@@@.@@@@
+	;;	..........@@@.@@.@@.....	@@@@@@@@..@@@.@@.@@.@@@@
+	;;	............@@..........	@@@@@@@@@@..@@..@..@@@@@
+	;;	........................	@@@@@@@@@@@@..@@@@@@@@@@
 
 					;; SPR_HEELS3:     EQU &1A	3x24
 	DEFB &00, &00, &00, &00, &3E, &00, &01, &F9, &C0, &07, &C6, &F0, &0F, &BE, &F8, &0F
@@ -18710,55 +18374,30 @@ img_3x24_1_mask:
 	DEFB &78, &3D, &E9, &FC, &6B, &D6, &EF, &71, &BF, &FB, &0E, &DF, &6E, &FA, &EF, &B8
 	DEFB &ED, &F3, &C7, &73, &FC, &DB, &37, &FF, &64, &CF, &FF, &9F, &FF, &FF, &FF, &FF
 
-	;;	........................
-	;;	..........@@@@@.........
-	;;	.......@@@@@@..@@@......
-	;;	.....@@@@@...@@.@@@@....
-	;;	....@@@@@.@@@@@.@@@@@...
-	;;	....@@@@@@.....@@...@@..
-	;;	...@@@@@@@@@@@.@@.@.@@..
-	;;	...@@.@@@@..@@@@.@@@.@@.
-	;;	.@@..@@@@..@.@@@.@...@@.
-	;;	.@@@@@@@@.@@@.@.....@.@.
-	;;	.@@@@@@@@.@....@@.@@@@..
-	;;	..@.@@@@@.....@@@@.@@@..
-	;;	.....@@@@..@@.@@@@.@.@..
-	;;	....@@@@.@@@@.@.@.@@@@..
-	;;	....@..@@@@@@@...@@.@...
-	;;	...@.@@.@@@.@@@@.@@@....
-	;;	..@@@@@@@@@@@.@@....@@@.
-	;;	...@@@@@.@@.@@@.@@@@@.@.
-	;;	....@@@@@.@@@...@@@.@@..
-	;;	......@@@@...@@@.@@@....
-	;;	........@@.@@.@@..@@....
-	;;	.........@@.............
-	;;	........................
-	;;	........................
-	;;
-	;;	@@@@@@@@@@.....@@@@@@@@@
-	;;	@@@@@@@...@@@@@...@@@@@@
-	;;	@@@@@..@@@@@@..@@@..@@@@
-	;;	@@@@.@@@@@......@@@@.@@@
-	;;	@@@.@@@@@.......@@@@@.@@
-	;;	@@@.@@@@@@.....@@...@@.@
-	;;	@@.@@@@@@@@@@@.@@...@@.@
-	;;	@..@@.@@@@..@@@@..@@.@@.
-	;;	.@@..@@@@....@@@.....@@.
-	;;	.@@@@@@@@..@@.@.....@.@.
-	;;	.@@@@@@@@.........@@@@.@
-	;;	@.@.@@@@@..........@@@.@
-	;;	@@.@.@@@@..@@......@.@.@
-	;;	@@@.@@@@.@@@@.....@@@@.@
-	;;	@@@.@..@@@@@@@...@@.@.@@
-	;;	@@.@.@@.@@@.@@@@.@@@...@
-	;;	@.@@@@@@@@@@@.@@....@@@.
-	;;	@@.@@@@@.@@.@@@.@@@@@.@.
-	;;	@@@.@@@@@.@@@...@@@.@@.@
-	;;	@@@@..@@@@...@@@.@@@..@@
-	;;	@@@@@@..@@.@@.@@..@@.@@@
-	;;	@@@@@@@@.@@..@..@@..@@@@
-	;;	@@@@@@@@@..@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@.....@@@@@@@@@
+	;;	..........@@@@@.........	@@@@@@@...@@@@@...@@@@@@
+	;;	.......@@@@@@..@@@......	@@@@@..@@@@@@..@@@..@@@@
+	;;	.....@@@@@...@@.@@@@....	@@@@.@@@@@......@@@@.@@@
+	;;	....@@@@@.@@@@@.@@@@@...	@@@.@@@@@.......@@@@@.@@
+	;;	....@@@@@@.....@@...@@..	@@@.@@@@@@.....@@...@@.@
+	;;	...@@@@@@@@@@@.@@.@.@@..	@@.@@@@@@@@@@@.@@...@@.@
+	;;	...@@.@@@@..@@@@.@@@.@@.	@..@@.@@@@..@@@@..@@.@@.
+	;;	.@@..@@@@..@.@@@.@...@@.	.@@..@@@@....@@@.....@@.
+	;;	.@@@@@@@@.@@@.@.....@.@.	.@@@@@@@@..@@.@.....@.@.
+	;;	.@@@@@@@@.@....@@.@@@@..	.@@@@@@@@.........@@@@.@
+	;;	..@.@@@@@.....@@@@.@@@..	@.@.@@@@@..........@@@.@
+	;;	.....@@@@..@@.@@@@.@.@..	@@.@.@@@@..@@......@.@.@
+	;;	....@@@@.@@@@.@.@.@@@@..	@@@.@@@@.@@@@.....@@@@.@
+	;;	....@..@@@@@@@...@@.@...	@@@.@..@@@@@@@...@@.@.@@
+	;;	...@.@@.@@@.@@@@.@@@....	@@.@.@@.@@@.@@@@.@@@...@
+	;;	..@@@@@@@@@@@.@@....@@@.	@.@@@@@@@@@@@.@@....@@@.
+	;;	...@@@@@.@@.@@@.@@@@@.@.	@@.@@@@@.@@.@@@.@@@@@.@.
+	;;	....@@@@@.@@@...@@@.@@..	@@@.@@@@@.@@@...@@@.@@.@
+	;;	......@@@@...@@@.@@@....	@@@@..@@@@...@@@.@@@..@@
+	;;	........@@.@@.@@..@@....	@@@@@@..@@.@@.@@..@@.@@@
+	;;	.........@@.............	@@@@@@@@.@@..@..@@..@@@@
+	;;	........................	@@@@@@@@@..@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
 
 			;; SPR_HEELSB1:     EQU &1B	3x24
 	DEFB &00, &00, &00, &00, &34, &00, &01, &E7, &00, &06, &1F, &C0, &0F, &FB, &E8, &0F
@@ -18771,55 +18410,30 @@ img_3x24_1_mask:
 	DEFB &B7, &87, &D6, &4F, &CF, &EF, &BF, &2F, &D7, &F0, &F7, &B9, &F7, &77, &DE, &7B
 	DEFB &FB, &E7, &BD, &FB, &FB, &FC, &77, &FC, &FD, &8F, &FF, &3B, &FF, &FF, &C7, &FF
 
-	;;	........................
-	;;	..........@@.@..........
-	;;	.......@@@@..@@@........
-	;;	.....@@....@@@@@@@......
-	;;	....@@@@@@@@@.@@@@@.@...
-	;;	....@@@@@@@@@@@@@@@@.@..
-	;;	...@@@@@@@@@@@@.@@@@.@..
-	;;	...@@@@@@@@@@@.@..@@@...
-	;;	..@@@@@@@@@@@@..@@.@@...
-	;;	..@.@@@.@@@@@@@.@@@.@...
-	;;	...@@@@@...@@@@.@@@.@...
-	;;	..@@@@@@@@@.@@@@.@@.....
-	;;	..@.@@@@.@@@.@@@.@@.....
-	;;	..@@@@@@@.@@.@@@@.@@....
-	;;	...@.@@..@..@@@@@@......
-	;;	....@@@@@.@@@@@@..@.....
-	;;	...@.@@@@@@@....@@@@....
-	;;	..@@@..@@@@@.@@@.@@@....
-	;;	...@@@@..@@@@.@@@@@@@...
-	;;	.....@@@@.@@@@.@@@@@@...
-	;;	......@@@@@@@@...@@@....
-	;;	........@@@@@@..........
-	;;	..........@@@...........
-	;;	........................
-	;;
-	;;	@@@@@@@@@@..@.@@@@@@@@@@
-	;;	@@@@@@@......@..@@@@@@@@
-	;;	@@@@@........@@@..@@@@@@
-	;;	@@@@.@@....@@@@@@@.@.@@@
-	;;	@@@.@@@@@@@@@.@@@@@.@.@@
-	;;	@@@.@@@@@@@@@@@@@@@@.@.@
-	;;	@@.@@@@@@@@@@@@.@@@@.@.@
-	;;	@@.@@@@@@@@@@@....@@@.@@
-	;;	@.@@@@@@@@@@@@.....@@.@@
-	;;	@.@.@@@.@@@@@@@.....@.@@
-	;;	@@.@@@@@...@@@@.....@.@@
-	;;	@.@@@@@@@@@.@@@@.....@@@
-	;;	@.@.@@@@.@@@.@@@.....@@@
-	;;	@.@@@@@@@.@@.@@@@....@@@
-	;;	@@.@.@@..@..@@@@@@..@@@@
-	;;	@@@.@@@@@.@@@@@@..@.@@@@
-	;;	@@.@.@@@@@@@....@@@@.@@@
-	;;	@.@@@..@@@@@.@@@.@@@.@@@
-	;;	@@.@@@@..@@@@.@@@@@@@.@@
-	;;	@@@..@@@@.@@@@.@@@@@@.@@
-	;;	@@@@@.@@@@@@@@...@@@.@@@
-	;;	@@@@@@..@@@@@@.@@...@@@@
-	;;	@@@@@@@@..@@@.@@@@@@@@@@
-	;;	@@@@@@@@@@...@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@..@.@@@@@@@@@@
+	;;	..........@@.@..........	@@@@@@@......@..@@@@@@@@
+	;;	.......@@@@..@@@........	@@@@@........@@@..@@@@@@
+	;;	.....@@....@@@@@@@......	@@@@.@@....@@@@@@@.@.@@@
+	;;	....@@@@@@@@@.@@@@@.@...	@@@.@@@@@@@@@.@@@@@.@.@@
+	;;	....@@@@@@@@@@@@@@@@.@..	@@@.@@@@@@@@@@@@@@@@.@.@
+	;;	...@@@@@@@@@@@@.@@@@.@..	@@.@@@@@@@@@@@@.@@@@.@.@
+	;;	...@@@@@@@@@@@.@..@@@...	@@.@@@@@@@@@@@....@@@.@@
+	;;	..@@@@@@@@@@@@..@@.@@...	@.@@@@@@@@@@@@.....@@.@@
+	;;	..@.@@@.@@@@@@@.@@@.@...	@.@.@@@.@@@@@@@.....@.@@
+	;;	...@@@@@...@@@@.@@@.@...	@@.@@@@@...@@@@.....@.@@
+	;;	..@@@@@@@@@.@@@@.@@.....	@.@@@@@@@@@.@@@@.....@@@
+	;;	..@.@@@@.@@@.@@@.@@.....	@.@.@@@@.@@@.@@@.....@@@
+	;;	..@@@@@@@.@@.@@@@.@@....	@.@@@@@@@.@@.@@@@....@@@
+	;;	...@.@@..@..@@@@@@......	@@.@.@@..@..@@@@@@..@@@@
+	;;	....@@@@@.@@@@@@..@.....	@@@.@@@@@.@@@@@@..@.@@@@
+	;;	...@.@@@@@@@....@@@@....	@@.@.@@@@@@@....@@@@.@@@
+	;;	..@@@..@@@@@.@@@.@@@....	@.@@@..@@@@@.@@@.@@@.@@@
+	;;	...@@@@..@@@@.@@@@@@@...	@@.@@@@..@@@@.@@@@@@@.@@
+	;;	.....@@@@.@@@@.@@@@@@...	@@@..@@@@.@@@@.@@@@@@.@@
+	;;	......@@@@@@@@...@@@....	@@@@@.@@@@@@@@...@@@.@@@
+	;;	........@@@@@@..........	@@@@@@..@@@@@@.@@...@@@@
+	;;	..........@@@...........	@@@@@@@@..@@@.@@@@@@@@@@
+	;;	........................	@@@@@@@@@@...@@@@@@@@@@@
 
 				;; SPR_HEELSB2:     EQU &1C	3x24
 	DEFB &00, &00, &00, &00, &34, &00, &01, &E7, &00, &06, &1F, &CC, &0F, &FB, &EC, &0F
@@ -18832,55 +18446,30 @@ img_3x24_1_mask:
 	DEFB &9F, &E7, &D6, &5F, &DF, &AF, &BF, &2F, &57, &E0, &EF, &79, &F6, &F7, &BE, &7B
 	DEFB &77, &CF, &FB, &FB, &F3, &F8, &FB, &FC, &77, &37, &FF, &8F, &CF, &FF, &FF, &FF
 
-	;;	........................
-	;;	..........@@.@..........
-	;;	.......@@@@..@@@........
-	;;	.....@@....@@@@@@@..@@..
-	;;	....@@@@@@@@@.@@@@@.@@..
-	;;	....@@@@@@@@@@@@@@@@....
-	;;	...@@@@@@@@@@@@.@@@@....
-	;;	...@@@@@@@@@@@.@..@@@...
-	;;	..@@@@@@@@@@@@..@@.@@...
-	;;	..@.@@@.@@..@@@.@@@.@...
-	;;	...@@@@@..@@.@@.@@@.@...
-	;;	..@@@@@@@@@@.@@@.@@@....
-	;;	..@.@@@@.@@.@@@@@..@@...
-	;;	..@@@@@@@..@@@@@@@@.....
-	;;	...@.@@..@.@@@@@@@......
-	;;	..@.@@@@@.@@@@@@..@.....
-	;;	.@.@.@@@@@@.....@@@.....
-	;;	.@@@@..@@@@@.@@.@@@@....
-	;;	..@@@@@..@@@@.@@.@@@....
-	;;	....@@@@@@@@@.@@@@@@@...
-	;;	......@@@@@@@...@@@@@...
-	;;	.........@@@......@@....
-	;;	........................
-	;;	........................
-	;;
-	;;	@@@@@@@@@@..@.@@@@@@@@@@
-	;;	@@@@@@@......@..@@@@@@@@
-	;;	@@@@@........@@@..@@..@@
-	;;	@@@@.@@....@@@@@@@..@@.@
-	;;	@@@.@@@@@@@@@.@@@@@.@@.@
-	;;	@@@.@@@@@@@@@@@@@@@@..@@
-	;;	@@.@@@@@@@@@@@@.@@@@.@@@
-	;;	@@.@@@@@@@@@@@....@@@.@@
-	;;	@.@@@@@@@@@@@@.....@@.@@
-	;;	@.@.@@@.@@..@@@.....@.@@
-	;;	@@.@@@@@..@@.@@.....@.@@
-	;;	@.@@@@@@@@@@.@@@.....@@@
-	;;	@.@.@@@@.@@.@@@@@.....@@
-	;;	@.@@@@@@@..@@@@@@@@..@@@
-	;;	@@.@.@@..@.@@@@@@@.@@@@@
-	;;	@.@.@@@@@.@@@@@@..@.@@@@
-	;;	.@.@.@@@@@@.....@@@.@@@@
-	;;	.@@@@..@@@@@.@@.@@@@.@@@
-	;;	@.@@@@@..@@@@.@@.@@@.@@@
-	;;	@@..@@@@@@@@@.@@@@@@@.@@
-	;;	@@@@..@@@@@@@...@@@@@.@@
-	;;	@@@@@@...@@@.@@@..@@.@@@
-	;;	@@@@@@@@@...@@@@@@..@@@@
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@..@.@@@@@@@@@@
+	;;	..........@@.@..........	@@@@@@@......@..@@@@@@@@
+	;;	.......@@@@..@@@........	@@@@@........@@@..@@..@@
+	;;	.....@@....@@@@@@@..@@..	@@@@.@@....@@@@@@@..@@.@
+	;;	....@@@@@@@@@.@@@@@.@@..	@@@.@@@@@@@@@.@@@@@.@@.@
+	;;	....@@@@@@@@@@@@@@@@....	@@@.@@@@@@@@@@@@@@@@..@@
+	;;	...@@@@@@@@@@@@.@@@@....	@@.@@@@@@@@@@@@.@@@@.@@@
+	;;	...@@@@@@@@@@@.@..@@@...	@@.@@@@@@@@@@@....@@@.@@
+	;;	..@@@@@@@@@@@@..@@.@@...	@.@@@@@@@@@@@@.....@@.@@
+	;;	..@.@@@.@@..@@@.@@@.@...	@.@.@@@.@@..@@@.....@.@@
+	;;	...@@@@@..@@.@@.@@@.@...	@@.@@@@@..@@.@@.....@.@@
+	;;	..@@@@@@@@@@.@@@.@@@....	@.@@@@@@@@@@.@@@.....@@@
+	;;	..@.@@@@.@@.@@@@@..@@...	@.@.@@@@.@@.@@@@@.....@@
+	;;	..@@@@@@@..@@@@@@@@.....	@.@@@@@@@..@@@@@@@@..@@@
+	;;	...@.@@..@.@@@@@@@......	@@.@.@@..@.@@@@@@@.@@@@@
+	;;	..@.@@@@@.@@@@@@..@.....	@.@.@@@@@.@@@@@@..@.@@@@
+	;;	.@.@.@@@@@@.....@@@.....	.@.@.@@@@@@.....@@@.@@@@
+	;;	.@@@@..@@@@@.@@.@@@@....	.@@@@..@@@@@.@@.@@@@.@@@
+	;;	..@@@@@..@@@@.@@.@@@....	@.@@@@@..@@@@.@@.@@@.@@@
+	;;	....@@@@@@@@@.@@@@@@@...	@@..@@@@@@@@@.@@@@@@@.@@
+	;;	......@@@@@@@...@@@@@...	@@@@..@@@@@@@...@@@@@.@@
+	;;	.........@@@......@@....	@@@@@@...@@@.@@@..@@.@@@
+	;;	........................	@@@@@@@@@...@@@@@@..@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
 
 			;; SPR_HEELSB3:     EQU &1D	3x24
 	DEFB &00, &00, &00, &00, &34, &00, &01, &E7, &00, &06, &1F, &D0, &0F, &FB, &E0, &0F
@@ -18893,55 +18482,30 @@ img_3x24_1_mask:
 	DEFB &B8, &6F, &D6, &B8, &DF, &EF, &7D, &3F, &F3, &F0, &DF, &F4, &FB, &DF, &EB, &3D
 	DEFB &BF, &EF, &EE, &7F, &F3, &FF, &7F, &FC, &7F, &7F, &FF, &8E, &FF, &FF, &F1, &FF
 
-	;;	........................
-	;;	..........@@.@..........
-	;;	.......@@@@..@@@........
-	;;	.....@@....@@@@@@@.@....
-	;;	....@@@@@@@@@.@@@@@.....
-	;;	....@@@@@@@@@@@@@@@@....
-	;;	...@@@@@@@@@@@@.@@@@....
-	;;	...@@@@@@@@@@@.@..@@@...
-	;;	..@@@@@@@@@@@@..@@.@@...
-	;;	..@.@@@..@@@@@.@@@.@@...
-	;;	...@@@@@@.@@@@.@@@.@@...
-	;;	..@@@@@@@@.@@@.@@@.@....
-	;;	..@.@@@..@.@@@.@@.@@....
-	;;	..@@@@@@@.@@@.@@.@@.....
-	;;	...@.@@.@.@@@.@.@@......
-	;;	....@@@@.@@@@@.@........
-	;;	......@@@@@@....@@......
-	;;	.....@..@@@@@.@@@@......
-	;;	....@.@@..@@@@.@@.......
-	;;	....@@@@@@@.@@@.........
-	;;	......@@@@@@@@@@........
-	;;	.........@@@@@@@........
-	;;	............@@@.........
-	;;	........................
-	;;
-	;;	@@@@@@@@@@..@.@@@@@@@@@@
-	;;	@@@@@@@......@..@@@@@@@@
-	;;	@@@@@........@@@..@.@@@@
-	;;	@@@@.@@....@@@@@@@.@.@@@
-	;;	@@@.@@@@@@@@@.@@@@@.@@@@
-	;;	@@@.@@@@@@@@@@@@@@@@.@@@
-	;;	@@.@@@@@@@@@@@@.@@@@.@@@
-	;;	@@.@@@@@@@@@@@....@@@.@@
-	;;	@.@@@@@@@@@@@@.....@@.@@
-	;;	@.@.@@@..@@@@@.....@@.@@
-	;;	@@.@@@@@@.@@@@.....@@.@@
-	;;	@.@@@@@@@@.@@@.....@.@@@
-	;;	@.@.@@@..@.@@@....@@.@@@
-	;;	@.@@@@@@@.@@@....@@.@@@@
-	;;	@@.@.@@.@.@@@...@@.@@@@@
-	;;	@@@.@@@@.@@@@@.@..@@@@@@
-	;;	@@@@..@@@@@@....@@.@@@@@
-	;;	@@@@.@..@@@@@.@@@@.@@@@@
-	;;	@@@.@.@@..@@@@.@@.@@@@@@
-	;;	@@@.@@@@@@@.@@@..@@@@@@@
-	;;	@@@@..@@@@@@@@@@.@@@@@@@
-	;;	@@@@@@...@@@@@@@.@@@@@@@
-	;;	@@@@@@@@@...@@@.@@@@@@@@
-	;;	@@@@@@@@@@@@...@@@@@@@@@
+	;;	........................	@@@@@@@@@@..@.@@@@@@@@@@
+	;;	..........@@.@..........	@@@@@@@......@..@@@@@@@@
+	;;	.......@@@@..@@@........	@@@@@........@@@..@.@@@@
+	;;	.....@@....@@@@@@@.@....	@@@@.@@....@@@@@@@.@.@@@
+	;;	....@@@@@@@@@.@@@@@.....	@@@.@@@@@@@@@.@@@@@.@@@@
+	;;	....@@@@@@@@@@@@@@@@....	@@@.@@@@@@@@@@@@@@@@.@@@
+	;;	...@@@@@@@@@@@@.@@@@....	@@.@@@@@@@@@@@@.@@@@.@@@
+	;;	...@@@@@@@@@@@.@..@@@...	@@.@@@@@@@@@@@....@@@.@@
+	;;	..@@@@@@@@@@@@..@@.@@...	@.@@@@@@@@@@@@.....@@.@@
+	;;	..@.@@@..@@@@@.@@@.@@...	@.@.@@@..@@@@@.....@@.@@
+	;;	...@@@@@@.@@@@.@@@.@@...	@@.@@@@@@.@@@@.....@@.@@
+	;;	..@@@@@@@@.@@@.@@@.@....	@.@@@@@@@@.@@@.....@.@@@
+	;;	..@.@@@..@.@@@.@@.@@....	@.@.@@@..@.@@@....@@.@@@
+	;;	..@@@@@@@.@@@.@@.@@.....	@.@@@@@@@.@@@....@@.@@@@
+	;;	...@.@@.@.@@@.@.@@......	@@.@.@@.@.@@@...@@.@@@@@
+	;;	....@@@@.@@@@@.@........	@@@.@@@@.@@@@@.@..@@@@@@
+	;;	......@@@@@@....@@......	@@@@..@@@@@@....@@.@@@@@
+	;;	.....@..@@@@@.@@@@......	@@@@.@..@@@@@.@@@@.@@@@@
+	;;	....@.@@..@@@@.@@.......	@@@.@.@@..@@@@.@@.@@@@@@
+	;;	....@@@@@@@.@@@.........	@@@.@@@@@@@.@@@..@@@@@@@
+	;;	......@@@@@@@@@@........	@@@@..@@@@@@@@@@.@@@@@@@
+	;;	.........@@@@@@@........	@@@@@@...@@@@@@@.@@@@@@@
+	;;	............@@@.........	@@@@@@@@@...@@@.@@@@@@@@
+	;;	........................	@@@@@@@@@@@@...@@@@@@@@@
 
 img_head_0:
 				;; SPR_HEAD1:     EQU &1E	3x24
@@ -18957,55 +18521,30 @@ img_head_0:
 	DEFB &7E, &07, &8F, &76, &07, &8E, &E7, &19, &8F, &38, &E1, &07, &CF, &83, &83, &86
 	DEFB &67, &E0, &81, &FF, &E3, &03, &FF, &F7, &87, &FF, &FF, &CF, &FF, &FF, &FF, &FF
 
-	;;	........................
-	;;	.........@@@@@..........
-	;;	.......@@@@@@@@@........
-	;;	......@@@@@@@@@@@.......
-	;;	.....@@@@@@@@@@..@......
-	;;	.....@@@@@@@..@@@@......
-	;;	....@@@@@@@.@@@@@@@.....
-	;;	....@@@@@@@@@@@@.@@@@...
-	;;	....@@@@@@@@@.@@.@...@..
-	;;	....@@@@@@@@@.@@@.....@.
-	;;	...@.@@@@@@@@@@@@.....@.
-	;;	...@@.@@@@@@@@@@......@.
-	;;	..@@.@@@@@@@@@@.@.....@.
-	;;	.@@@.@@@.@@@@@@......@..
-	;;	..@.@@@@.@@@.@@......@..
-	;;	..@.@@@.@@@..@@@...@@@..
-	;;	..@.@@@@..@@@...@@@@@@..
-	;;	.@@@.@@@@@..@@@@@..@@...
-	;;	...@@.@@@.@@.@@.........
-	;;	....@@..@@@@@...........
-	;;	....@....@.@@...........
-	;;	..........@@............
-	;;	........................
-	;;	........................
-	;;
-	;;	@@@@@@@@@.....@@@@@@@@@@
-	;;	@@@@@@@..@@@@@..@@@@@@@@
-	;;	@@@@@@.@@@@@@@@@.@@@@@@@
-	;;	@@@@@.@@@@@@@@@@@.@@@@@@
-	;;	@@@@.@@@@@@@@@@..@.@@@@@
-	;;	@@@@.@@@@@@@..@@@@.@@@@@
-	;;	@@@.@@@@@@@.@@@@@@@.@@@@
-	;;	@@@.@@@@@@@@@@@@.@@@@@@@
-	;;	@@@.@@@@@@@@@.@@.@...@@@
-	;;	@@@.@@@@@@@@@.@@@.....@@
-	;;	@@...@@@@@@@@@@@@.....@@
-	;;	@@....@@@@@@@@@@......@@
-	;;	@....@@@@@@@@@@.@.....@@
-	;;	.....@@@.@@@@@@......@@@
-	;;	@...@@@@.@@@.@@......@@@
-	;;	@...@@@.@@@..@@@...@@..@
-	;;	@...@@@@..@@@...@@@....@
-	;;	.....@@@@@..@@@@@.....@@
-	;;	@.....@@@....@@..@@..@@@
-	;;	@@@.....@......@@@@@@@@@
-	;;	@@@...@@......@@@@@@@@@@
-	;;	@@@@.@@@@....@@@@@@@@@@@
-	;;	@@@@@@@@@@..@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@.....@@@@@@@@@@
+	;;	.........@@@@@..........	@@@@@@@..@@@@@..@@@@@@@@
+	;;	.......@@@@@@@@@........	@@@@@@.@@@@@@@@@.@@@@@@@
+	;;	......@@@@@@@@@@@.......	@@@@@.@@@@@@@@@@@.@@@@@@
+	;;	.....@@@@@@@@@@..@......	@@@@.@@@@@@@@@@..@.@@@@@
+	;;	.....@@@@@@@..@@@@......	@@@@.@@@@@@@..@@@@.@@@@@
+	;;	....@@@@@@@.@@@@@@@.....	@@@.@@@@@@@.@@@@@@@.@@@@
+	;;	....@@@@@@@@@@@@.@@@@...	@@@.@@@@@@@@@@@@.@@@@@@@
+	;;	....@@@@@@@@@.@@.@...@..	@@@.@@@@@@@@@.@@.@...@@@
+	;;	....@@@@@@@@@.@@@.....@.	@@@.@@@@@@@@@.@@@.....@@
+	;;	...@.@@@@@@@@@@@@.....@.	@@...@@@@@@@@@@@@.....@@
+	;;	...@@.@@@@@@@@@@......@.	@@....@@@@@@@@@@......@@
+	;;	..@@.@@@@@@@@@@.@.....@.	@....@@@@@@@@@@.@.....@@
+	;;	.@@@.@@@.@@@@@@......@..	.....@@@.@@@@@@......@@@
+	;;	..@.@@@@.@@@.@@......@..	@...@@@@.@@@.@@......@@@
+	;;	..@.@@@.@@@..@@@...@@@..	@...@@@.@@@..@@@...@@..@
+	;;	..@.@@@@..@@@...@@@@@@..	@...@@@@..@@@...@@@....@
+	;;	.@@@.@@@@@..@@@@@..@@...	.....@@@@@..@@@@@.....@@
+	;;	...@@.@@@.@@.@@.........	@.....@@@....@@..@@..@@@
+	;;	....@@..@@@@@...........	@@@.....@......@@@@@@@@@
+	;;	....@....@.@@...........	@@@...@@......@@@@@@@@@@
+	;;	..........@@............	@@@@.@@@@....@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@..@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
 
 			;; SPR_HEAD2:     EQU &1F	3x24
 .img_head_1f:
@@ -19014,62 +18553,36 @@ img_head_0:
 	DEFB &04, &77, &FE, &04, &2F, &FD, &04, &2E, &FC, &08, &2E, &EC, &0C, &5D, &CF, &3E
 	DEFB &1E, &F0, &DE, &0F, &3F, &8C, &16, &DE, &00, &1B, &E0, &00, &05, &60, &00, &00
 	DEFB &C0, &00, &00, &00, &00, &00, &00, &00
-
-	;;	........................
-	;;	.........@@@@@..........
-	;;	.......@@@@@@@@@........
-	;;	......@@@@@@@@@@@.......
-	;;	.....@@@@@@@@@..@.......
-	;;	.....@@@@@@..@@@@@......
-	;;	....@@@@@@.@@@@@@@......
-	;;	....@@@@@@@@@@@.@@@@....
-	;;	....@@@@@@@@.@@.@...@...
-	;;	....@@@@@@@@.@@@.....@..
-	;;	...@.@@@@@@@@@@@.....@..
-	;;	.@@@.@@@@@@@@@@......@..
-	;;	..@.@@@@@@@@@@.@.....@..
-	;;	..@.@@@.@@@@@@......@...
-	;;	..@.@@@.@@@.@@......@@..
-	;;	.@.@@@.@@@..@@@@..@@@@@.
-	;;	...@@@@.@@@@....@@.@@@@.
-	;;	....@@@@..@@@@@@@...@@..
-	;;	...@.@@.@@.@@@@.........
-	;;	...@@.@@@@@.............
-	;;	.....@.@.@@.............
-	;;	........@@..............
-	;;	........................
-	;;	........................
-
 	DEFB &FF, &83, &FF, &FE, &7C, &FF, &FD, &FF, &7F, &FB, &FF, &BF, &F7, &FC, &BF, &F7
 	DEFB &E7, &DF, &EF, &DF, &DF, &EF, &FE, &FF, &EF, &F6, &8F, &EF, &F7, &07, &87, &FF
 	DEFB &07, &07, &FE, &07, &8F, &FD, &07, &8E, &FC, &0B, &8E, &EC, &09, &1D, &CF, &30
 	DEFB &9E, &F0, &C0, &EF, &3F, &A1, &C6, &1E, &73, &C2, &01, &FF, &E0, &0F, &FF, &FA
 	DEFB &1F, &FF, &FF, &3F, &FF, &FF, &FF, &FF
 
-	;;	@@@@@@@@@.....@@@@@@@@@@
-	;;	@@@@@@@..@@@@@..@@@@@@@@
-	;;	@@@@@@.@@@@@@@@@.@@@@@@@
-	;;	@@@@@.@@@@@@@@@@@.@@@@@@
-	;;	@@@@.@@@@@@@@@..@.@@@@@@
-	;;	@@@@.@@@@@@..@@@@@.@@@@@
-	;;	@@@.@@@@@@.@@@@@@@.@@@@@
-	;;	@@@.@@@@@@@@@@@.@@@@@@@@
-	;;	@@@.@@@@@@@@.@@.@...@@@@
-	;;	@@@.@@@@@@@@.@@@.....@@@
-	;;	@....@@@@@@@@@@@.....@@@
-	;;	.....@@@@@@@@@@......@@@
-	;;	@...@@@@@@@@@@.@.....@@@
-	;;	@...@@@.@@@@@@......@.@@
-	;;	@...@@@.@@@.@@......@..@
-	;;	...@@@.@@@..@@@@..@@....
-	;;	@..@@@@.@@@@....@@......
-	;;	@@@.@@@@..@@@@@@@.@....@
-	;;	@@...@@....@@@@..@@@..@@
-	;;	@@....@........@@@@@@@@@
-	;;	@@@.........@@@@@@@@@@@@
-	;;	@@@@@.@....@@@@@@@@@@@@@
-	;;	@@@@@@@@..@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@.....@@@@@@@@@@
+	;;	.........@@@@@..........	@@@@@@@..@@@@@..@@@@@@@@
+	;;	.......@@@@@@@@@........	@@@@@@.@@@@@@@@@.@@@@@@@
+	;;	......@@@@@@@@@@@.......	@@@@@.@@@@@@@@@@@.@@@@@@
+	;;	.....@@@@@@@@@..@.......	@@@@.@@@@@@@@@..@.@@@@@@
+	;;	.....@@@@@@..@@@@@......	@@@@.@@@@@@..@@@@@.@@@@@
+	;;	....@@@@@@.@@@@@@@......	@@@.@@@@@@.@@@@@@@.@@@@@
+	;;	....@@@@@@@@@@@.@@@@....	@@@.@@@@@@@@@@@.@@@@@@@@
+	;;	....@@@@@@@@.@@.@...@...	@@@.@@@@@@@@.@@.@...@@@@
+	;;	....@@@@@@@@.@@@.....@..	@@@.@@@@@@@@.@@@.....@@@
+	;;	...@.@@@@@@@@@@@.....@..	@....@@@@@@@@@@@.....@@@
+	;;	.@@@.@@@@@@@@@@......@..	.....@@@@@@@@@@......@@@
+	;;	..@.@@@@@@@@@@.@.....@..	@...@@@@@@@@@@.@.....@@@
+	;;	..@.@@@.@@@@@@......@...	@...@@@.@@@@@@......@.@@
+	;;	..@.@@@.@@@.@@......@@..	@...@@@.@@@.@@......@..@
+	;;	.@.@@@.@@@..@@@@..@@@@@.	...@@@.@@@..@@@@..@@....
+	;;	...@@@@.@@@@....@@.@@@@.	@..@@@@.@@@@....@@......
+	;;	....@@@@..@@@@@@@...@@..	@@@.@@@@..@@@@@@@.@....@
+	;;	...@.@@.@@.@@@@.........	@@...@@....@@@@..@@@..@@
+	;;	...@@.@@@@@.............	@@....@........@@@@@@@@@
+	;;	.....@.@.@@.............	@@@.........@@@@@@@@@@@@
+	;;	........@@..............	@@@@@.@....@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@..@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
 
 			;; SPR_HEAD3:     EQU &20	3x24
 	DEFB &00, &00, &00, &00, &7C, &00, &01, &FF, &00, &03, &FF, &80, &07, &FF, &40, &07
@@ -19082,55 +18595,30 @@ img_head_0:
 	DEFB &BF, &03, &E3, &BB, &03, &E3, &B3, &8F, &E3, &BC, &73, &C3, &DF, &87, &E1, &E6
 	DEFB &7F, &F0, &C1, &FF, &F0, &41, &FF, &F8, &81, &FF, &FF, &C3, &FF, &FF, &E7, &FF
 
-	;;	........................
-	;;	.........@@@@@..........
-	;;	.......@@@@@@@@@........
-	;;	......@@@@@@@@@@@.......
-	;;	.....@@@@@@@@@@@.@......
-	;;	.....@@@@@@@@..@@@......
-	;;	....@@@@@@@@.@@@@@@.....
-	;;	....@@@@@@@@@@@@@.@@@@..
-	;;	....@@@@@@@@@@.@@.@...@.
-	;;	....@@@@@@@@@@.@@@.....@
-	;;	.....@@@@@@@@@@@@@.....@
-	;;	....@..@@@@@@@@@@......@
-	;;	....@.@@@@@@@@@@.@.....@
-	;;	...@@.@@@.@@@@@@......@.
-	;;	....@.@@@.@@@.@@......@.
-	;;	....@.@@@.@@..@@@...@@..
-	;;	....@.@@@.@@@@...@@@@...
-	;;	...@@.@@@@.@@@@@@.......
-	;;	.....@.@@@@..@@.........
-	;;	.....@@.@@.@@...........
-	;;	.....@@@.@@@@@..........
-	;;	..........@.@@..........
-	;;	...........@@...........
-	;;	........................
-	;;
-	;;	@@@@@@@@@.....@@@@@@@@@@
-	;;	@@@@@@@..@@@@@..@@@@@@@@
-	;;	@@@@@@.@@@@@@@@@.@@@@@@@
-	;;	@@@@@.@@@@@@@@@@@.@@@@@@
-	;;	@@@@.@@@@@@@@@@@.@.@@@@@
-	;;	@@@@.@@@@@@@@..@@@.@@@@@
-	;;	@@@.@@@@@@@@.@@@@@@.@@@@
-	;;	@@@.@@@@@@@@@@@@@.@@@@@@
-	;;	@@@.@@@@@@@@@@.@@.@...@@
-	;;	@@@.@@@@@@@@@@.@@@.....@
-	;;	@@@@.@@@@@@@@@@@@@.....@
-	;;	@@@....@@@@@@@@@@......@
-	;;	@@@...@@@@@@@@@@.@.....@
-	;;	@@....@@@.@@@@@@......@@
-	;;	@@@...@@@.@@@.@@......@@
-	;;	@@@...@@@.@@..@@@...@@@@
-	;;	@@@...@@@.@@@@...@@@..@@
-	;;	@@....@@@@.@@@@@@....@@@
-	;;	@@@....@@@@..@@..@@@@@@@
-	;;	@@@@....@@.....@@@@@@@@@
-	;;	@@@@.....@.....@@@@@@@@@
-	;;	@@@@@...@......@@@@@@@@@
-	;;	@@@@@@@@@@....@@@@@@@@@@
-	;;	@@@@@@@@@@@..@@@@@@@@@@@
+	;;	........................	@@@@@@@@@.....@@@@@@@@@@
+	;;	.........@@@@@..........	@@@@@@@..@@@@@..@@@@@@@@
+	;;	.......@@@@@@@@@........	@@@@@@.@@@@@@@@@.@@@@@@@
+	;;	......@@@@@@@@@@@.......	@@@@@.@@@@@@@@@@@.@@@@@@
+	;;	.....@@@@@@@@@@@.@......	@@@@.@@@@@@@@@@@.@.@@@@@
+	;;	.....@@@@@@@@..@@@......	@@@@.@@@@@@@@..@@@.@@@@@
+	;;	....@@@@@@@@.@@@@@@.....	@@@.@@@@@@@@.@@@@@@.@@@@
+	;;	....@@@@@@@@@@@@@.@@@@..	@@@.@@@@@@@@@@@@@.@@@@@@
+	;;	....@@@@@@@@@@.@@.@...@.	@@@.@@@@@@@@@@.@@.@...@@
+	;;	....@@@@@@@@@@.@@@.....@	@@@.@@@@@@@@@@.@@@.....@
+	;;	.....@@@@@@@@@@@@@.....@	@@@@.@@@@@@@@@@@@@.....@
+	;;	....@..@@@@@@@@@@......@	@@@....@@@@@@@@@@......@
+	;;	....@.@@@@@@@@@@.@.....@	@@@...@@@@@@@@@@.@.....@
+	;;	...@@.@@@.@@@@@@......@.	@@....@@@.@@@@@@......@@
+	;;	....@.@@@.@@@.@@......@.	@@@...@@@.@@@.@@......@@
+	;;	....@.@@@.@@..@@@...@@..	@@@...@@@.@@..@@@...@@@@
+	;;	....@.@@@.@@@@...@@@@...	@@@...@@@.@@@@...@@@..@@
+	;;	...@@.@@@@.@@@@@@.......	@@....@@@@.@@@@@@....@@@
+	;;	.....@.@@@@..@@.........	@@@....@@@@..@@..@@@@@@@
+	;;	.....@@.@@.@@...........	@@@@....@@.....@@@@@@@@@
+	;;	.....@@@.@@@@@..........	@@@@.....@.....@@@@@@@@@
+	;;	..........@.@@..........	@@@@@...@......@@@@@@@@@
+	;;	...........@@...........	@@@@@@@@@@....@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@..@@@@@@@@@@@
 
 			;; SPR_HEADB1:     EQU &21	3x24
 	DEFB &00, &00, &00, &00, &00, &00, &0F, &3E, &00, &10, &FF, &80, &21, &FF, &C0, &23
@@ -19143,55 +18631,30 @@ img_head_0:
 	DEFB &0F, &F3, &CB, &0F, &F1, &8F, &0F, &E3, &06, &07, &E7, &00, &0F, &DF, &80, &3F
 	DEFB &BF, &C8, &3E, &7F, &FE, &C1, &FF, &FF, &FF, &FF, &FF, &FF, &FF, &FF, &FF, &FF
 
-	;;	........................
-	;;	........................
-	;;	....@@@@..@@@@@.........
-	;;	...@....@@@@@@@@@.......
-	;;	..@....@@@@@@@@@@@......
-	;;	..@...@@@@@@@@@@@@@.....
-	;;	..@...@@@@@@@@@@@@@.....
-	;;	..@..@@@@@@@@@@.@@@@....
-	;;	...@.@@@@.@@@@@@@@@@....
-	;;	...@.@@@.@.@@@@@@@@@....
-	;;	....@@..@@.@@@@@@@@@.@..
-	;;	......@@.@@.@@@@@@@@....
-	;;	.....@@@.@@@.@@@@@@@....
-	;;	.....@@@.@@.@@@@@@@@....
-	;;	....@.@@.@@.@@@@@@@@.@..
-	;;	..@@@@@@.@@.@@@@@@@.@...
-	;;	.@@@@@@.@@@@.@@@@@@.....
-	;;	.@@.@..@@@..@@@@@@......
-	;;	..@@.@@@@.@@@@@@@.......
-	;;	.......@..@@@@@.........
-	;;	........................
-	;;	........................
-	;;	........................
-	;;	........................
-	;;
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@.....@@@@@@@@@
-	;;	@@@@@@@@..@@@@@..@@@@@@@
-	;;	@@@@....@@@@@@@@@.@@@@@@
-	;;	@@@....@@@@@@@@@@@.@@@@@
-	;;	@@@...@@@@@@@@@@@@@.@@@@
-	;;	@@@...@@@@@@@@@@@@@.@@@@
-	;;	@@@..@@@@@@@@@@.@@@@.@@@
-	;;	@@@@.@@@@.@@@@@@@@@@.@@@
-	;;	@@@@.@@@...@@@@@@@@@..@@
-	;;	@@@@@@.....@@@@@@@@@...@
-	;;	@@@@@.@@....@@@@@@@@..@@
-	;;	@@@@.@@@.....@@@@@@@.@@@
-	;;	@@@@.@@@....@@@@@@@@..@@
-	;;	@@..@.@@....@@@@@@@@...@
-	;;	@...@@@@....@@@@@@@...@@
-	;;	.....@@......@@@@@@..@@@
-	;;	............@@@@@@.@@@@@
-	;;	@.........@@@@@@@.@@@@@@
-	;;	@@..@.....@@@@@..@@@@@@@
-	;;	@@@@@@@.@@.....@@@@@@@@@
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@.....@@@@@@@@@
+	;;	....@@@@..@@@@@.........	@@@@@@@@..@@@@@..@@@@@@@
+	;;	...@....@@@@@@@@@.......	@@@@....@@@@@@@@@.@@@@@@
+	;;	..@....@@@@@@@@@@@......	@@@....@@@@@@@@@@@.@@@@@
+	;;	..@...@@@@@@@@@@@@@.....	@@@...@@@@@@@@@@@@@.@@@@
+	;;	..@...@@@@@@@@@@@@@.....	@@@...@@@@@@@@@@@@@.@@@@
+	;;	..@..@@@@@@@@@@.@@@@....	@@@..@@@@@@@@@@.@@@@.@@@
+	;;	...@.@@@@.@@@@@@@@@@....	@@@@.@@@@.@@@@@@@@@@.@@@
+	;;	...@.@@@.@.@@@@@@@@@....	@@@@.@@@...@@@@@@@@@..@@
+	;;	....@@..@@.@@@@@@@@@.@..	@@@@@@.....@@@@@@@@@...@
+	;;	......@@.@@.@@@@@@@@....	@@@@@.@@....@@@@@@@@..@@
+	;;	.....@@@.@@@.@@@@@@@....	@@@@.@@@.....@@@@@@@.@@@
+	;;	.....@@@.@@.@@@@@@@@....	@@@@.@@@....@@@@@@@@..@@
+	;;	....@.@@.@@.@@@@@@@@.@..	@@..@.@@....@@@@@@@@...@
+	;;	..@@@@@@.@@.@@@@@@@.@...	@...@@@@....@@@@@@@...@@
+	;;	.@@@@@@.@@@@.@@@@@@.....	.....@@......@@@@@@..@@@
+	;;	.@@.@..@@@..@@@@@@......	............@@@@@@.@@@@@
+	;;	..@@.@@@@.@@@@@@@.......	@.........@@@@@@@.@@@@@@
+	;;	.......@..@@@@@.........	@@..@.....@@@@@..@@@@@@@
+	;;	........................	@@@@@@@.@@.....@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
 
 			;; SPR_HEADB2:     EQU &22	3x24
 	DEFB &00, &00, &00, &00, &00, &00, &1E, &3E, &00, &21, &FF, &80, &41, &FF, &C0, &43
@@ -19204,55 +18667,30 @@ img_head_0:
 	DEFB &C7, &F7, &F9, &C3, &F7, &F7, &87, &EF, &E3, &0F, &EF, &C0, &0F, &DF, &C0, &0F
 	DEFB &BF, &E1, &DE, &7F, &F3, &E1, &FF, &FF, &FF, &FF, &FF, &FF, &FF, &FF, &FF, &FF
 
-	;;	........................
-	;;	........................
-	;;	...@@@@...@@@@@.........
-	;;	..@....@@@@@@@@@@.......
-	;;	.@.....@@@@@@@@@@@......
-	;;	.@....@@@@@@@@@@@@@.....
-	;;	.@....@@@@@@@@@@@@@.....
-	;;	.@...@@@.@@@@@@@.@@@....
-	;;	..@..@@.@.@@@@@@@@@@....
-	;;	..@..@.@@@..@@@@@@@@....
-	;;	...@.@...@@@.@@@@@@@....
-	;;	....@.@@@.@@.@@@@@@@....
-	;;	......@@@@.@.@@@@@@@....
-	;;	......@@@@.@.@@@@@@@....
-	;;	.......@@@.@@.@@@@@@....
-	;;	.....@@@@.@@.@@@@@@.....
-	;;	....@@@@.@@.@@@@@@@.....
-	;;	...@@@@.@@@.@@@@@@......
-	;;	...@@.@...@.@@@@@.......
-	;;	....@@.....@@@@.........
-	;;	........................
-	;;	........................
-	;;	........................
-	;;	........................
-	;;
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@.....@@@@@@@@@
-	;;	@@@@@@@...@@@@@..@@@@@@@
-	;;	@@@....@@@@@@@@@@.@@@@@@
-	;;	@@.....@@@@@@@@@@@.@@@@@
-	;;	@@....@@@@@@@@@@@@@.@@@@
-	;;	@@....@@@@@@@@@@@@@.@@@@
-	;;	@@...@@@.@@@@@@@.@@@.@@@
-	;;	@@@..@@...@@@@@@@@@@.@@@
-	;;	@@@..@......@@@@@@@@.@@@
-	;;	@@@@.@.......@@@@@@@.@@@
-	;;	@@@@@.@@@....@@@@@@@.@@@
-	;;	@@@@@.@@@@...@@@@@@@.@@@
-	;;	@@@@@.@@@@...@@@@@@@.@@@
-	;;	@@@@@..@@@....@@@@@@.@@@
-	;;	@@@@.@@@@....@@@@@@.@@@@
-	;;	@@@...@@....@@@@@@@.@@@@
-	;;	@@..........@@@@@@.@@@@@
-	;;	@@..........@@@@@.@@@@@@
-	;;	@@@....@@@.@@@@..@@@@@@@
-	;;	@@@@..@@@@@....@@@@@@@@@
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@.....@@@@@@@@@
+	;;	...@@@@...@@@@@.........	@@@@@@@...@@@@@..@@@@@@@
+	;;	..@....@@@@@@@@@@.......	@@@....@@@@@@@@@@.@@@@@@
+	;;	.@.....@@@@@@@@@@@......	@@.....@@@@@@@@@@@.@@@@@
+	;;	.@....@@@@@@@@@@@@@.....	@@....@@@@@@@@@@@@@.@@@@
+	;;	.@....@@@@@@@@@@@@@.....	@@....@@@@@@@@@@@@@.@@@@
+	;;	.@...@@@.@@@@@@@.@@@....	@@...@@@.@@@@@@@.@@@.@@@
+	;;	..@..@@.@.@@@@@@@@@@....	@@@..@@...@@@@@@@@@@.@@@
+	;;	..@..@.@@@..@@@@@@@@....	@@@..@......@@@@@@@@.@@@
+	;;	...@.@...@@@.@@@@@@@....	@@@@.@.......@@@@@@@.@@@
+	;;	....@.@@@.@@.@@@@@@@....	@@@@@.@@@....@@@@@@@.@@@
+	;;	......@@@@.@.@@@@@@@....	@@@@@.@@@@...@@@@@@@.@@@
+	;;	......@@@@.@.@@@@@@@....	@@@@@.@@@@...@@@@@@@.@@@
+	;;	.......@@@.@@.@@@@@@....	@@@@@..@@@....@@@@@@.@@@
+	;;	.....@@@@.@@.@@@@@@.....	@@@@.@@@@....@@@@@@.@@@@
+	;;	....@@@@.@@.@@@@@@@.....	@@@...@@....@@@@@@@.@@@@
+	;;	...@@@@.@@@.@@@@@@......	@@..........@@@@@@.@@@@@
+	;;	...@@.@...@.@@@@@.......	@@..........@@@@@.@@@@@@
+	;;	....@@.....@@@@.........	@@@....@@@.@@@@..@@@@@@@
+	;;	........................	@@@@..@@@@@....@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
 
 			;; SPR_HEADB3:     EQU &23	3x24
 	DEFB &00, &00, &00, &00, &00, &00, &07, &3E, &00, &08, &FF, &80, &11, &FF, &C0, &13
@@ -19265,55 +18703,30 @@ img_head_0:
 	DEFB &1F, &F0, &8E, &1F, &F1, &0E, &1F, &E3, &0C, &0F, &E7, &80, &1F, &DF, &C8, &FF
 	DEFB &BF, &FD, &3E, &7F, &FF, &C1, &FF, &FF, &FF, &FF, &FF, &FF, &FF, &FF, &FF, &FF
 
-	;;	........................
-	;;	........................
-	;;	.....@@@..@@@@@.........
-	;;	....@...@@@@@@@@@.......
-	;;	...@...@@@@@@@@@@@......
-	;;	...@..@@@@@@@@@@@@@.....
-	;;	...@..@@@@@@@@@@@@@.@...
-	;;	...@.@@@@@@@@@.@@@@@....
-	;;	....@@@@.@@@@@@@@@@@....
-	;;	....@@@.@.@@@@@@@@@@.@@.
-	;;	.......@@.@@@@@@@@@@.@..
-	;;	.....@@.@@.@@@@@@@@@....
-	;;	....@@@.@@@.@@@@@@@@.@..
-	;;	....@@@.@@.@@@@@@@@@.@@.
-	;;	..@.@@@.@@.@@@@@@@@@.@..
-	;;	.@@@@@@.@@.@@@@@@@@.@...
-	;;	.@@.@@.@@@@.@@@@@@@.....
-	;;	..@@..@@...@@@@@@@......
-	;;	......@.@@@@@@@@@.......
-	;;	..........@@@@@.........
-	;;	........................
-	;;	........................
-	;;	........................
-	;;	........................
-	;;
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@.....@@@@@@@@@
-	;;	@@@@@@@@..@@@@@..@@@@@@@
-	;;	@@@@@...@@@@@@@@@.@@@@@@
-	;;	@@@@...@@@@@@@@@@@.@@@@@
-	;;	@@@@..@@@@@@@@@@@@@..@@@
-	;;	@@@@..@@@@@@@@@@@@@...@@
-	;;	@@@@.@@@@@@@@@.@@@@@.@@@
-	;;	@@@@@@@@.@@@@@@@@@@@...@
-	;;	@@@@@@@...@@@@@@@@@@....
-	;;	@@@@@.....@@@@@@@@@@...@
-	;;	@@@@.@@....@@@@@@@@@..@@
-	;;	@@@.@@@.....@@@@@@@@...@
-	;;	@@..@@@....@@@@@@@@@....
-	;;	@...@@@....@@@@@@@@@...@
-	;;	....@@@....@@@@@@@@...@@
-	;;	....@@......@@@@@@@..@@@
-	;;	@..........@@@@@@@.@@@@@
-	;;	@@..@...@@@@@@@@@.@@@@@@
-	;;	@@@@@@.@..@@@@@..@@@@@@@
-	;;	@@@@@@@@@@.....@@@@@@@@@
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@.....@@@@@@@@@
+	;;	.....@@@..@@@@@.........	@@@@@@@@..@@@@@..@@@@@@@
+	;;	....@...@@@@@@@@@.......	@@@@@...@@@@@@@@@.@@@@@@
+	;;	...@...@@@@@@@@@@@......	@@@@...@@@@@@@@@@@.@@@@@
+	;;	...@..@@@@@@@@@@@@@.....	@@@@..@@@@@@@@@@@@@..@@@
+	;;	...@..@@@@@@@@@@@@@.@...	@@@@..@@@@@@@@@@@@@...@@
+	;;	...@.@@@@@@@@@.@@@@@....	@@@@.@@@@@@@@@.@@@@@.@@@
+	;;	....@@@@.@@@@@@@@@@@....	@@@@@@@@.@@@@@@@@@@@...@
+	;;	....@@@.@.@@@@@@@@@@.@@.	@@@@@@@...@@@@@@@@@@....
+	;;	.......@@.@@@@@@@@@@.@..	@@@@@.....@@@@@@@@@@...@
+	;;	.....@@.@@.@@@@@@@@@....	@@@@.@@....@@@@@@@@@..@@
+	;;	....@@@.@@@.@@@@@@@@.@..	@@@.@@@.....@@@@@@@@...@
+	;;	....@@@.@@.@@@@@@@@@.@@.	@@..@@@....@@@@@@@@@....
+	;;	..@.@@@.@@.@@@@@@@@@.@..	@...@@@....@@@@@@@@@...@
+	;;	.@@@@@@.@@.@@@@@@@@.@...	....@@@....@@@@@@@@...@@
+	;;	.@@.@@.@@@@.@@@@@@@.....	....@@......@@@@@@@..@@@
+	;;	..@@..@@...@@@@@@@......	@..........@@@@@@@.@@@@@
+	;;	......@.@@@@@@@@@.......	@@..@...@@@@@@@@@.@@@@@@
+	;;	..........@@@@@.........	@@@@@@.@..@@@@@..@@@@@@@
+	;;	........................	@@@@@@@@@@.....@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
 
 						;; SPR_VAPE1:      EQU &24
 	DEFB &00, &00, &00, &00, &00, &00, &00, &1D, &80, &07, &BE, &80, &0F, &DE, &78, &0F
@@ -19326,55 +18739,30 @@ img_head_0:
 	DEFB &AA, &00, &EF, &D4, &F1, &CF, &C9, &FB, &AF, &D5, &FB, &AF, &C1, &FB, &C7, &A1
 	DEFB &FB, &B0, &40, &F7, &B0, &C0, &0F, &C8, &20, &FF, &FC, &F1, &FF, &FF, &FF, &FF
 
-	;;	........................
-	;;	........................
-	;;	...........@@@.@@.......
-	;;	.....@@@@.@@@@@.@.......
-	;;	....@@@@@@.@@@@..@@@@...
-	;;	....@@@@@@......@@@@@@..
-	;;	....@@@@@..@@@...@@@@@..
-	;;	....@@@@.@@@@.@@@.@@@@..
-	;;	.....@@.@@@@.@@@@@.@@@..
-	;;	...@@...@@@@.@@@@@.@@...
-	;;	..@@@@.@@@@@@.@@@.@..@..
-	;;	..@@@@.@@..@@@...@@.@@@.
-	;;	..@@@....@@.@@@@@@@.@@@.
-	;;	...@.@@@@.@.@@@@....@@@.
-	;;	....@@@@@@.@@@@.@@@@.@..
-	;;	....@@@@@@.@@@.@@@@@@...
-	;;	..@.@@@@@@.@@@.@@@@@@...
-	;;	..@.@@@@@@.@...@@@@@@...
-	;;	.....@@@@.@.@@.@@@@@@...
-	;;	..@@.....@.@@@@.@@@@....
-	;;	..@@.@@.@@.@@@@@........
-	;;	......@@....@@@.........
-	;;	........................
-	;;	........................
-	;;
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@...@..@@@@@@@
-	;;	@@@@@....@.@@@....@@@@@@
-	;;	@@@@.@@@@.@@@@@......@@@
-	;;	@@@.@@@@@@.@@@@..@@@@.@@
-	;;	@@@.@@@@@@......@@@@@@.@
-	;;	@@@.@@@@@..@.@...@@@@@.@
-	;;	@@@.@@@@..@.@.@@@.@@@@.@
-	;;	@@@..@@..@.@.@@@@@.@@@.@
-	;;	@@......@.@..@@@@@.@@.@@
-	;;	@......@.@.@..@@@......@
-	;;	@.......@...@.....@.....
-	;;	@........@@..@.@.@......
-	;;	@@...@@@@.@.@.@.........
-	;;	@@@.@@@@@@.@.@..@@@@...@
-	;;	@@..@@@@@@..@..@@@@@@.@@
-	;;	@.@.@@@@@@.@.@.@@@@@@.@@
-	;;	@.@.@@@@@@.....@@@@@@.@@
-	;;	@@...@@@@.@....@@@@@@.@@
-	;;	@.@@.....@......@@@@.@@@
-	;;	@.@@....@@..........@@@@
-	;;	@@..@.....@.....@@@@@@@@
-	;;	@@@@@@..@@@@...@@@@@@@@@
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@...@..@@@@@@@
+	;;	...........@@@.@@.......	@@@@@....@.@@@....@@@@@@
+	;;	.....@@@@.@@@@@.@.......	@@@@.@@@@.@@@@@......@@@
+	;;	....@@@@@@.@@@@..@@@@...	@@@.@@@@@@.@@@@..@@@@.@@
+	;;	....@@@@@@......@@@@@@..	@@@.@@@@@@......@@@@@@.@
+	;;	....@@@@@..@@@...@@@@@..	@@@.@@@@@..@.@...@@@@@.@
+	;;	....@@@@.@@@@.@@@.@@@@..	@@@.@@@@..@.@.@@@.@@@@.@
+	;;	.....@@.@@@@.@@@@@.@@@..	@@@..@@..@.@.@@@@@.@@@.@
+	;;	...@@...@@@@.@@@@@.@@...	@@......@.@..@@@@@.@@.@@
+	;;	..@@@@.@@@@@@.@@@.@..@..	@......@.@.@..@@@......@
+	;;	..@@@@.@@..@@@...@@.@@@.	@.......@...@.....@.....
+	;;	..@@@....@@.@@@@@@@.@@@.	@........@@..@.@.@......
+	;;	...@.@@@@.@.@@@@....@@@.	@@...@@@@.@.@.@.........
+	;;	....@@@@@@.@@@@.@@@@.@..	@@@.@@@@@@.@.@..@@@@...@
+	;;	....@@@@@@.@@@.@@@@@@...	@@..@@@@@@..@..@@@@@@.@@
+	;;	..@.@@@@@@.@@@.@@@@@@...	@.@.@@@@@@.@.@.@@@@@@.@@
+	;;	..@.@@@@@@.@...@@@@@@...	@.@.@@@@@@.....@@@@@@.@@
+	;;	.....@@@@.@.@@.@@@@@@...	@@...@@@@.@....@@@@@@.@@
+	;;	..@@.....@.@@@@.@@@@....	@.@@.....@......@@@@.@@@
+	;;	..@@.@@.@@.@@@@@........	@.@@....@@..........@@@@
+	;;	......@@....@@@.........	@@..@.....@.....@@@@@@@@
+	;;	........................	@@@@@@..@@@@...@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
 
 						;; SPR_VAPE2:      EQU &25
 	DEFB &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &1C, &80, &03, &BE, &00, &07
@@ -19387,55 +18775,30 @@ img_head_0:
 	DEFB &8A, &83, &E7, &D5, &07, &D7, &CA, &EF, &A7, &C5, &F7, &DB, &B1, &F7, &EC, &20
 	DEFB &EF, &D0, &40, &1F, &E8, &21, &FF, &FC, &F3, &FF, &FF, &FF, &FF, &FF, &FF, &FF
 
-	;;	........................
-	;;	........................
-	;;	........................
-	;;	...........@@@..@.......
-	;;	......@@@.@@@@@.........
-	;;	.....@@@@@.@@@@..@@@....
-	;;	.....@@@@@......@@@@@...
-	;;	.....@@@@.@@@.@@.@@@@...
-	;;	......@@.@@@.@@@@.@@@...
-	;;	........@@@@.@@@@.@@....
-	;;	...@@...@@@@@.@@....@...
-	;;	..@@@@...@.@......@@@@..
-	;;	..@@@@....@.@@@@@.@@@@..
-	;;	...@@.@@@..@@@@@@@.@@...
-	;;	.....@@@@@.@@@@@........
-	;;	.....@@@@@.@@@@.@@@.....
-	;;	..@..@@@@@..@@.@@@@@....
-	;;	......@@@......@@@@@....
-	;;	............@@..@@@.....
-	;;	...@..@@.@.@@@@.........
-	;;	......@@....@@..........
-	;;	........................
-	;;	........................
-	;;	........................
-	;;
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@...@@.@@@@@@@
-	;;	@@@@@@...@.@@@....@@@@@@
-	;;	@@@@@.@@@.@@@@@.....@@@@
-	;;	@@@@.@@@@@.@@@@..@@@.@@@
-	;;	@@@@.@@@@@......@@@@@.@@
-	;;	@@@@.@@@@.@.@.@@.@@@@.@@
-	;;	@@@@@.@@.@.@.@@@@.@@@.@@
-	;;	@@@..@..@.@..@@@@.@@.@@@
-	;;	@@....@..@.@..@@.@....@@
-	;;	@......@...............@
-	;;	@.........@..@.@.......@
-	;;	@@....@@@...@.@.@.....@@
-	;;	@@@..@@@@@.@.@.@.....@@@
-	;;	@@.@.@@@@@..@.@.@@@.@@@@
-	;;	@.@..@@@@@...@.@@@@@.@@@
-	;;	@@.@@.@@@.@@...@@@@@.@@@
-	;;	@@@.@@....@.....@@@.@@@@
-	;;	@@.@.....@.........@@@@@
-	;;	@@@.@.....@....@@@@@@@@@
-	;;	@@@@@@..@@@@..@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@...@@.@@@@@@@
+	;;	...........@@@..@.......	@@@@@@...@.@@@....@@@@@@
+	;;	......@@@.@@@@@.........	@@@@@.@@@.@@@@@.....@@@@
+	;;	.....@@@@@.@@@@..@@@....	@@@@.@@@@@.@@@@..@@@.@@@
+	;;	.....@@@@@......@@@@@...	@@@@.@@@@@......@@@@@.@@
+	;;	.....@@@@.@@@.@@.@@@@...	@@@@.@@@@.@.@.@@.@@@@.@@
+	;;	......@@.@@@.@@@@.@@@...	@@@@@.@@.@.@.@@@@.@@@.@@
+	;;	........@@@@.@@@@.@@....	@@@..@..@.@..@@@@.@@.@@@
+	;;	...@@...@@@@@.@@....@...	@@....@..@.@..@@.@....@@
+	;;	..@@@@...@.@......@@@@..	@......@...............@
+	;;	..@@@@....@.@@@@@.@@@@..	@.........@..@.@.......@
+	;;	...@@.@@@..@@@@@@@.@@...	@@....@@@...@.@.@.....@@
+	;;	.....@@@@@.@@@@@........	@@@..@@@@@.@.@.@.....@@@
+	;;	.....@@@@@.@@@@.@@@.....	@@.@.@@@@@..@.@.@@@.@@@@
+	;;	..@..@@@@@..@@.@@@@@....	@.@..@@@@@...@.@@@@@.@@@
+	;;	......@@@......@@@@@....	@@.@@.@@@.@@...@@@@@.@@@
+	;;	............@@..@@@.....	@@@.@@....@.....@@@.@@@@
+	;;	...@..@@.@.@@@@.........	@@.@.....@.........@@@@@
+	;;	......@@....@@..........	@@@.@.....@....@@@@@@@@@
+	;;	........................	@@@@@@..@@@@..@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
 
 						;; SPR_VAPE3:      EQU &26
 	DEFB &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &08, &00, &00, &1C, &00, &01
@@ -19448,55 +18811,30 @@ img_head_0:
 	DEFB &F2, &A7, &FD, &75, &3F, &FB, &BA, &3F, &FD, &7C, &DF, &FE, &F2, &DF, &FE, &E1
 	DEFB &3F, &FC, &61, &FF, &FE, &F3, &FF, &FF, &FF, &FF, &FF, &FF, &FF, &FF, &FF, &FF
 
-	;;	........................
-	;;	........................
-	;;	........................
-	;;	............@...........
-	;;	...........@@@..........
-	;;	.......@....@...........
-	;;	......@@@.........@.....
-	;;	.......@.........@@@....
-	;;	..........@@..@@..@.....
-	;;	.........@@@@.@@........
-	;;	.........@@@@...........
-	;;	...@@.....@@.......@@...
-	;;	...@@.........@@...@@...
-	;;	.............@@@@.......
-	;;	.......@.....@@@@.......
-	;;	......@@@.....@@........
-	;;	.......@........@@......
-	;;	................@@......
-	;;	............@@..........
-	;;	.......@....@@..........
-	;;	........................
-	;;	........................
-	;;	........................
-	;;	........................
-	;;
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@.@@@@@@@@@@@
-	;;	@@@@@@@@@@@.@.@@@@@@@@@@
-	;;	@@@@@@@.@@.@@@.@@@@@@@@@
-	;;	@@@@@@.@.@@.@.@@@@.@@@@@
-	;;	@@@@@.@@@.@@.@@@@.@.@@@@
-	;;	@@@@@@.@.@..@@...@@@.@@@
-	;;	@@@@@@@.@.@...@@..@.@@@@
-	;;	@@@@@@@@.@.@..@@.@.@@@@@
-	;;	@@@..@@@..@.@...@@@..@@@
-	;;	@@....@@@..@.@..@@....@@
-	;;	@@....@@@@..@..@.@....@@
-	;;	@@@..@@.@@@@..@.@.@..@@@
-	;;	@@@@@@.@.@@@.@.@..@@@@@@
-	;;	@@@@@.@@@.@@@.@...@@@@@@
-	;;	@@@@@@.@.@@@@@..@@.@@@@@
-	;;	@@@@@@@.@@@@..@.@@.@@@@@
-	;;	@@@@@@@.@@@....@..@@@@@@
-	;;	@@@@@@...@@....@@@@@@@@@
-	;;	@@@@@@@.@@@@..@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@.@@@@@@@@@@@
+	;;	............@...........	@@@@@@@@@@@.@.@@@@@@@@@@
+	;;	...........@@@..........	@@@@@@@.@@.@@@.@@@@@@@@@
+	;;	.......@....@...........	@@@@@@.@.@@.@.@@@@.@@@@@
+	;;	......@@@.........@.....	@@@@@.@@@.@@.@@@@.@.@@@@
+	;;	.......@.........@@@....	@@@@@@.@.@..@@...@@@.@@@
+	;;	..........@@..@@..@.....	@@@@@@@.@.@...@@..@.@@@@
+	;;	.........@@@@.@@........	@@@@@@@@.@.@..@@.@.@@@@@
+	;;	.........@@@@...........	@@@..@@@..@.@...@@@..@@@
+	;;	...@@.....@@.......@@...	@@....@@@..@.@..@@....@@
+	;;	...@@.........@@...@@...	@@....@@@@..@..@.@....@@
+	;;	.............@@@@.......	@@@..@@.@@@@..@.@.@..@@@
+	;;	.......@.....@@@@.......	@@@@@@.@.@@@.@.@..@@@@@@
+	;;	......@@@.....@@........	@@@@@.@@@.@@@.@...@@@@@@
+	;;	.......@........@@......	@@@@@@.@.@@@@@..@@.@@@@@
+	;;	................@@......	@@@@@@@.@@@@..@.@@.@@@@@
+	;;	............@@..........	@@@@@@@.@@@....@..@@@@@@
+	;;	.......@....@@..........	@@@@@@...@@....@@@@@@@@@
+	;;	........................	@@@@@@@.@@@@..@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
 
 							;; SPR_PURSE:      EQU &27
 	DEFB &00, &00, &00, &00, &00, &00, &00, &13, &00, &00, &38, &E0, &00, &3B, &F0, &01
@@ -19509,55 +18847,30 @@ img_head_0:
 	DEFB &00, &00, &0B, &00, &00, &06, &00, &00, &00, &00, &00, &00, &00, &01, &00, &00
 	DEFB &03, &80, &00, &07, &80, &00, &1F, &C0, &00, &7F, &E0, &03, &FF, &F8, &BF, &FF
 
-	;;	........................
-	;;	........................
-	;;	...........@..@@........
-	;;	..........@@@...@@@.....
-	;;	..........@@@.@@@@@@....
-	;;	.......@@@.@.@@@...@....
-	;;	.....@@@..@@@@..@@@.....
-	;;	....@@..@@@@..@@@@@@....
-	;;	....@.@@@@..@@@@@@@@.@..
-	;;	....@.@@@.@@@@@..@@@.@..
-	;;	....@.@@.@@@@@.@@.@@.@@.
-	;;	..@.@.@@..@@@@.@@.@.@@@.
-	;;	..@.@.@@.@.@@@@..@@.@@@.
-	;;	.@@.@@@@.@@..@@@@..@@@.@
-	;;	.@@.@.@@..@@@....@@@...@
-	;;	.@@..@@.@.@@@@@@@@....@.
-	;;	@.......@@.@@@@@....@@@.
-	;;	@...@....@.@@@....@@@@..
-	;;	.@@@@@@...@.....@@@@@...
-	;;	..@@@@@@@.@...@@@@@.....
-	;;	..@@@@@@@@.@@@@@@.......
-	;;	...@@@@@@.@@@@..........
-	;;	.....@@@.@..............
-	;;	........................
-	;;
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@.@@..@@@@@@@@
-	;;	@@@@@@@@@@.@..@@...@@@@@
-	;;	@@@@@@@@@.@@@...@@@.@@@@
-	;;	@@@@@@@...@@@.@@@@@@.@@@
-	;;	@@@@@..@@@.@.@@@...@.@@@
-	;;	@@@@.@@@..@@@@......@@@@
-	;;	@@@.@@..@@@@..........@@
-	;;	@@@.@.@@@@.............@
-	;;	@@@.@.@@@..............@
-	;;	@@..@.@@.......@@.......
-	;;	@...@.@@.......@@.......
-	;;	@...@.@@................
-	;;	....@@@@................
-	;;	....@.@@................
-	;;	.....@@.................
-	;;	........................
-	;;	.......................@
-	;;	......................@@
-	;;	@....................@@@
-	;;	@..................@@@@@
-	;;	@@...............@@@@@@@
-	;;	@@@...........@@@@@@@@@@
-	;;	@@@@@...@.@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@.@@..@@@@@@@@
+	;;	...........@..@@........	@@@@@@@@@@.@..@@...@@@@@
+	;;	..........@@@...@@@.....	@@@@@@@@@.@@@...@@@.@@@@
+	;;	..........@@@.@@@@@@....	@@@@@@@...@@@.@@@@@@.@@@
+	;;	.......@@@.@.@@@...@....	@@@@@..@@@.@.@@@...@.@@@
+	;;	.....@@@..@@@@..@@@.....	@@@@.@@@..@@@@......@@@@
+	;;	....@@..@@@@..@@@@@@....	@@@.@@..@@@@..........@@
+	;;	....@.@@@@..@@@@@@@@.@..	@@@.@.@@@@.............@
+	;;	....@.@@@.@@@@@..@@@.@..	@@@.@.@@@..............@
+	;;	....@.@@.@@@@@.@@.@@.@@.	@@..@.@@.......@@.......
+	;;	..@.@.@@..@@@@.@@.@.@@@.	@...@.@@.......@@.......
+	;;	..@.@.@@.@.@@@@..@@.@@@.	@...@.@@................
+	;;	.@@.@@@@.@@..@@@@..@@@.@	....@@@@................
+	;;	.@@.@.@@..@@@....@@@...@	....@.@@................
+	;;	.@@..@@.@.@@@@@@@@....@.	.....@@.................
+	;;	@.......@@.@@@@@....@@@.	........................
+	;;	@...@....@.@@@....@@@@..	.......................@
+	;;	.@@@@@@...@.....@@@@@...	......................@@
+	;;	..@@@@@@@.@...@@@@@.....	@....................@@@
+	;;	..@@@@@@@@.@@@@@@.......	@..................@@@@@
+	;;	...@@@@@@.@@@@..........	@@...............@@@@@@@
+	;;	.....@@@.@..............	@@@...........@@@@@@@@@@
+	;;	........................	@@@@@...@.@@@@@@@@@@@@@@
 
 							;; SPR_HOOTER:     EQU &28
 	DEFB &00, &00, &00, &03, &C0, &00, &07, &F0, &00, &16, &78, &00, &20, &B8, &00, &20
@@ -19570,55 +18883,30 @@ img_head_0:
 	DEFB &1F, &3E, &FE, &0A, &1E, &FC, &06, &1A, &FC, &02, &3E, &FC, &03, &76, &FC, &01
 	DEFB &8D, &FE, &00, &FB, &FD, &00, &07, &FE, &C3, &7F, &FF, &3C, &FF, &FF, &C3, &FF
 
-	;;	........................
-	;;	......@@@@..............
-	;;	.....@@@@@@@............
-	;;	...@.@@..@@@@...........
-	;;	..@.....@.@@@...........
-	;;	..@.......@@@@..........
-	;;	...@....@@.@@@.@........
-	;;	..@.@@.@@..@@..@@.......
-	;;	..@.....@@@..@@@........
-	;;	...@...@..@@....@.......
-	;;	..@.@@..@@..@@@@........
-	;;	..@....@...@@@@.@@@@@...
-	;;	...@...@@@.@@@.@@...@@..
-	;;	...@...@@@.@@@@@..@@@@@.
-	;;	....@@@@@@@.@.@..@.@@@@.
-	;;	.......@@@@@.@@.@@.@@.@.
-	;;	.......@@@@@@.@...@@@@@.
-	;;	.......@@@@@@.@@.@@@.@@.
-	;;	.......@@@@@@@.@@...@@..
-	;;	........@@@@@@@.@@@@@...
-	;;	.......@..@@@@..........
-	;;	........@@....@@........
-	;;	..........@@@@..........
-	;;	........................
-	;;
-	;;	@@@@@@....@@@@@@@@@@@@@@
-	;;	@@@@@.@@@@..@@@@@@@@@@@@
-	;;	@@@@.@@@@@@@.@@@@@@@@@@@
-	;;	@@@@.@@..@@@@.@@@@@@@@@@
-	;;	@@@.....@.@@@.@@@@@@@@@@
-	;;	@@@.......@@@@..@@@@@@@@
-	;;	@@@@.......@@@...@@@@@@@
-	;;	@@@.@@.....@@.....@@@@@@
-	;;	@@@..............@@@@@@@
-	;;	@@@@...@........@.@@@@@@
-	;;	@@@.@@..@@..@@@@.....@@@
-	;;	@@@........@@@@.@@@@@.@@
-	;;	@@@@.......@@@.@@...@@.@
-	;;	@@@@.......@@@@@..@@@@@.
-	;;	@@@@@@@.....@.@....@@@@.
-	;;	@@@@@@.......@@....@@.@.
-	;;	@@@@@@........@...@@@@@.
-	;;	@@@@@@........@@.@@@.@@.
-	;;	@@@@@@.........@@...@@.@
-	;;	@@@@@@@.........@@@@@.@@
-	;;	@@@@@@.@.............@@@
-	;;	@@@@@@@.@@....@@.@@@@@@@
-	;;	@@@@@@@@..@@@@..@@@@@@@@
-	;;	@@@@@@@@@@....@@@@@@@@@@
+	;;	........................	@@@@@@....@@@@@@@@@@@@@@
+	;;	......@@@@..............	@@@@@.@@@@..@@@@@@@@@@@@
+	;;	.....@@@@@@@............	@@@@.@@@@@@@.@@@@@@@@@@@
+	;;	...@.@@..@@@@...........	@@@@.@@..@@@@.@@@@@@@@@@
+	;;	..@.....@.@@@...........	@@@.....@.@@@.@@@@@@@@@@
+	;;	..@.......@@@@..........	@@@.......@@@@..@@@@@@@@
+	;;	...@....@@.@@@.@........	@@@@.......@@@...@@@@@@@
+	;;	..@.@@.@@..@@..@@.......	@@@.@@.....@@.....@@@@@@
+	;;	..@.....@@@..@@@........	@@@..............@@@@@@@
+	;;	...@...@..@@....@.......	@@@@...@........@.@@@@@@
+	;;	..@.@@..@@..@@@@........	@@@.@@..@@..@@@@.....@@@
+	;;	..@....@...@@@@.@@@@@...	@@@........@@@@.@@@@@.@@
+	;;	...@...@@@.@@@.@@...@@..	@@@@.......@@@.@@...@@.@
+	;;	...@...@@@.@@@@@..@@@@@.	@@@@.......@@@@@..@@@@@.
+	;;	....@@@@@@@.@.@..@.@@@@.	@@@@@@@.....@.@....@@@@.
+	;;	.......@@@@@.@@.@@.@@.@.	@@@@@@.......@@....@@.@.
+	;;	.......@@@@@@.@...@@@@@.	@@@@@@........@...@@@@@.
+	;;	.......@@@@@@.@@.@@@.@@.	@@@@@@........@@.@@@.@@.
+	;;	.......@@@@@@@.@@...@@..	@@@@@@.........@@...@@.@
+	;;	........@@@@@@@.@@@@@...	@@@@@@@.........@@@@@.@@
+	;;	.......@..@@@@..........	@@@@@@.@.............@@@
+	;;	........@@....@@........	@@@@@@@.@@....@@.@@@@@@@
+	;;	..........@@@@..........	@@@@@@@@..@@@@..@@@@@@@@
+	;;	........................	@@@@@@@@@@....@@@@@@@@@@
 
 							;; SPR_DONUTS:     EQU &29
 	DEFB &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &03, &80, &01
@@ -19631,55 +18919,30 @@ img_head_0:
 	DEFB &1D, &A0, &80, &19, &81, &00, &1E, &00, &00, &08, &00, &80, &00, &01, &E0, &00
 	DEFB &07, &F8, &00, &1F, &FE, &00, &7F, &FF, &81, &FF, &FF, &E7, &FF, &FF, &FF, &FF
 
-	;;	........................
-	;;	........................
-	;;	........................
-	;;	........................
-	;;	..............@@@.......
-	;;	.......@@@@..@@..@@.....
-	;;	......@@@.@@......@@....
-	;;	.......@..@.@@@@..@@....
-	;;	...@@@@.@@.@@@.@@.......
-	;;	..@@@.@....@@..@.@@@@...
-	;;	..@@...@@@@.@@@.@@@.@@..
-	;;	..@.@@@...@@....@@..@@..
-	;;	.@.@@..@@.@.@@@@.@@@@.@.
-	;;	.@@@..@.@@.@@@.@@.@..@@.
-	;;	..@@@...@@.@@..@@..@@@..
-	;;	.@..@@@.@@.@@@@..@@@..@.
-	;;	.@@@..@@@...@..@@@..@@@.
-	;;	...@@@..@@@..@@@..@@@...
-	;;	.....@@@..@@@@..@@@.....
-	;;	.......@@@....@@@.......
-	;;	.........@@@@@@.........
-	;;	...........@@...........
-	;;	........................
-	;;	........................
-	;;
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@...@@@@@@@
-	;;	@@@@@@@....@@......@@@@@
-	;;	@@@@@@.@@@@.........@@@@
-	;;	@@@@@.@@@.@@....@....@@@
-	;;	@@@....@..@.@@@@.....@@@
-	;;	@@.@@@@.@@.@@@.@@....@@@
-	;;	@.@@@.@....@@..@.@@@@.@@
-	;;	@.@@...@@@@.@@@.@@@.@@.@
-	;;	@.@.......@@....@@..@@.@
-	;;	..........@.@@@@.@@@@...
-	;;	......@....@@@.@@.@.....
-	;;	@..........@@..@@......@
-	;;	...........@@@@.........
-	;;	............@...........
-	;;	@......................@
-	;;	@@@..................@@@
-	;;	@@@@@..............@@@@@
-	;;	@@@@@@@..........@@@@@@@
-	;;	@@@@@@@@@......@@@@@@@@@
-	;;	@@@@@@@@@@@..@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@...@@@@@@@
+	;;	..............@@@.......	@@@@@@@....@@......@@@@@
+	;;	.......@@@@..@@..@@.....	@@@@@@.@@@@.........@@@@
+	;;	......@@@.@@......@@....	@@@@@.@@@.@@....@....@@@
+	;;	.......@..@.@@@@..@@....	@@@....@..@.@@@@.....@@@
+	;;	...@@@@.@@.@@@.@@.......	@@.@@@@.@@.@@@.@@....@@@
+	;;	..@@@.@....@@..@.@@@@...	@.@@@.@....@@..@.@@@@.@@
+	;;	..@@...@@@@.@@@.@@@.@@..	@.@@...@@@@.@@@.@@@.@@.@
+	;;	..@.@@@...@@....@@..@@..	@.@.......@@....@@..@@.@
+	;;	.@.@@..@@.@.@@@@.@@@@.@.	..........@.@@@@.@@@@...
+	;;	.@@@..@.@@.@@@.@@.@..@@.	......@....@@@.@@.@.....
+	;;	..@@@...@@.@@..@@..@@@..	@..........@@..@@......@
+	;;	.@..@@@.@@.@@@@..@@@..@.	...........@@@@.........
+	;;	.@@@..@@@...@..@@@..@@@.	............@...........
+	;;	...@@@..@@@..@@@..@@@...	@......................@
+	;;	.....@@@..@@@@..@@@.....	@@@..................@@@
+	;;	.......@@@....@@@.......	@@@@@..............@@@@@
+	;;	.........@@@@@@.........	@@@@@@@..........@@@@@@@
+	;;	...........@@...........	@@@@@@@@@......@@@@@@@@@
+	;;	........................	@@@@@@@@@@@..@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
 
 							;; SPR_BUNNY:      EQU &2A
 	DEFB &00, &00, &00, &00, &3C, &00, &00, &F8, &00, &01, &F0, &F0, &01, &CF, &38, &03
@@ -19692,55 +18955,30 @@ img_head_0:
 	DEFB &FF, &7D, &A0, &FE, &76, &B1, &9F, &0E, &5B, &DF, &BE, &6B, &BB, &BD, &B4, &71
 	DEFB &9D, &CF, &8F, &A3, &FF, &77, &7F, &FF, &7E, &FF, &FF, &B9, &FF, &FF, &C7, &FF
 
-	;;	........................
-	;;	..........@@@@..........
-	;;	........@@@@@...........
-	;;	.......@@@@@....@@@@....
-	;;	.......@@@..@@@@..@@@...
-	;;	......@@@.@@@@@@@@.@@...
-	;;	......@...@@@@@@........
-	;;	.......@@@@@@...@@@@@@@.
-	;;	.....@@@@@@@.@@@@@@@@@..
-	;;	....@@@@@@@.@@@@@@@@....
-	;;	...@@.@@@@@@@@@@@@..@...
-	;;	...@@..@.@@@@.....@@@...
-	;;	...@.@@@..@@@@.@@@@@....
-	;;	..@....@@@@@@@@@.@@@@@..
-	;;	..@.@...@@@@@@@..@@@.@@.
-	;;	..@@...@@..@@@@@....@@@.
-	;;	.@.@@.@@@@.@@@@@@.@@@@@.
-	;;	.@@.@.@@@.@@@.@@@.@@@@..
-	;;	..@@.....@@@...@@..@@@..
-	;;	............@@@@@.......
-	;;	.........@@@.@@@........
-	;;	.........@@@@@@.........
-	;;	..........@@@...........
-	;;	........................
-	;;
-	;;	@@@@@@@@@@....@@@@@@@@@@
-	;;	@@@@@@@@..@@@@.@@@@@@@@@
-	;;	@@@@@@@.@@@@@.@@....@@@@
-	;;	@@@@@@.@@@@@....@@@@.@@@
-	;;	@@@@@@.@@@..@@@@..@@@.@@
-	;;	@@@@@.@@@.@@@@@@@@.@@.@@
-	;;	@@@@@.@...@@@@@@.......@
-	;;	@@@@@..@@@@@@...@@@@@@@.
-	;;	@@@@.@@@@@@@.@@@@@@@@@.@
-	;;	@@@.@@@@@@@.@@@@@@@@..@@
-	;;	@@.@@.@@@@@@@@@@@@..@.@@
-	;;	@@.@@..@.@@@@.....@@@.@@
-	;;	@@.@.@@@..@@@@.@@@@@..@@
-	;;	@.@....@@@@@@@@@.@@@@@.@
-	;;	@.@.....@@@@@@@..@@@.@@.
-	;;	@.@@...@@..@@@@@....@@@.
-	;;	.@.@@.@@@@.@@@@@@.@@@@@.
-	;;	.@@.@.@@@.@@@.@@@.@@@@.@
-	;;	@.@@.@...@@@...@@..@@@.@
-	;;	@@..@@@@@...@@@@@.@...@@
-	;;	@@@@@@@@.@@@.@@@.@@@@@@@
-	;;	@@@@@@@@.@@@@@@.@@@@@@@@
-	;;	@@@@@@@@@.@@@..@@@@@@@@@
-	;;	@@@@@@@@@@...@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@....@@@@@@@@@@
+	;;	..........@@@@..........	@@@@@@@@..@@@@.@@@@@@@@@
+	;;	........@@@@@...........	@@@@@@@.@@@@@.@@....@@@@
+	;;	.......@@@@@....@@@@....	@@@@@@.@@@@@....@@@@.@@@
+	;;	.......@@@..@@@@..@@@...	@@@@@@.@@@..@@@@..@@@.@@
+	;;	......@@@.@@@@@@@@.@@...	@@@@@.@@@.@@@@@@@@.@@.@@
+	;;	......@...@@@@@@........	@@@@@.@...@@@@@@.......@
+	;;	.......@@@@@@...@@@@@@@.	@@@@@..@@@@@@...@@@@@@@.
+	;;	.....@@@@@@@.@@@@@@@@@..	@@@@.@@@@@@@.@@@@@@@@@.@
+	;;	....@@@@@@@.@@@@@@@@....	@@@.@@@@@@@.@@@@@@@@..@@
+	;;	...@@.@@@@@@@@@@@@..@...	@@.@@.@@@@@@@@@@@@..@.@@
+	;;	...@@..@.@@@@.....@@@...	@@.@@..@.@@@@.....@@@.@@
+	;;	...@.@@@..@@@@.@@@@@....	@@.@.@@@..@@@@.@@@@@..@@
+	;;	..@....@@@@@@@@@.@@@@@..	@.@....@@@@@@@@@.@@@@@.@
+	;;	..@.@...@@@@@@@..@@@.@@.	@.@.....@@@@@@@..@@@.@@.
+	;;	..@@...@@..@@@@@....@@@.	@.@@...@@..@@@@@....@@@.
+	;;	.@.@@.@@@@.@@@@@@.@@@@@.	.@.@@.@@@@.@@@@@@.@@@@@.
+	;;	.@@.@.@@@.@@@.@@@.@@@@..	.@@.@.@@@.@@@.@@@.@@@@.@
+	;;	..@@.....@@@...@@..@@@..	@.@@.@...@@@...@@..@@@.@
+	;;	............@@@@@.......	@@..@@@@@...@@@@@.@...@@
+	;;	.........@@@.@@@........	@@@@@@@@.@@@.@@@.@@@@@@@
+	;;	.........@@@@@@.........	@@@@@@@@.@@@@@@.@@@@@@@@
+	;;	..........@@@...........	@@@@@@@@@.@@@..@@@@@@@@@
+	;;	........................	@@@@@@@@@@...@@@@@@@@@@@
 
 							;; SPR_SPRING:     EQU &2B
 	DEFB &00, &00, &00, &00, &3C, &00, &01, &FF, &80, &07, &FF, &E0, &0F, &FF, &F0, &1F
@@ -19753,55 +18991,30 @@ img_head_0:
 	DEFB &CE, &3B, &EE, &31, &E5, &D3, &CF, &16, &B4, &78, &66, &B7, &87, &8D, &D9, &FE
 	DEFB &3B, &EE, &31, &E5, &F3, &CF, &0D, &FC, &78, &F3, &FF, &87, &FF, &FF, &FF, &FF
 
-	;;	........................
-	;;	..........@@@@..........
-	;;	.......@@@@@@@@@@.......
-	;;	.....@@@@@@@@@@@@@@.....
-	;;	....@@@@@@@@@@@@@@@@....
-	;;	...@@@@@@@@@@@@@@@@@@...
-	;;	....@@@@@@@@@@@@@@@@....
-	;;	...@.@@@@@@@@@@@@@@.@...
-	;;	....@..@@@@@@@@@@..@....
-	;;	.....@@...@@@@...@@.@...
-	;;	...@@..@@@....@@@...@@..
-	;;	..@@......@@@@...@@.@@..
-	;;	..@@.....@.........@@@..
-	;;	...@@..@@@..@@@...@@@...
-	;;	....@@@........@@@@..@..
-	;;	...@..@@@@..@@@@.....@@.
-	;;	..@@.....@@@@....@@..@@.
-	;;	..@@................@@..
-	;;	...@@.............@@@...
-	;;	....@@@........@@@@..@..
-	;;	......@@@@..@@@@....@@..
-	;;	.........@@@@...........
-	;;	........................
-	;;	........................
-	;;
-	;;	@@@@@@@@@@....@@@@@@@@@@
-	;;	@@@@@@@...@@@@...@@@@@@@
-	;;	@@@@@..@@@.@@.@@@..@@@@@
-	;;	@@@@.@@.@.@..@.@.@@.@@@@
-	;;	@@@.@@.@.@.@@.@.@.@@.@@@
-	;;	@@.@@.@.@.@..@.@.@.@@.@@
-	;;	@@@.@@.@.@.@@.@.@.@@.@@@
-	;;	@@...@@.@.@..@.@.@@...@@
-	;;	@@@....@@@.@@.@@@....@@@
-	;;	@@@.......@@@@......@.@@
-	;;	@@.@@...............@@.@
-	;;	@.@@.@@..........@@.@@.@
-	;;	@.@@.@@..@.....@@..@@@.@
-	;;	@@.@@..@@@..@@@...@@@.@@
-	;;	@@@.@@@...@@...@@@@..@.@
-	;;	@@.@..@@@@..@@@@...@.@@.
-	;;	@.@@.@...@@@@....@@..@@.
-	;;	@.@@.@@@@....@@@@...@@.@
-	;;	@@.@@..@@@@@@@@...@@@.@@
-	;;	@@@.@@@...@@...@@@@..@.@
-	;;	@@@@..@@@@..@@@@....@@.@
-	;;	@@@@@@...@@@@...@@@@..@@
-	;;	@@@@@@@@@....@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@....@@@@@@@@@@
+	;;	..........@@@@..........	@@@@@@@...@@@@...@@@@@@@
+	;;	.......@@@@@@@@@@.......	@@@@@..@@@.@@.@@@..@@@@@
+	;;	.....@@@@@@@@@@@@@@.....	@@@@.@@.@.@..@.@.@@.@@@@
+	;;	....@@@@@@@@@@@@@@@@....	@@@.@@.@.@.@@.@.@.@@.@@@
+	;;	...@@@@@@@@@@@@@@@@@@...	@@.@@.@.@.@..@.@.@.@@.@@
+	;;	....@@@@@@@@@@@@@@@@....	@@@.@@.@.@.@@.@.@.@@.@@@
+	;;	...@.@@@@@@@@@@@@@@.@...	@@...@@.@.@..@.@.@@...@@
+	;;	....@..@@@@@@@@@@..@....	@@@....@@@.@@.@@@....@@@
+	;;	.....@@...@@@@...@@.@...	@@@.......@@@@......@.@@
+	;;	...@@..@@@....@@@...@@..	@@.@@...............@@.@
+	;;	..@@......@@@@...@@.@@..	@.@@.@@..........@@.@@.@
+	;;	..@@.....@.........@@@..	@.@@.@@..@.....@@..@@@.@
+	;;	...@@..@@@..@@@...@@@...	@@.@@..@@@..@@@...@@@.@@
+	;;	....@@@........@@@@..@..	@@@.@@@...@@...@@@@..@.@
+	;;	...@..@@@@..@@@@.....@@.	@@.@..@@@@..@@@@...@.@@.
+	;;	..@@.....@@@@....@@..@@.	@.@@.@...@@@@....@@..@@.
+	;;	..@@................@@..	@.@@.@@@@....@@@@...@@.@
+	;;	...@@.............@@@...	@@.@@..@@@@@@@@...@@@.@@
+	;;	....@@@........@@@@..@..	@@@.@@@...@@...@@@@..@.@
+	;;	......@@@@..@@@@....@@..	@@@@..@@@@..@@@@....@@.@
+	;;	.........@@@@...........	@@@@@@...@@@@...@@@@..@@
+	;;	........................	@@@@@@@@@....@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
 
 							;; SPR_SPRUNG:     EQU &2C
 	DEFB &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &3C, &00, &01, &FF, &80, &07
@@ -19814,55 +19027,30 @@ img_head_0:
 	DEFB &00, &5D, &D9, &C2, &39, &CE, &31, &E2, &B3, &CF, &16, &B4, &78, &CD, &D9, &86
 	DEFB &3B, &EE, &31, &E5, &F3, &CF, &0D, &FC, &78, &F3, &FF, &87, &FF, &FF, &FF, &FF
 
-	;;	........................
-	;;	........................
-	;;	........................
-	;;	..........@@@@..........
-	;;	.......@@@@@@@@@@.......
-	;;	.....@@@@@@@@@@@@@@.....
-	;;	....@@@@@@@@@@@@@@@@....
-	;;	...@@@@@@@@@@@@@@@@@@...
-	;;	....@@@@@@@@@@@@@@@@....
-	;;	...@.@@@@@@@@@@@@@@.@...
-	;;	....@..@@@@@@@@@@..@....
-	;;	...@.@@...@@@@...@@.@@..
-	;;	..@@...@@@....@@@...@@..
-	;;	..@@..@...@@@@.....@@@..
-	;;	...@@.............@@@...
-	;;	....@@@........@@@@...@.
-	;;	..@@..@@@@..@@@@.....@@.
-	;;	..@@.....@@@@.......@@..
-	;;	...@@.............@@@...
-	;;	....@@@........@@@@..@..
-	;;	......@@@@..@@@@....@@..
-	;;	.........@@@@...........
-	;;	........................
-	;;	........................
-	;;
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@....@@@@@@@@@@
-	;;	@@@@@@@...@@@@...@@@@@@@
-	;;	@@@@@..@@@.@@.@@@..@@@@@
-	;;	@@@@.@@.@.@..@.@.@@.@@@@
-	;;	@@@.@@.@.@.@@.@.@.@@.@@@
-	;;	@@.@@.@.@.@..@.@.@.@@.@@
-	;;	@@@.@@.@.@.@@.@.@.@@.@@@
-	;;	@@...@@.@.@..@.@.@@...@@
-	;;	@@@....@@@.@@.@@@.....@@
-	;;	@@.@......@@@@......@@.@
-	;;	@.@@................@@.@
-	;;	@.@@..@..........@.@@@.@
-	;;	@@.@@..@@@....@...@@@..@
-	;;	@@..@@@...@@...@@@@...@.
-	;;	@.@@..@@@@..@@@@...@.@@.
-	;;	@.@@.@...@@@@...@@..@@.@
-	;;	@@.@@..@@....@@...@@@.@@
-	;;	@@@.@@@...@@...@@@@..@.@
-	;;	@@@@..@@@@..@@@@....@@.@
-	;;	@@@@@@...@@@@...@@@@..@@
-	;;	@@@@@@@@@....@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@....@@@@@@@@@@
+	;;	..........@@@@..........	@@@@@@@...@@@@...@@@@@@@
+	;;	.......@@@@@@@@@@.......	@@@@@..@@@.@@.@@@..@@@@@
+	;;	.....@@@@@@@@@@@@@@.....	@@@@.@@.@.@..@.@.@@.@@@@
+	;;	....@@@@@@@@@@@@@@@@....	@@@.@@.@.@.@@.@.@.@@.@@@
+	;;	...@@@@@@@@@@@@@@@@@@...	@@.@@.@.@.@..@.@.@.@@.@@
+	;;	....@@@@@@@@@@@@@@@@....	@@@.@@.@.@.@@.@.@.@@.@@@
+	;;	...@.@@@@@@@@@@@@@@.@...	@@...@@.@.@..@.@.@@...@@
+	;;	....@..@@@@@@@@@@..@....	@@@....@@@.@@.@@@.....@@
+	;;	...@.@@...@@@@...@@.@@..	@@.@......@@@@......@@.@
+	;;	..@@...@@@....@@@...@@..	@.@@................@@.@
+	;;	..@@..@...@@@@.....@@@..	@.@@..@..........@.@@@.@
+	;;	...@@.............@@@...	@@.@@..@@@....@...@@@..@
+	;;	....@@@........@@@@...@.	@@..@@@...@@...@@@@...@.
+	;;	..@@..@@@@..@@@@.....@@.	@.@@..@@@@..@@@@...@.@@.
+	;;	..@@.....@@@@.......@@..	@.@@.@...@@@@...@@..@@.@
+	;;	...@@.............@@@...	@@.@@..@@....@@...@@@.@@
+	;;	....@@@........@@@@..@..	@@@.@@@...@@...@@@@..@.@
+	;;	......@@@@..@@@@....@@..	@@@@..@@@@..@@@@....@@.@
+	;;	.........@@@@...........	@@@@@@...@@@@...@@@@..@@
+	;;	........................	@@@@@@@@@....@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
 
 							;; SPR_FISH1:      EQU &2D
 	DEFB &00, &00, &00, &00, &38, &6C, &00, &F8, &96, &00, &DD, &8C, &71, &6D, &80, &19
@@ -19875,55 +19063,30 @@ img_head_0:
 	DEFB &2F, &99, &86, &3E, &3E, &83, &29, &BA, &85, &B3, &31, &8E, &DC, &65, &88, &67
 	DEFB &CD, &D0, &18, &BB, &F8, &07, &47, &FC, &08, &FF, &FF, &0F, &FF, &FF, &9F, &FF
 
-	;;	........................
-	;;	..........@@@....@@.@@..
-	;;	........@@@@@...@..@.@@.
-	;;	........@@.@@@.@@...@@..
-	;;	.@@@...@.@@.@@.@@.......
-	;;	...@@..@@.@.@@.@@.@.....
-	;;	.@@.@@.@......@@.@.@@...
-	;;	..@@.@..@@@@@...@@.@@...
-	;;	.@@@@.@@@@@......@@..@..
-	;;	.@@@.@@@@@.@@@@@..@.@@@.
-	;;	.@@@.@@@@@@@@@@@@.@@.@@.
-	;;	..@.@@@@...@@...@.@@....
-	;;	..@.@@@...@@.@@.@.@@.@@.
-	;;	..@@.@@...@.@@@@@..@@...
-	;;	..@@.@@...@@@@@...@@@@@.
-	;;	..@@@.@@..@.@..@@.@@@.@.
-	;;	..@@...@@.@@..@@..@@....
-	;;	..@.....@@.@@@...@@..@..
-	;;	..@....@.@@..@@@@@..@@..
-	;;	.....@@@@..@@...@.@@@...
-	;;	......@@.@@..@@@........
-	;;	........@@@.............
-	;;	.........@@.............
-	;;	........................
-	;;
-	;;	@@@@@@@@@@...@@@@..@..@@
-	;;	@@@@@@@@......@@.@@....@
-	;;	@@@@@@@.......@.@....@..
-	;;	@...@@@........@@.@....@
-	;;	.@@@.@.........@@..@..@@
-	;;	@..@@..........@@.@..@@@
-	;;	....@@........@@.@.@@.@@
-	;;	@....@..@@@@@...@@.@@.@@
-	;;	......@@@@@......@@..@.@
-	;;	.....@@@@@.@@@@@..@.@@@.
-	;;	.....@@@@@@@@@@@@.@@.@@.
-	;;	@...@@@@...@@...@.@@...@
-	;;	@...@@@...@@.@@.@.@@.@@.
-	;;	@....@@...@.@@@@@..@@..@
-	;;	@....@@...@@@@@...@@@@@.
-	;;	@.....@@..@.@..@@.@@@.@.
-	;;	@....@.@@.@@..@@..@@...@
-	;;	@...@@@.@@.@@@...@@..@.@
-	;;	@...@....@@..@@@@@..@@.@
-	;;	@@.@.......@@...@.@@@.@@
-	;;	@@@@@........@@@.@...@@@
-	;;	@@@@@@......@...@@@@@@@@
-	;;	@@@@@@@@....@@@@@@@@@@@@
-	;;	@@@@@@@@@..@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@...@@@@..@..@@
+	;;	..........@@@....@@.@@..	@@@@@@@@......@@.@@....@
+	;;	........@@@@@...@..@.@@.	@@@@@@@.......@.@....@..
+	;;	........@@.@@@.@@...@@..	@...@@@........@@.@....@
+	;;	.@@@...@.@@.@@.@@.......	.@@@.@.........@@..@..@@
+	;;	...@@..@@.@.@@.@@.@.....	@..@@..........@@.@..@@@
+	;;	.@@.@@.@......@@.@.@@...	....@@........@@.@.@@.@@
+	;;	..@@.@..@@@@@...@@.@@...	@....@..@@@@@...@@.@@.@@
+	;;	.@@@@.@@@@@......@@..@..	......@@@@@......@@..@.@
+	;;	.@@@.@@@@@.@@@@@..@.@@@.	.....@@@@@.@@@@@..@.@@@.
+	;;	.@@@.@@@@@@@@@@@@.@@.@@.	.....@@@@@@@@@@@@.@@.@@.
+	;;	..@.@@@@...@@...@.@@....	@...@@@@...@@...@.@@...@
+	;;	..@.@@@...@@.@@.@.@@.@@.	@...@@@...@@.@@.@.@@.@@.
+	;;	..@@.@@...@.@@@@@..@@...	@....@@...@.@@@@@..@@..@
+	;;	..@@.@@...@@@@@...@@@@@.	@....@@...@@@@@...@@@@@.
+	;;	..@@@.@@..@.@..@@.@@@.@.	@.....@@..@.@..@@.@@@.@.
+	;;	..@@...@@.@@..@@..@@....	@....@.@@.@@..@@..@@...@
+	;;	..@.....@@.@@@...@@..@..	@...@@@.@@.@@@...@@..@.@
+	;;	..@....@.@@..@@@@@..@@..	@...@....@@..@@@@@..@@.@
+	;;	.....@@@@..@@...@.@@@...	@@.@.......@@...@.@@@.@@
+	;;	......@@.@@..@@@........	@@@@@........@@@.@...@@@
+	;;	........@@@.............	@@@@@@......@...@@@@@@@@
+	;;	.........@@.............	@@@@@@@@....@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@..@@@@@@@@@@@@@
 
 							;; SPR_FISH2:      EQU &2E
 	DEFB &00, &00, &00, &00, &38, &68, &00, &F8, &94, &18, &DD, &9C, &31, &6D, &88, &19
@@ -19936,55 +19099,30 @@ img_head_0:
 	DEFB &2F, &99, &86, &3E, &3E, &83, &29, &BA, &85, &B3, &31, &C0, &DC, &65, &E0, &67
 	DEFB &DB, &F8, &18, &B7, &F8, &07, &4F, &FC, &18, &FF, &FE, &3F, &FF, &FF, &7F, &FF
 
-	;;	........................
-	;;	..........@@@....@@.@...
-	;;	........@@@@@...@..@.@..
-	;;	...@@...@@.@@@.@@..@@@..
-	;;	..@@...@.@@.@@.@@...@...
-	;;	...@@..@@.@.@@.@@.@.....
-	;;	..@.@@.@......@@.@.@@...
-	;;	..@@.@..@@@@@...@@.@@...
-	;;	..@@@.@@@@@......@@..@..
-	;;	..@@.@@@@@.@@@@@..@.@@@.
-	;;	...@.@@@@@@@@@@@@.@@.@@.
-	;;	..@.@@@@...@@...@.@@....
-	;;	..@.@@@...@@.@@.@.@@.@@.
-	;;	..@@.@@...@.@@@@@..@@...
-	;;	..@@.@@...@@@@@...@@@@@.
-	;;	..@@@.@@..@.@..@@.@@@.@.
-	;;	..@....@@.@@..@@..@@....
-	;;	...@@...@@.@@@...@@..@..
-	;;	......@@.@@..@@@@@.@@...
-	;;	......@@...@@...@.@@....
-	;;	......@.@@@..@@@........
-	;;	.......@@@..............
-	;;	........@...............
-	;;	........................
-	;;
-	;;	@@@@@@@@@@...@@@@..@.@@@
-	;;	@@@@@@@@......@@.@@...@@
-	;;	@@@..@@.......@.@......@
-	;;	@@.@@.@........@@...@..@
-	;;	@.@@.@.........@@.....@@
-	;;	@@.@@..........@@.@..@@@
-	;;	@...@@........@@.@.@@.@@
-	;;	@....@..@@@@@...@@.@@.@@
-	;;	@.....@@@@@......@@..@.@
-	;;	@....@@@@@.@@@@@..@.@@@.
-	;;	@@...@@@@@@@@@@@@.@@.@@.
-	;;	@...@@@@...@@...@.@@...@
-	;;	@...@@@...@@.@@.@.@@.@@.
-	;;	@....@@...@.@@@@@..@@..@
-	;;	@....@@...@@@@@...@@@@@.
-	;;	@.....@@..@.@..@@.@@@.@.
-	;;	@....@.@@.@@..@@..@@...@
-	;;	@@......@@.@@@...@@..@.@
-	;;	@@@......@@..@@@@@.@@.@@
-	;;	@@@@@......@@...@.@@.@@@
-	;;	@@@@@........@@@.@..@@@@
-	;;	@@@@@@.....@@...@@@@@@@@
-	;;	@@@@@@@...@@@@@@@@@@@@@@
-	;;	@@@@@@@@.@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@...@@@@..@.@@@
+	;;	..........@@@....@@.@...	@@@@@@@@......@@.@@...@@
+	;;	........@@@@@...@..@.@..	@@@..@@.......@.@......@
+	;;	...@@...@@.@@@.@@..@@@..	@@.@@.@........@@...@..@
+	;;	..@@...@.@@.@@.@@...@...	@.@@.@.........@@.....@@
+	;;	...@@..@@.@.@@.@@.@.....	@@.@@..........@@.@..@@@
+	;;	..@.@@.@......@@.@.@@...	@...@@........@@.@.@@.@@
+	;;	..@@.@..@@@@@...@@.@@...	@....@..@@@@@...@@.@@.@@
+	;;	..@@@.@@@@@......@@..@..	@.....@@@@@......@@..@.@
+	;;	..@@.@@@@@.@@@@@..@.@@@.	@....@@@@@.@@@@@..@.@@@.
+	;;	...@.@@@@@@@@@@@@.@@.@@.	@@...@@@@@@@@@@@@.@@.@@.
+	;;	..@.@@@@...@@...@.@@....	@...@@@@...@@...@.@@...@
+	;;	..@.@@@...@@.@@.@.@@.@@.	@...@@@...@@.@@.@.@@.@@.
+	;;	..@@.@@...@.@@@@@..@@...	@....@@...@.@@@@@..@@..@
+	;;	..@@.@@...@@@@@...@@@@@.	@....@@...@@@@@...@@@@@.
+	;;	..@@@.@@..@.@..@@.@@@.@.	@.....@@..@.@..@@.@@@.@.
+	;;	..@....@@.@@..@@..@@....	@....@.@@.@@..@@..@@...@
+	;;	...@@...@@.@@@...@@..@..	@@......@@.@@@...@@..@.@
+	;;	......@@.@@..@@@@@.@@...	@@@......@@..@@@@@.@@.@@
+	;;	......@@...@@...@.@@....	@@@@@......@@...@.@@.@@@
+	;;	......@.@@@..@@@........	@@@@@........@@@.@..@@@@
+	;;	.......@@@..............	@@@@@@.....@@...@@@@@@@@
+	;;	........@...............	@@@@@@@...@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@.@@@@@@@@@@@@@@@
 
 							;; SPR_CROWN:      EQU &2F
 	DEFB &00, &00, &00, &02, &70, &00, &05, &FC, &00, &07, &FE, &00, &09, &BE, &10, &3E
@@ -19997,55 +19135,30 @@ img_head_0:
 	DEFB &4A, &25, &01, &08, &82, &30, &4A, &06, &30, &08, &06, &24, &08, &36, &87, &0A
 	DEFB &71, &C7, &26, &73, &F3, &3E, &0F, &FC, &3E, &3F, &FF, &9D, &FF, &FF, &C3, &FF
 
-	;;	........................
-	;;	......@..@@@............
-	;;	.....@.@@@@@@@..........
-	;;	.....@@@@@@@@@@.........
-	;;	....@..@@.@@@@@....@....
-	;;	..@@@@@..@@@@@@..@@@@@..
-	;;	.@@...@@@.@@@@.@@@...@@.
-	;;	.@.......@.@@.@.......@.
-	;;	.@...@@@.@@..@@.@@@...@.
-	;;	.@..@@@@@..@@..@@@@@..@.
-	;;	.@@.@@@@@.@.@@.@@@@@.@@.
-	;;	..@.@@@@@.@@@@.@@@@@.@..
-	;;	..@.@@@@@.@.@@.@@@@@.@..
-	;;	..@.@@@@@@.@@.@@@@@@.@..
-	;;	.@..@@@@@@.@@.@@@@@@..@.
-	;;	.@@@.@@@@@.@@.@@@@@.@@@.
-	;;	.@@@..@@@@.@@.@@@@..@@@.
-	;;	.@@.@@..@..@@..@..@@.@@.
-	;;	..@.@@@@.@.@@.@.@@@@.@..
-	;;	....@@@@.@@..@@.@@@@....
-	;;	......@@.@@@@@@.@@......
-	;;	.........@@@@@@.........
-	;;	..........@@@@..........
-	;;	........................
-	;;
-	;;	@@@@@@.@@...@@@@@@@@@@@@
-	;;	@@@@@.........@@@@@@@@@@
-	;;	@@@@...........@@@@@@@@@
-	;;	@@@@............@@@.@@@@
-	;;	@@..@...........@..@..@@
-	;;	@.@@@@@..........@@@@@.@
-	;;	.@@...@@@......@@@...@@.
-	;;	.@.@@....@....@....@@.@.
-	;;	.@.@...@.@@..@@.@...@.@.
-	;;	.@...@.....@@.....@...@.
-	;;	.@@....@....@@..@....@@.
-	;;	@.@..@.....@@@....@..@.@
-	;;	@.@....@....@@..@....@.@
-	;;	@.@..@...@..@.@...@..@.@
-	;;	.......@....@...@.....@.
-	;;	..@@.....@..@.@......@@.
-	;;	..@@........@........@@.
-	;;	..@..@......@.....@@.@@.
-	;;	@....@@@....@.@..@@@...@
-	;;	@@...@@@..@..@@..@@@..@@
-	;;	@@@@..@@..@@@@@.....@@@@
-	;;	@@@@@@....@@@@@...@@@@@@
-	;;	@@@@@@@@@..@@@.@@@@@@@@@
-	;;	@@@@@@@@@@....@@@@@@@@@@
+	;;	........................	@@@@@@.@@...@@@@@@@@@@@@
+	;;	......@..@@@............	@@@@@.........@@@@@@@@@@
+	;;	.....@.@@@@@@@..........	@@@@...........@@@@@@@@@
+	;;	.....@@@@@@@@@@.........	@@@@............@@@.@@@@
+	;;	....@..@@.@@@@@....@....	@@..@...........@..@..@@
+	;;	..@@@@@..@@@@@@..@@@@@..	@.@@@@@..........@@@@@.@
+	;;	.@@...@@@.@@@@.@@@...@@.	.@@...@@@......@@@...@@.
+	;;	.@.......@.@@.@.......@.	.@.@@....@....@....@@.@.
+	;;	.@...@@@.@@..@@.@@@...@.	.@.@...@.@@..@@.@...@.@.
+	;;	.@..@@@@@..@@..@@@@@..@.	.@...@.....@@.....@...@.
+	;;	.@@.@@@@@.@.@@.@@@@@.@@.	.@@....@....@@..@....@@.
+	;;	..@.@@@@@.@@@@.@@@@@.@..	@.@..@.....@@@....@..@.@
+	;;	..@.@@@@@.@.@@.@@@@@.@..	@.@....@....@@..@....@.@
+	;;	..@.@@@@@@.@@.@@@@@@.@..	@.@..@...@..@.@...@..@.@
+	;;	.@..@@@@@@.@@.@@@@@@..@.	.......@....@...@.....@.
+	;;	.@@@.@@@@@.@@.@@@@@.@@@.	..@@.....@..@.@......@@.
+	;;	.@@@..@@@@.@@.@@@@..@@@.	..@@........@........@@.
+	;;	.@@.@@..@..@@..@..@@.@@.	..@..@......@.....@@.@@.
+	;;	..@.@@@@.@.@@.@.@@@@.@..	@....@@@....@.@..@@@...@
+	;;	....@@@@.@@..@@.@@@@....	@@...@@@..@..@@..@@@..@@
+	;;	......@@.@@@@@@.@@......	@@@@..@@..@@@@@.....@@@@
+	;;	.........@@@@@@.........	@@@@@@....@@@@@...@@@@@@
+	;;	..........@@@@..........	@@@@@@@@@..@@@.@@@@@@@@@
+	;;	........................	@@@@@@@@@@....@@@@@@@@@@
 
 							;; SPR_SWITCH:     EQU &30
 	DEFB &00, &00, &00, &07, &00, &00, &0B, &80, &00, &0F, &80, &00, &07, &3E, &00, &00
@@ -20058,55 +19171,30 @@ img_head_0:
 	DEFB &00, &30, &03, &81, &C0, &00, &7E, &00, &00, &00, &00, &00, &00, &00, &80, &00
 	DEFB &01, &C0, &00, &03, &F0, &00, &0F, &FC, &00, &3F, &FF, &00, &FF, &FF, &C3, &FF
 
-	;;	........................
-	;;	.....@@@................
-	;;	....@.@@@...............
-	;;	....@@@@@...............
-	;;	.....@@@..@@@@@.........
-	;;	........@@.@@@@@@.......
-	;;	.....@@.@@@.@@@@@@@.....
-	;;	....@@@@.@@@....@@@@....
-	;;	...@@@@@........@@@@@...
-	;;	...@@@@@@@@@@@@@@@@@@...
-	;;	..@.@@@@@@@@@@@@@@@@.@..
-	;;	..@.@@@@@@@@@@@@@@@@.@..
-	;;	...@..@@@@@@@@@@@@..@...
-	;;	.@..@@...@@@@@@...@@..@.
-	;;	.@@@..@@@......@@@..@@@.
-	;;	.@@@@@...@@@@@@...@@@@@.
-	;;	.@@@@@@@........@@@@@@@.
-	;;	.@@@@@@@@@....@@@@@@@@@.
-	;;	..@@@@@@@@@..@@@@@@@@@..
-	;;	....@@@@@@@..@@@@@@@....
-	;;	......@@@@@..@@@@@......
-	;;	........@@@..@@@........
-	;;	..........@..@..........
-	;;	........................
-	;;
-	;;	@@@@@...@@@@@@@@@@@@@@@@
-	;;	@@@@.@@@.@@@@@@@@@@@@@@@
-	;;	@@@.@.@@@.@@@@@@@@@@@@@@
-	;;	@@@.@@@@@......@@@@@@@@@
-	;;	@@@@.@@@.........@@@@@@@
-	;;	@@@@@...@@.........@@@@@
-	;;	@@@@....@@@.........@@@@
-	;;	@@@......@@@.........@@@
-	;;	@@....................@@
-	;;	@@....................@@
-	;;	@.@..................@.@
-	;;	@.@..................@.@
-	;;	@..@................@..@
-	;;	....@@............@@....
-	;;	......@@@......@@@......
-	;;	.........@@@@@@.........
-	;;	........................
-	;;	........................
-	;;	@......................@
-	;;	@@....................@@
-	;;	@@@@................@@@@
-	;;	@@@@@@............@@@@@@
-	;;	@@@@@@@@........@@@@@@@@
-	;;	@@@@@@@@@@....@@@@@@@@@@
+	;;	........................	@@@@@...@@@@@@@@@@@@@@@@
+	;;	.....@@@................	@@@@.@@@.@@@@@@@@@@@@@@@
+	;;	....@.@@@...............	@@@.@.@@@.@@@@@@@@@@@@@@
+	;;	....@@@@@...............	@@@.@@@@@......@@@@@@@@@
+	;;	.....@@@..@@@@@.........	@@@@.@@@.........@@@@@@@
+	;;	........@@.@@@@@@.......	@@@@@...@@.........@@@@@
+	;;	.....@@.@@@.@@@@@@@.....	@@@@....@@@.........@@@@
+	;;	....@@@@.@@@....@@@@....	@@@......@@@.........@@@
+	;;	...@@@@@........@@@@@...	@@....................@@
+	;;	...@@@@@@@@@@@@@@@@@@...	@@....................@@
+	;;	..@.@@@@@@@@@@@@@@@@.@..	@.@..................@.@
+	;;	..@.@@@@@@@@@@@@@@@@.@..	@.@..................@.@
+	;;	...@..@@@@@@@@@@@@..@...	@..@................@..@
+	;;	.@..@@...@@@@@@...@@..@.	....@@............@@....
+	;;	.@@@..@@@......@@@..@@@.	......@@@......@@@......
+	;;	.@@@@@...@@@@@@...@@@@@.	.........@@@@@@.........
+	;;	.@@@@@@@........@@@@@@@.	........................
+	;;	.@@@@@@@@@....@@@@@@@@@.	........................
+	;;	..@@@@@@@@@..@@@@@@@@@..	@......................@
+	;;	....@@@@@@@..@@@@@@@....	@@....................@@
+	;;	......@@@@@..@@@@@......	@@@@................@@@@
+	;;	........@@@..@@@........	@@@@@@............@@@@@@
+	;;	..........@..@..........	@@@@@@@@........@@@@@@@@
+	;;	........................	@@@@@@@@@@....@@@@@@@@@@
 
 							;; SPR_GRATING:    EQU &31
 	DEFB &00, &00, &00, &00, &00, &20, &00, &00, &F0, &00, &03, &C8, &00, &0F, &38, &00
@@ -20119,55 +19207,30 @@ img_head_0:
 	DEFB &D0, &C3, &D0, &D1, &07, &C8, &D0, &0F, &D0, &30, &3F, &C8, &C0, &FF, &D0, &03
 	DEFB &FF, &C8, &0F, &FF, &E0, &3F, &FF, &F0, &FF, &FF, &FF, &FF, &FF, &FF, &FF, &FF
 
-	;;	........................
-	;;	..................@.....
-	;;	................@@@@....
-	;;	..............@@@@..@...
-	;;	............@@@@..@@@...
-	;;	..........@@@@..@@..@...
-	;;	........@@@@..@@..@.@...
-	;;	......@@@@..@@....@.@...
-	;;	....@@@@..@@.@....@.@...
-	;;	...@.@..@@...@....@.@...
-	;;	...@@.@@...@.@....@.@...
-	;;	...@@.@....@.@....@.@...
-	;;	...@@.@....@.@....@.@...
-	;;	...@@.@....@.@..@@..@...
-	;;	...@@.@....@.@.@..@@....
-	;;	...@@.@....@.@..@@......
-	;;	...@@.@...@@.@@@........
-	;;	...@@.@.@@..@@..........
-	;;	...@@.@...@@............
-	;;	...@@.@.@@..............
-	;;	....@.@@................
-	;;	........................
-	;;	........................
-	;;	........................
-	;;
-	;;	@@@@@@@@@@@@@@@@@@.@@@@@
-	;;	@@@@@@@@@@@@@@@@....@@@@
-	;;	@@@@@@@@@@@@@@.......@@@
-	;;	@@@@@@@@@@@@..........@@
-	;;	@@@@@@@@@@............@@
-	;;	@@@@@@@@..............@@
-	;;	@@@@@@............@...@@
-	;;	@@@@............@.@...@@
-	;;	@@@............@@.@...@@
-	;;	@@.............@@.@...@@
-	;;	@@.@.......@...@@.@...@@
-	;;	@@..@...@@.@...@@.@...@@
-	;;	@@.@....@@.@...@..@...@@
-	;;	@@..@...@@.@....@@....@@
-	;;	@@.@....@@.@...@.....@@@
-	;;	@@..@...@@.@........@@@@
-	;;	@@.@......@@......@@@@@@
-	;;	@@..@...@@......@@@@@@@@
-	;;	@@.@..........@@@@@@@@@@
-	;;	@@..@.......@@@@@@@@@@@@
-	;;	@@@.......@@@@@@@@@@@@@@
-	;;	@@@@....@@@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@.@@@@@
+	;;	..................@.....	@@@@@@@@@@@@@@@@....@@@@
+	;;	................@@@@....	@@@@@@@@@@@@@@.......@@@
+	;;	..............@@@@..@...	@@@@@@@@@@@@..........@@
+	;;	............@@@@..@@@...	@@@@@@@@@@............@@
+	;;	..........@@@@..@@..@...	@@@@@@@@..............@@
+	;;	........@@@@..@@..@.@...	@@@@@@............@...@@
+	;;	......@@@@..@@....@.@...	@@@@............@.@...@@
+	;;	....@@@@..@@.@....@.@...	@@@............@@.@...@@
+	;;	...@.@..@@...@....@.@...	@@.............@@.@...@@
+	;;	...@@.@@...@.@....@.@...	@@.@.......@...@@.@...@@
+	;;	...@@.@....@.@....@.@...	@@..@...@@.@...@@.@...@@
+	;;	...@@.@....@.@....@.@...	@@.@....@@.@...@..@...@@
+	;;	...@@.@....@.@..@@..@...	@@..@...@@.@....@@....@@
+	;;	...@@.@....@.@.@..@@....	@@.@....@@.@...@.....@@@
+	;;	...@@.@....@.@..@@......	@@..@...@@.@........@@@@
+	;;	...@@.@...@@.@@@........	@@.@......@@......@@@@@@
+	;;	...@@.@.@@..@@..........	@@..@...@@......@@@@@@@@
+	;;	...@@.@...@@............	@@.@..........@@@@@@@@@@
+	;;	...@@.@.@@..............	@@..@.......@@@@@@@@@@@@
+	;;	....@.@@................	@@@.......@@@@@@@@@@@@@@
+	;;	........................	@@@@....@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
 
 							;; SPR_MONOCAT1:   EQU &32
 	DEFB &00, &00, &00, &01, &20, &00, &07, &C8, &00, &0C, &72, &00, &13, &9C, &00, &17
@@ -20180,55 +19243,30 @@ img_head_0:
 	DEFB &F0, &01, &00, &F8, &01, &80, &7C, &01, &60, &00, &03, &78, &00, &05, &7E, &40
 	DEFB &0D, &6A, &F0, &3B, &BD, &7D, &C7, &C3, &6A, &FF, &FF, &BD, &FF, &FF, &C3, &FF
 
-	;;	........................
-	;;	.......@..@.............
-	;;	.....@@@@@..@...........
-	;;	....@@...@@@..@.........
-	;;	...@..@@@..@@@..........
-	;;	...@.@@@@@@...@@@@@.....
-	;;	..@.@@@@@@@.@@@@@@@@@@..
-	;;	.@@.@@@@@@.@@@@@@@@@@...
-	;;	.@.@@@@@@.@@@@@@@@...@..
-	;;	.@...@@@.@@@@@....@.@@@.
-	;;	..@@@.@@......@...@@.@@.
-	;;	..@@@@@@.@@@.@.@@..@.@@.
-	;;	.@@@@@@.@@@@.@.@...@.@..
-	;;	.@@@@@@.@@@@.@.....@....
-	;;	.@@@@@@.@@@@@.@...@..@..
-	;;	...@@@.@.@@@@@.@@..@@@..
-	;;	.@@..@.@@........@@@@...
-	;;	.@@@@..@@..@@@@@@@@@.@..
-	;;	.@@@@@@..@...@@@@@..@@..
-	;;	.@@.@.@.@@@@......@@@...
-	;;	..@@@@...@@@@@..........
-	;;	.........@@.@.@.........
-	;;	..........@@@@..........
-	;;	........................
-	;;
-	;;	@@@@@@@.@@.@@@@@@@@@@@@@
-	;;	@@@@@..@.....@@@@@@@@@@@
-	;;	@@@@.@@@@@.....@@@@@@@@@
-	;;	@@@.@@...@@@....@@@@@@@@
-	;;	@@.@.......@@@.....@@@@@
-	;;	@@.@..................@@
-	;;	@.@....................@
-	;;	.@@....................@
-	;;	.@...................@.@
-	;;	.@..................@@@.
-	;;	@....................@@.
-	;;	@........@@@...@@....@@.
-	;;	........@@@@...@.....@.@
-	;;	........@@@@...........@
-	;;	........@@@@@..........@
-	;;	@........@@@@@.........@
-	;;	.@@...................@@
-	;;	.@@@@................@.@
-	;;	.@@@@@@..@..........@@.@
-	;;	.@@.@.@.@@@@......@@@.@@
-	;;	@.@@@@.@.@@@@@.@@@...@@@
-	;;	@@....@@.@@.@.@.@@@@@@@@
-	;;	@@@@@@@@@.@@@@.@@@@@@@@@
-	;;	@@@@@@@@@@....@@@@@@@@@@
+	;;	........................	@@@@@@@.@@.@@@@@@@@@@@@@
+	;;	.......@..@.............	@@@@@..@.....@@@@@@@@@@@
+	;;	.....@@@@@..@...........	@@@@.@@@@@.....@@@@@@@@@
+	;;	....@@...@@@..@.........	@@@.@@...@@@....@@@@@@@@
+	;;	...@..@@@..@@@..........	@@.@.......@@@.....@@@@@
+	;;	...@.@@@@@@...@@@@@.....	@@.@..................@@
+	;;	..@.@@@@@@@.@@@@@@@@@@..	@.@....................@
+	;;	.@@.@@@@@@.@@@@@@@@@@...	.@@....................@
+	;;	.@.@@@@@@.@@@@@@@@...@..	.@...................@.@
+	;;	.@...@@@.@@@@@....@.@@@.	.@..................@@@.
+	;;	..@@@.@@......@...@@.@@.	@....................@@.
+	;;	..@@@@@@.@@@.@.@@..@.@@.	@........@@@...@@....@@.
+	;;	.@@@@@@.@@@@.@.@...@.@..	........@@@@...@.....@.@
+	;;	.@@@@@@.@@@@.@.....@....	........@@@@...........@
+	;;	.@@@@@@.@@@@@.@...@..@..	........@@@@@..........@
+	;;	...@@@.@.@@@@@.@@..@@@..	@........@@@@@.........@
+	;;	.@@..@.@@........@@@@...	.@@...................@@
+	;;	.@@@@..@@..@@@@@@@@@.@..	.@@@@................@.@
+	;;	.@@@@@@..@...@@@@@..@@..	.@@@@@@..@..........@@.@
+	;;	.@@.@.@.@@@@......@@@...	.@@.@.@.@@@@......@@@.@@
+	;;	..@@@@...@@@@@..........	@.@@@@.@.@@@@@.@@@...@@@
+	;;	.........@@.@.@.........	@@....@@.@@.@.@.@@@@@@@@
+	;;	..........@@@@..........	@@@@@@@@@.@@@@.@@@@@@@@@
+	;;	........................	@@@@@@@@@@....@@@@@@@@@@
 
 							;; SPR_MONOCAT2:   EQU &33
 	DEFB &00, &00, &00, &01, &20, &00, &07, &C8, &00, &0C, &72, &00, &13, &9C, &00, &17
@@ -20241,55 +19279,30 @@ img_head_0:
 	DEFB &F0, &01, &00, &F8, &01, &80, &7C, &01, &70, &00, &02, &BC, &00, &06, &BE, &60
 	DEFB &0A, &B5, &78, &1D, &DE, &FD, &E3, &E0, &D5, &FF, &FF, &7B, &FF, &FF, &87, &FF
 
-	;;	........................
-	;;	.......@..@.............
-	;;	.....@@@@@..@...........
-	;;	....@@...@@@..@.........
-	;;	...@..@@@..@@@..........
-	;;	...@.@@@@@@...@@@@@.....
-	;;	..@.@@@@@@@.@@@@@@@@@@..
-	;;	.@@.@@@@@@.@@@@@@@@@@...
-	;;	.@.@@@@@@.@@@@@@@@...@..
-	;;	.@...@@@.@@@@@....@.@@@.
-	;;	..@@@.@@......@...@@.@@.
-	;;	..@@@@@@.@@@.@.@@..@.@@.
-	;;	.@@@@@@.@@@@.@.@...@.@..
-	;;	.@@@@@@.@@@@.@.....@....
-	;;	.@@@@@@.@@@@@.@...@..@..
-	;;	....@@.@.@@@@@.@@..@@@..
-	;;	.@@@...@@........@@@@.@.
-	;;	..@@@@.@@..@@@@@@@@@.@@.
-	;;	..@@@@@..@@..@@@@@..@.@.
-	;;	..@@.@.@.@@@@......@@@..
-	;;	...@@@@.@@@@@@..........
-	;;	........@@.@.@..........
-	;;	.........@@@@...........
-	;;	........................
-	;;
-	;;	@@@@@@@.@@.@@@@@@@@@@@@@
-	;;	@@@@@..@.....@@@@@@@@@@@
-	;;	@@@@.@@@@@.....@@@@@@@@@
-	;;	@@@.@@...@@@....@@@@@@@@
-	;;	@@.@.......@@@.....@@@@@
-	;;	@@.@..................@@
-	;;	@.@....................@
-	;;	.@@....................@
-	;;	.@...................@.@
-	;;	.@..................@@@.
-	;;	@....................@@.
-	;;	@........@@@...@@....@@.
-	;;	........@@@@...@.....@.@
-	;;	........@@@@...........@
-	;;	........@@@@@..........@
-	;;	@........@@@@@.........@
-	;;	.@@@..................@.
-	;;	@.@@@@...............@@.
-	;;	@.@@@@@..@@.........@.@.
-	;;	@.@@.@.@.@@@@......@@@.@
-	;;	@@.@@@@.@@@@@@.@@@@...@@
-	;;	@@@.....@@.@.@.@@@@@@@@@
-	;;	@@@@@@@@.@@@@.@@@@@@@@@@
-	;;	@@@@@@@@@....@@@@@@@@@@@
+	;;	........................	@@@@@@@.@@.@@@@@@@@@@@@@
+	;;	.......@..@.............	@@@@@..@.....@@@@@@@@@@@
+	;;	.....@@@@@..@...........	@@@@.@@@@@.....@@@@@@@@@
+	;;	....@@...@@@..@.........	@@@.@@...@@@....@@@@@@@@
+	;;	...@..@@@..@@@..........	@@.@.......@@@.....@@@@@
+	;;	...@.@@@@@@...@@@@@.....	@@.@..................@@
+	;;	..@.@@@@@@@.@@@@@@@@@@..	@.@....................@
+	;;	.@@.@@@@@@.@@@@@@@@@@...	.@@....................@
+	;;	.@.@@@@@@.@@@@@@@@...@..	.@...................@.@
+	;;	.@...@@@.@@@@@....@.@@@.	.@..................@@@.
+	;;	..@@@.@@......@...@@.@@.	@....................@@.
+	;;	..@@@@@@.@@@.@.@@..@.@@.	@........@@@...@@....@@.
+	;;	.@@@@@@.@@@@.@.@...@.@..	........@@@@...@.....@.@
+	;;	.@@@@@@.@@@@.@.....@....	........@@@@...........@
+	;;	.@@@@@@.@@@@@.@...@..@..	........@@@@@..........@
+	;;	....@@.@.@@@@@.@@..@@@..	@........@@@@@.........@
+	;;	.@@@...@@........@@@@.@.	.@@@..................@.
+	;;	..@@@@.@@..@@@@@@@@@.@@.	@.@@@@...............@@.
+	;;	..@@@@@..@@..@@@@@..@.@.	@.@@@@@..@@.........@.@.
+	;;	..@@.@.@.@@@@......@@@..	@.@@.@.@.@@@@......@@@.@
+	;;	...@@@@.@@@@@@..........	@@.@@@@.@@@@@@.@@@@...@@
+	;;	........@@.@.@..........	@@@.....@@.@.@.@@@@@@@@@
+	;;	.........@@@@...........	@@@@@@@@.@@@@.@@@@@@@@@@
+	;;	........................	@@@@@@@@@....@@@@@@@@@@@
 
 							;; SPR_MONOCATB1:  EQU &34
 	DEFB &00, &00, &00, &00, &00, &00, &00, &3E, &00, &00, &07, &80, &07, &79, &A0, &1C
@@ -20302,55 +19315,30 @@ img_head_0:
 	DEFB &00, &31, &80, &00, &30, &80, &00, &31, &80, &00, &32, &CC, &00, &4E, &DC, &00
 	DEFB &3E, &EE, &7E, &DD, &F0, &F5, &E3, &FE, &FD, &FF, &FF, &7B, &FF, &FF, &87, &FF
 
-	;;	........................
-	;;	........................
-	;;	..........@@@@@.........
-	;;	.............@@@@.......
-	;;	.....@@@.@@@@..@@.@.....
-	;;	...@@@..@@@@@@@.@@.@....
-	;;	..@@@.@@@@@@@@@.@@.@@...
-	;;	..@@.@@@@@@@@@@@.@@.@...
-	;;	.@..@@@@@@@@@@@@.@@.@@..
-	;;	.@@.@@@@@@@@@@@@@.@@.@..
-	;;	..@.@@@@@@@@@@@@@.@@.@@.
-	;;	.@....@@@@@@@@@@@.@@.@@.
-	;;	..@.@@@@@@@...@@@.@@.@..
-	;;	...@@@@@@@.@@@@@..@@.@..
-	;;	..@@@@.@@@@@@@@@@.@@..@.
-	;;	..@@@@.@@@@@@@@@@.@@.@..
-	;;	..@@...@@.@@@@@@@.@@..@.
-	;;	....@@.@@.@@@@@@.@..@@@.
-	;;	...@@@..@......@..@@@@@.
-	;;	....@@@..@@@@@@....@@@..
-	;;	........@@@@.@..........
-	;;	........@@@@@@..........
-	;;	.........@@@@...........
-	;;	........................
-	;;
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@.....@@@@@@@@@
-	;;	@@@@@@@@@.@@@@@..@@@@@@@
-	;;	@@@@@........@@@@..@@@@@
-	;;	@@@............@@...@@@@
-	;;	@@..............@@...@@@
-	;;	@...............@@....@@
-	;;	@................@@...@@
-	;;	.@...............@@....@
-	;;	.@@...............@@...@
-	;;	@.@...............@@....
-	;;	..................@@....
-	;;	@.................@@...@
-	;;	@@................@@...@
-	;;	@.................@@....
-	;;	@.................@@...@
-	;;	@.................@@..@.
-	;;	@@..@@...........@..@@@.
-	;;	@@.@@@............@@@@@.
-	;;	@@@.@@@..@@@@@@.@@.@@@.@
-	;;	@@@@....@@@@.@.@@@@...@@
-	;;	@@@@@@@.@@@@@@.@@@@@@@@@
-	;;	@@@@@@@@.@@@@.@@@@@@@@@@
-	;;	@@@@@@@@@....@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@.....@@@@@@@@@
+	;;	..........@@@@@.........	@@@@@@@@@.@@@@@..@@@@@@@
+	;;	.............@@@@.......	@@@@@........@@@@..@@@@@
+	;;	.....@@@.@@@@..@@.@.....	@@@............@@...@@@@
+	;;	...@@@..@@@@@@@.@@.@....	@@..............@@...@@@
+	;;	..@@@.@@@@@@@@@.@@.@@...	@...............@@....@@
+	;;	..@@.@@@@@@@@@@@.@@.@...	@................@@...@@
+	;;	.@..@@@@@@@@@@@@.@@.@@..	.@...............@@....@
+	;;	.@@.@@@@@@@@@@@@@.@@.@..	.@@...............@@...@
+	;;	..@.@@@@@@@@@@@@@.@@.@@.	@.@...............@@....
+	;;	.@....@@@@@@@@@@@.@@.@@.	..................@@....
+	;;	..@.@@@@@@@...@@@.@@.@..	@.................@@...@
+	;;	...@@@@@@@.@@@@@..@@.@..	@@................@@...@
+	;;	..@@@@.@@@@@@@@@@.@@..@.	@.................@@....
+	;;	..@@@@.@@@@@@@@@@.@@.@..	@.................@@...@
+	;;	..@@...@@.@@@@@@@.@@..@.	@.................@@..@.
+	;;	....@@.@@.@@@@@@.@..@@@.	@@..@@...........@..@@@.
+	;;	...@@@..@......@..@@@@@.	@@.@@@............@@@@@.
+	;;	....@@@..@@@@@@....@@@..	@@@.@@@..@@@@@@.@@.@@@.@
+	;;	........@@@@.@..........	@@@@....@@@@.@.@@@@...@@
+	;;	........@@@@@@..........	@@@@@@@.@@@@@@.@@@@@@@@@
+	;;	.........@@@@...........	@@@@@@@@.@@@@.@@@@@@@@@@
+	;;	........................	@@@@@@@@@....@@@@@@@@@@@
 
 							;; SPR_MONOCATB2:  EQU &35
 	DEFB &00, &00, &00, &00, &00, &00, &00, &3E, &00, &00, &07, &80, &07, &79, &A0, &1C
@@ -20363,55 +19351,30 @@ img_head_0:
 	DEFB &00, &31, &80, &00, &30, &80, &00, &31, &C0, &00, &32, &B0, &00, &4D, &BC, &00
 	DEFB &3D, &DD, &3E, &7B, &E3, &7A, &87, &FF, &7E, &FF, &FF, &BD, &FF, &FF, &C3, &FF
 
-	;;	........................
-	;;	........................
-	;;	..........@@@@@.........
-	;;	.............@@@@.......
-	;;	.....@@@.@@@@..@@.@.....
-	;;	...@@@..@@@@@@@.@@.@....
-	;;	..@@@.@@@@@@@@@.@@.@@...
-	;;	..@@.@@@@@@@@@@@.@@.@...
-	;;	.@..@@@@@@@@@@@@.@@.@@..
-	;;	.@@.@@@@@@@@@@@@@.@@.@..
-	;;	..@.@@@@@@@@@@@@@.@@.@@.
-	;;	.@....@@@@@@@@@@@.@@.@@.
-	;;	..@.@@@@@@@...@@@.@@.@..
-	;;	...@@@@@@@.@@@@@..@@.@..
-	;;	..@@@@.@@@@@@@@@@.@@..@.
-	;;	..@@@@.@@@@@@@@@@.@@.@..
-	;;	....@@.@@.@@@@@@@.@@..@.
-	;;	..@@...@@.@@@@@@.@..@@..
-	;;	..@@@@..@......@..@@@@..
-	;;	...@@@....@@@@@..@@@@...
-	;;	.........@@@@.@.........
-	;;	.........@@@@@@.........
-	;;	..........@@@@..........
-	;;	........................
-	;;
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@.....@@@@@@@@@
-	;;	@@@@@@@@@.@@@@@..@@@@@@@
-	;;	@@@@@........@@@@..@@@@@
-	;;	@@@............@@...@@@@
-	;;	@@..............@@...@@@
-	;;	@...............@@....@@
-	;;	@................@@...@@
-	;;	.@...............@@....@
-	;;	.@@...............@@...@
-	;;	@.@...............@@....
-	;;	..................@@....
-	;;	@.................@@...@
-	;;	@@................@@...@
-	;;	@.................@@....
-	;;	@.................@@...@
-	;;	@@................@@..@.
-	;;	@.@@.............@..@@.@
-	;;	@.@@@@............@@@@.@
-	;;	@@.@@@.@..@@@@@..@@@@.@@
-	;;	@@@...@@.@@@@.@.@....@@@
-	;;	@@@@@@@@.@@@@@@.@@@@@@@@
-	;;	@@@@@@@@@.@@@@.@@@@@@@@@
-	;;	@@@@@@@@@@....@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@.....@@@@@@@@@
+	;;	..........@@@@@.........	@@@@@@@@@.@@@@@..@@@@@@@
+	;;	.............@@@@.......	@@@@@........@@@@..@@@@@
+	;;	.....@@@.@@@@..@@.@.....	@@@............@@...@@@@
+	;;	...@@@..@@@@@@@.@@.@....	@@..............@@...@@@
+	;;	..@@@.@@@@@@@@@.@@.@@...	@...............@@....@@
+	;;	..@@.@@@@@@@@@@@.@@.@...	@................@@...@@
+	;;	.@..@@@@@@@@@@@@.@@.@@..	.@...............@@....@
+	;;	.@@.@@@@@@@@@@@@@.@@.@..	.@@...............@@...@
+	;;	..@.@@@@@@@@@@@@@.@@.@@.	@.@...............@@....
+	;;	.@....@@@@@@@@@@@.@@.@@.	..................@@....
+	;;	..@.@@@@@@@...@@@.@@.@..	@.................@@...@
+	;;	...@@@@@@@.@@@@@..@@.@..	@@................@@...@
+	;;	..@@@@.@@@@@@@@@@.@@..@.	@.................@@....
+	;;	..@@@@.@@@@@@@@@@.@@.@..	@.................@@...@
+	;;	....@@.@@.@@@@@@@.@@..@.	@@................@@..@.
+	;;	..@@...@@.@@@@@@.@..@@..	@.@@.............@..@@.@
+	;;	..@@@@..@......@..@@@@..	@.@@@@............@@@@.@
+	;;	...@@@....@@@@@..@@@@...	@@.@@@.@..@@@@@..@@@@.@@
+	;;	.........@@@@.@.........	@@@...@@.@@@@.@.@....@@@
+	;;	.........@@@@@@.........	@@@@@@@@.@@@@@@.@@@@@@@@
+	;;	..........@@@@..........	@@@@@@@@@.@@@@.@@@@@@@@@
+	;;	........................	@@@@@@@@@@....@@@@@@@@@@
 
 							;; SPR_ROBOMOUSE:  EQU &36
 	DEFB &00, &00, &00, &00, &3C, &00, &01, &E7, &00, &03, &F9, &C0, &06, &7E, &E0, &05
@@ -20424,55 +19387,30 @@ img_head_0:
 	DEFB &7F, &B1, &1B, &1F, &88, &8F, &CE, &78, &4F, &01, &F0, &73, &0F, &90, &B4, &07
 	DEFB &6F, &CB, &06, &EF, &FB, &01, &DF, &FD, &87, &3F, &FE, &4C, &FF, &FF, &B3, &FF
 
-	;;	........................
-	;;	..........@@@@..........
-	;;	.......@@@@..@@@........
-	;;	......@@@@@@@..@@@......
-	;;	.....@@..@@@@@@.@@@.....
-	;;	.....@.@@.@@@@@@.@.@....
-	;;	..@@.@.@@.@@@..@@.@.@...
-	;;	.@@@.@@..@@@.@..@..@@...
-	;;	.@@@@.@@@@@@@..@@@.@@...
-	;;	..@..@..@@@@@@@@@@@.@...
-	;;	.@.@@@@....@@@@@@@@@....
-	;;	.@.@@@@.@@..........@...
-	;;	.@.@@@@.@@@@@@@@@@@@@...
-	;;	.@.@@@...@@@@@@@@.@@.@..
-	;;	.@.@@.@@...@@@@@@...@.@.
-	;;	..@.@@@@@@..@@@..@@@@.@.
-	;;	.@..@@@@.......@@@@@.@@.
-	;;	.@@@..@@.@@.@@@@@..@....
-	;;	..@@.@..@@@@.@@@.@@.....
-	;;	......@@.@@@.@@.@@@.....
-	;;	......@@.@@@...@@@......
-	;;	.......@@.@@.@@@........
-	;;	.........@..@@..........
-	;;	........................
-	;;
-	;;	@@@@@@@@@@....@@@@@@@@@@
-	;;	@@@@@@@.........@@@@@@@@
-	;;	@@@@@@............@@@@@@
-	;;	@@@@@..............@@@@@
-	;;	@@@@................@@@@
-	;;	@@.....@@............@@@
-	;;	@.@@...@@.........@...@@
-	;;	.@@@.........@........@@
-	;;	.@@@@.................@@
-	;;	@.@..@................@@
-	;;	...@@@@..............@@@
-	;;	...@@@@.@@..........@.@@
-	;;	...@@@@.@@@@@@@@@@@@@.@@
-	;;	...@@@...@@@@@@@@.@@...@
-	;;	...@@.@@...@@@@@@...@...
-	;;	@...@@@@@@..@@@..@@@@...
-	;;	.@..@@@@.......@@@@@....
-	;;	.@@@..@@....@@@@@..@....
-	;;	@.@@.@.......@@@.@@.@@@@
-	;;	@@..@.@@.....@@.@@@.@@@@
-	;;	@@@@@.@@.......@@@.@@@@@
-	;;	@@@@@@.@@....@@@..@@@@@@
-	;;	@@@@@@@..@..@@..@@@@@@@@
-	;;	@@@@@@@@@.@@..@@@@@@@@@@
+	;;	........................	@@@@@@@@@@....@@@@@@@@@@
+	;;	..........@@@@..........	@@@@@@@.........@@@@@@@@
+	;;	.......@@@@..@@@........	@@@@@@............@@@@@@
+	;;	......@@@@@@@..@@@......	@@@@@..............@@@@@
+	;;	.....@@..@@@@@@.@@@.....	@@@@................@@@@
+	;;	.....@.@@.@@@@@@.@.@....	@@.....@@............@@@
+	;;	..@@.@.@@.@@@..@@.@.@...	@.@@...@@.........@...@@
+	;;	.@@@.@@..@@@.@..@..@@...	.@@@.........@........@@
+	;;	.@@@@.@@@@@@@..@@@.@@...	.@@@@.................@@
+	;;	..@..@..@@@@@@@@@@@.@...	@.@..@................@@
+	;;	.@.@@@@....@@@@@@@@@....	...@@@@..............@@@
+	;;	.@.@@@@.@@..........@...	...@@@@.@@..........@.@@
+	;;	.@.@@@@.@@@@@@@@@@@@@...	...@@@@.@@@@@@@@@@@@@.@@
+	;;	.@.@@@...@@@@@@@@.@@.@..	...@@@...@@@@@@@@.@@...@
+	;;	.@.@@.@@...@@@@@@...@.@.	...@@.@@...@@@@@@...@...
+	;;	..@.@@@@@@..@@@..@@@@.@.	@...@@@@@@..@@@..@@@@...
+	;;	.@..@@@@.......@@@@@.@@.	.@..@@@@.......@@@@@....
+	;;	.@@@..@@.@@.@@@@@..@....	.@@@..@@....@@@@@..@....
+	;;	..@@.@..@@@@.@@@.@@.....	@.@@.@.......@@@.@@.@@@@
+	;;	......@@.@@@.@@.@@@.....	@@..@.@@.....@@.@@@.@@@@
+	;;	......@@.@@@...@@@......	@@@@@.@@.......@@@.@@@@@
+	;;	.......@@.@@.@@@........	@@@@@@.@@....@@@..@@@@@@
+	;;	.........@..@@..........	@@@@@@@..@..@@..@@@@@@@@
+	;;	........................	@@@@@@@@@.@@..@@@@@@@@@@
 
 							;; SPR_ROBOMOUSEB: EQU &37
 	DEFB &00, &00, &00, &00, &3C, &00, &00, &C7, &80, &03, &F9, &C0, &05, &FE, &E0, &09
@@ -20485,55 +19423,30 @@ img_head_0:
 	DEFB &C1, &C0, &D3, &C0, &00, &8F, &A0, &00, &8F, &A0, &01, &87, &60, &02, &80, &E0
 	DEFB &1E, &C3, &E2, &2D, &E5, &E3, &E3, &FE, &71, &DF, &FF, &8A, &3F, &FF, &FF, &FF
 
-	;;	........................
-	;;	..........@@@@..........
-	;;	........@@...@@@@.......
-	;;	......@@@@@@@..@@@......
-	;;	.....@.@@@@@@@@.@@@.....
-	;;	....@..@@..@@@@@.@@.....
-	;;	...@@@@@.@@.@@@@.@@.....
-	;;	....@@@@.@@.@@@@.@@.....
-	;;	.....@@@@..@@@@@@@.@@@..
-	;;	.......@@@@@@@@...@@@@@.
-	;;	.....@@...@@@..@@@.@@@@.
-	;;	....@@.@@.....@@@@@.@@..
-	;;	....@.@@@@..@.@@@@@...@.
-	;;	....@.@@@@..@..@@@..@@@.
-	;;	......@@@@..@.@...@.@@@.
-	;;	..@.@@@@@.@.@.@@@@@.@@@.
-	;;	..@.@@@@@.@.@.@@@@@.@@..
-	;;	..@@.@@@.@@.@.@@@@@...@.
-	;;	..@@@...@@@.@..@@@.@@@@.
-	;;	...@@.@@@@@.@.@...@.@@..
-	;;	.......@@@@.@.@@@@@.....
-	;;	.........@@@.@.@@@......
-	;;	........................
-	;;	........................
-	;;
-	;;	@@@@@@@@@@....@@@@@@@@@@
-	;;	@@@@@@@@.........@@@@@@@
-	;;	@@@@@@............@@@@@@
-	;;	@@@@@..............@@@@@
-	;;	@@@@.@..............@@@@
-	;;	@@@.................@@@@
-	;;	@@.......@@.........@@@@
-	;;	@@@......@@...........@@
-	;;	@@@@...............@@@.@
-	;;	@@@@@.............@@@@@.
-	;;	@@@@.@@........@@@.@@@@.
-	;;	@@@.@@.@@.....@@@@@.@@.@
-	;;	@@@.@.@@@@....@@@@@.....
-	;;	@@@.@.@@@@.....@@@......
-	;;	@@.@..@@@@..............
-	;;	@...@@@@@.@.............
-	;;	@...@@@@@.@............@
-	;;	@....@@@.@@...........@.
-	;;	@.......@@@........@@@@.
-	;;	@@....@@@@@...@...@.@@.@
-	;;	@@@..@.@@@@...@@@@@...@@
-	;;	@@@@@@@..@@@...@@@.@@@@@
-	;;	@@@@@@@@@...@.@...@@@@@@
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@....@@@@@@@@@@
+	;;	..........@@@@..........	@@@@@@@@.........@@@@@@@
+	;;	........@@...@@@@.......	@@@@@@............@@@@@@
+	;;	......@@@@@@@..@@@......	@@@@@..............@@@@@
+	;;	.....@.@@@@@@@@.@@@.....	@@@@.@..............@@@@
+	;;	....@..@@..@@@@@.@@.....	@@@.................@@@@
+	;;	...@@@@@.@@.@@@@.@@.....	@@.......@@.........@@@@
+	;;	....@@@@.@@.@@@@.@@.....	@@@......@@...........@@
+	;;	.....@@@@..@@@@@@@.@@@..	@@@@...............@@@.@
+	;;	.......@@@@@@@@...@@@@@.	@@@@@.............@@@@@.
+	;;	.....@@...@@@..@@@.@@@@.	@@@@.@@........@@@.@@@@.
+	;;	....@@.@@.....@@@@@.@@..	@@@.@@.@@.....@@@@@.@@.@
+	;;	....@.@@@@..@.@@@@@...@.	@@@.@.@@@@....@@@@@.....
+	;;	....@.@@@@..@..@@@..@@@.	@@@.@.@@@@.....@@@......
+	;;	......@@@@..@.@...@.@@@.	@@.@..@@@@..............
+	;;	..@.@@@@@.@.@.@@@@@.@@@.	@...@@@@@.@.............
+	;;	..@.@@@@@.@.@.@@@@@.@@..	@...@@@@@.@............@
+	;;	..@@.@@@.@@.@.@@@@@...@.	@....@@@.@@...........@.
+	;;	..@@@...@@@.@..@@@.@@@@.	@.......@@@........@@@@.
+	;;	...@@.@@@@@.@.@...@.@@..	@@....@@@@@...@...@.@@.@
+	;;	.......@@@@.@.@@@@@.....	@@@..@.@@@@...@@@@@...@@
+	;;	.........@@@.@.@@@......	@@@@@@@..@@@...@@@.@@@@@
+	;;	........................	@@@@@@@@@...@.@...@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
 
 							;; SPR_BEE1:       EQU &38
 	DEFB &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &0C, &00, &00, &0E, &00, &00
@@ -20546,55 +19459,30 @@ img_head_0:
 	DEFB &70, &60, &0D, &20, &B0, &09, &00, &90, &06, &00, &60, &80, &00, &01, &80, &00
 	DEFB &01, &C0, &00, &03, &F0, &00, &0F, &FC, &00, &3F, &FF, &00, &FF, &FF, &C3, &FF
 
-	;;	........................
-	;;	........................
-	;;	........................
-	;;	............@@..........
-	;;	............@@@.........
-	;;	............@@..........
-	;;	..@@@.......@...........
-	;;	.@@.@@@.................
-	;;	..@@@@@@@@.@@.@@@@@@@@..
-	;;	.................@@@.@@.
-	;;	....@@.@@..@...@@..@@@..
-	;;	...@......@@..@.........
-	;;	..@......@.@.@.......@..
-	;;	.@...@@..@@@.@...@@...@.
-	;;	.@..@@.@..@.@...@.@@..@.
-	;;	.@..@..@...@@...@..@..@.
-	;;	.@...@@...@@@@...@@...@.
-	;;	..@.......@..@.......@..
-	;;	..@@@...@@....@@...@@@..
-	;;	....@@@@..@@@@..@@@@....
-	;;	......@@@@@@@@@@@@......
-	;;	........@@@..@@@........
-	;;	..........@@@@..........
-	;;	........................
-	;;
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@...@@@@@@@@@
-	;;	@@@@@@@@@@@.@@..@@@@@@@@
-	;;	@@@@@@@@@@@.@@@.@@@@@@@@
-	;;	@@....@@@@@.@@.@@@@@@@@@
-	;;	@.@@@...@@@.@.@@@@@@@@@@
-	;;	.@@.@@@...............@@
-	;;	@.@@@@@@@@....@@@@@@@@.@
-	;;	@@...............@@@.@@.
-	;;	@@@........@.......@@@.@
-	;;	@@........@@..........@@
-	;;	@........@.@...........@
-	;;	.....@@..@@@.....@@.....
-	;;	....@@.@..@.....@.@@....
-	;;	....@..@........@..@....
-	;;	.....@@..........@@.....
-	;;	@......................@
-	;;	@......................@
-	;;	@@....................@@
-	;;	@@@@................@@@@
-	;;	@@@@@@............@@@@@@
-	;;	@@@@@@@@........@@@@@@@@
-	;;	@@@@@@@@@@....@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@...@@@@@@@@@
+	;;	............@@..........	@@@@@@@@@@@.@@..@@@@@@@@
+	;;	............@@@.........	@@@@@@@@@@@.@@@.@@@@@@@@
+	;;	............@@..........	@@....@@@@@.@@.@@@@@@@@@
+	;;	..@@@.......@...........	@.@@@...@@@.@.@@@@@@@@@@
+	;;	.@@.@@@.................	.@@.@@@...............@@
+	;;	..@@@@@@@@.@@.@@@@@@@@..	@.@@@@@@@@....@@@@@@@@.@
+	;;	.................@@@.@@.	@@...............@@@.@@.
+	;;	....@@.@@..@...@@..@@@..	@@@........@.......@@@.@
+	;;	...@......@@..@.........	@@........@@..........@@
+	;;	..@......@.@.@.......@..	@........@.@...........@
+	;;	.@...@@..@@@.@...@@...@.	.....@@..@@@.....@@.....
+	;;	.@..@@.@..@.@...@.@@..@.	....@@.@..@.....@.@@....
+	;;	.@..@..@...@@...@..@..@.	....@..@........@..@....
+	;;	.@...@@...@@@@...@@...@.	.....@@..........@@.....
+	;;	..@.......@..@.......@..	@......................@
+	;;	..@@@...@@....@@...@@@..	@......................@
+	;;	....@@@@..@@@@..@@@@....	@@....................@@
+	;;	......@@@@@@@@@@@@......	@@@@................@@@@
+	;;	........@@@..@@@........	@@@@@@............@@@@@@
+	;;	..........@@@@..........	@@@@@@@@........@@@@@@@@
+	;;	........................	@@@@@@@@@@....@@@@@@@@@@
 
 							;; SPR_BEE2:       EQU &39
 	DEFB &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &1C, &01, &C0, &17
@@ -20607,55 +19495,30 @@ img_head_0:
 	DEFB &00, &38, &00, &00, &80, &09, &00, &90, &06, &00, &60, &80, &00, &01, &80, &00
 	DEFB &01, &C0, &00, &03, &F0, &00, &0F, &FC, &00, &3F, &FF, &00, &FF, &FF, &C3, &FF
 
-	;;	........................
-	;;	........................
-	;;	........................
-	;;	........................
-	;;	...@@@.........@@@......
-	;;	...@.@@@......@@.@......
-	;;	....@@@@@....@@@@.......
-	;;	........@@@..@@.........
-	;;	...........@@...........
-	;;	......@...@..@@.........
-	;;	....@@..@@@...@@@@......
-	;;	...@..@@@@......@@@@@...
-	;;	..@..@.@@.@..@...@@.@@..
-	;;	.@...@@@..@..@....@@@.@.
-	;;	.@.........@@...@.....@.
-	;;	.@..@..@...@@...@..@..@.
-	;;	.@...@@...@@@@...@@...@.
-	;;	..@.......@..@.......@..
-	;;	..@@@...@@....@@...@@@..
-	;;	....@@@@..@@@@..@@@@....
-	;;	......@@@@@@@@@@@@......
-	;;	........@@@..@@@........
-	;;	..........@@@@..........
-	;;	........................
-	;;
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
-	;;	@@@...@@@@@@@@@...@@@@@@
-	;;	@@.@@@..@@@@@@.@@@.@@@@@
-	;;	@@.@.@@@.@@@@.@@.@.@@@@@
-	;;	@@@.@@@@@..@.@@@@.@@@@@@
-	;;	@@@@....@@@..@@..@@@@@@@
-	;;	@@@@@@...........@@@@@@@
-	;;	@@@@......@..@@...@@@@@@
-	;;	@@@.....@@@...@@@@...@@@
-	;;	@@....@@@@......@@@@@.@@
-	;;	@....@.@@........@@.@@.@
-	;;	.....@@@..........@@@...
-	;;	................@.......
-	;;	....@..@........@..@....
-	;;	.....@@..........@@.....
-	;;	@......................@
-	;;	@......................@
-	;;	@@....................@@
-	;;	@@@@................@@@@
-	;;	@@@@@@............@@@@@@
-	;;	@@@@@@@@........@@@@@@@@
-	;;	@@@@@@@@@@....@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@...@@@@@@@@@...@@@@@@
+	;;	...@@@.........@@@......	@@.@@@..@@@@@@.@@@.@@@@@
+	;;	...@.@@@......@@.@......	@@.@.@@@.@@@@.@@.@.@@@@@
+	;;	....@@@@@....@@@@.......	@@@.@@@@@..@.@@@@.@@@@@@
+	;;	........@@@..@@.........	@@@@....@@@..@@..@@@@@@@
+	;;	...........@@...........	@@@@@@...........@@@@@@@
+	;;	......@...@..@@.........	@@@@......@..@@...@@@@@@
+	;;	....@@..@@@...@@@@......	@@@.....@@@...@@@@...@@@
+	;;	...@..@@@@......@@@@@...	@@....@@@@......@@@@@.@@
+	;;	..@..@.@@.@..@...@@.@@..	@....@.@@........@@.@@.@
+	;;	.@...@@@..@..@....@@@.@.	.....@@@..........@@@...
+	;;	.@.........@@...@.....@.	................@.......
+	;;	.@..@..@...@@...@..@..@.	....@..@........@..@....
+	;;	.@...@@...@@@@...@@...@.	.....@@..........@@.....
+	;;	..@.......@..@.......@..	@......................@
+	;;	..@@@...@@....@@...@@@..	@......................@
+	;;	....@@@@..@@@@..@@@@....	@@....................@@
+	;;	......@@@@@@@@@@@@......	@@@@................@@@@
+	;;	........@@@..@@@........	@@@@@@............@@@@@@
+	;;	..........@@@@..........	@@@@@@@@........@@@@@@@@
+	;;	........................	@@@@@@@@@@....@@@@@@@@@@
 
 							;; SPR_BEACON:     EQU &3A
 	DEFB &00, &00, &00, &00, &7E, &00, &01, &E7, &80, &03, &99, &C0, &07, &C3, &E0, &07
@@ -20668,55 +19531,30 @@ img_head_0:
 	DEFB &33, &01, &80, &30, &01, &40, &00, &02, &60, &00, &06, &78, &00, &1E, &BE, &00
 	DEFB &7D, &CF, &81, &F3, &F3, &E7, &CF, &FC, &FF, &3F, &FF, &3C, &FF, &FF, &C3, &FF
 
-	;;	........................
-	;;	.........@@@@@@.........
-	;;	.......@@@@..@@@@.......
-	;;	......@@@..@@..@@@......
-	;;	.....@@@@@....@@@@@.....
-	;;	.....@@@@@@@@@@@@@@.....
-	;;	.....@@@@@@@@@@@@@@.....
-	;;	....@.@@@@@@@@@@@@.@....
-	;;	....@@.@@@@@@@@@@..@....
-	;;	....@@....@@@@...@.@....
-	;;	....@@..@@......@@.@....
-	;;	...@..@.@@..@@..@.@.@...
-	;;	...@..@@.@..@@.@..@.@...
-	;;	..@@@..@..@@..@@...@@@..
-	;;	..@.@@@...@@.....@@@.@..
-	;;	.@.@@.@@@@....@@@@.@@.@.
-	;;	.@@..@@.@@@@@@@@.@@..@@.
-	;;	.@@@@..@@.@@@@.@@..@@@@.
-	;;	..@@@@@..@@..@@..@@@@@..
-	;;	....@@@@@..@@..@@@@@....
-	;;	......@@@@@..@@@@@......
-	;;	........@@@@@@@@........
-	;;	..........@@@@..........
-	;;	........................
-	;;
-	;;	@@@@@@@@@......@@@@@@@@@
-	;;	@@@@@@@..........@@@@@@@
-	;;	@@@@@@............@@@@@@
-	;;	@@@@@......@@......@@@@@
-	;;	@@@@................@@@@
-	;;	@@@@................@@@@
-	;;	@@@@................@@@@
-	;;	@@@.@..............@.@@@
-	;;	@@@.@@.............@.@@@
-	;;	@@@.@@...........@.@.@@@
-	;;	@@@.@@..@@......@@.@.@@@
-	;;	@@....@.@@..@@..@.@...@@
-	;;	@@....@@.@..@@.@..@...@@
-	;;	@......@..@@..@@.......@
-	;;	@.........@@...........@
-	;;	.@....................@.
-	;;	.@@..................@@.
-	;;	.@@@@..............@@@@.
-	;;	@.@@@@@..........@@@@@.@
-	;;	@@..@@@@@......@@@@@..@@
-	;;	@@@@..@@@@@..@@@@@..@@@@
-	;;	@@@@@@..@@@@@@@@..@@@@@@
-	;;	@@@@@@@@..@@@@..@@@@@@@@
-	;;	@@@@@@@@@@....@@@@@@@@@@
+	;;	........................	@@@@@@@@@......@@@@@@@@@
+	;;	.........@@@@@@.........	@@@@@@@..........@@@@@@@
+	;;	.......@@@@..@@@@.......	@@@@@@............@@@@@@
+	;;	......@@@..@@..@@@......	@@@@@......@@......@@@@@
+	;;	.....@@@@@....@@@@@.....	@@@@................@@@@
+	;;	.....@@@@@@@@@@@@@@.....	@@@@................@@@@
+	;;	.....@@@@@@@@@@@@@@.....	@@@@................@@@@
+	;;	....@.@@@@@@@@@@@@.@....	@@@.@..............@.@@@
+	;;	....@@.@@@@@@@@@@..@....	@@@.@@.............@.@@@
+	;;	....@@....@@@@...@.@....	@@@.@@...........@.@.@@@
+	;;	....@@..@@......@@.@....	@@@.@@..@@......@@.@.@@@
+	;;	...@..@.@@..@@..@.@.@...	@@....@.@@..@@..@.@...@@
+	;;	...@..@@.@..@@.@..@.@...	@@....@@.@..@@.@..@...@@
+	;;	..@@@..@..@@..@@...@@@..	@......@..@@..@@.......@
+	;;	..@.@@@...@@.....@@@.@..	@.........@@...........@
+	;;	.@.@@.@@@@....@@@@.@@.@.	.@....................@.
+	;;	.@@..@@.@@@@@@@@.@@..@@.	.@@..................@@.
+	;;	.@@@@..@@.@@@@.@@..@@@@.	.@@@@..............@@@@.
+	;;	..@@@@@..@@..@@..@@@@@..	@.@@@@@..........@@@@@.@
+	;;	....@@@@@..@@..@@@@@....	@@..@@@@@......@@@@@..@@
+	;;	......@@@@@..@@@@@......	@@@@..@@@@@..@@@@@..@@@@
+	;;	........@@@@@@@@........	@@@@@@..@@@@@@@@..@@@@@@
+	;;	..........@@@@..........	@@@@@@@@..@@@@..@@@@@@@@
+	;;	........................	@@@@@@@@@@....@@@@@@@@@@
 
 							;; SPR_FACE:       EQU &3B
 	DEFB &00, &00, &00, &00, &1E, &60, &00, &E1, &F0, &03, &07, &F8, &04, &1F, &E4, &08
@@ -20729,55 +19567,30 @@ img_head_0:
 	DEFB &E0, &7E, &80, &70, &FE, &80, &3B, &C2, &C0, &37, &82, &C0, &37, &0E, &E0, &36
 	DEFB &3D, &F0, &36, &F3, &FC, &37, &CF, &FF, &17, &3F, &FF, &EC, &FF, &FF, &F3, &FF
 
-	;;	........................
-	;;	...........@@@@..@@.....
-	;;	........@@@....@@@@@....
-	;;	......@@.....@@@@@@@@...
-	;;	.....@.....@@@@@@@@..@..
-	;;	....@....@@@@@@@@..@.@..
-	;;	...@...@@@@@@@@..@.@.@..
-	;;	..@...@.@@@@@...@@@.@.@.
-	;;	..@...@@..@...@.@.@.@.@.
-	;;	.@....@@@@.@.@@@.@@.@.@.
-	;;	.@.....@@@.@.@.@...@@.@.
-	;;	.@.....@@@.@..@@.@@..@..
-	;;	.@.@.@..@@@.@...@..@@@@.
-	;;	.@..@...@@@.@@@@.@@@@@@.
-	;;	.@..@....@@@.@..@@@@@@@.
-	;;	.@..@.....@@@.@@@@....@.
-	;;	..@..@....@@.@@@@..@..@.
-	;;	..@..@@...@@.@@@.@..@@@.
-	;;	...@...@@.@@.@@...@@@@..
-	;;	....@@....@@.@@.@@@@....
-	;;	......@@..@@.@@@@@......
-	;;	........@@.@.@@@........
-	;;	..........@.@@..........
-	;;	........................
-	;;
-	;;	@@@@@@@@@@@@@@@@@..@@@@@
-	;;	@@@@@@@@@@@......@@.@@@@
-	;;	@@@@@@@@.......@@@@@.@@@
-	;;	@@@@@@.......@@@@@@@@.@@
-	;;	@@@@@......@@@@@@@@..@.@
-	;;	@@@@.....@@@@@@@@....@.@
-	;;	@@@....@@@@@@@@......@.@
-	;;	@@....@.@@@@@....@....@.
-	;;	@@....@@..@.....@.@...@.
-	;;	@.....@@@@....@..@....@.
-	;;	@......@@@...@.@......@.
-	;;	@......@@@....@......@.@
-	;;	@.......@@@........@@@@.
-	;;	@.......@@@......@@@@@@.
-	;;	@........@@@....@@@@@@@.
-	;;	@.........@@@.@@@@....@.
-	;;	@@........@@.@@@@.....@.
-	;;	@@........@@.@@@....@@@.
-	;;	@@@.......@@.@@...@@@@.@
-	;;	@@@@......@@.@@.@@@@..@@
-	;;	@@@@@@....@@.@@@@@..@@@@
-	;;	@@@@@@@@...@.@@@..@@@@@@
-	;;	@@@@@@@@@@@.@@..@@@@@@@@
-	;;	@@@@@@@@@@@@..@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@..@@@@@
+	;;	...........@@@@..@@.....	@@@@@@@@@@@......@@.@@@@
+	;;	........@@@....@@@@@....	@@@@@@@@.......@@@@@.@@@
+	;;	......@@.....@@@@@@@@...	@@@@@@.......@@@@@@@@.@@
+	;;	.....@.....@@@@@@@@..@..	@@@@@......@@@@@@@@..@.@
+	;;	....@....@@@@@@@@..@.@..	@@@@.....@@@@@@@@....@.@
+	;;	...@...@@@@@@@@..@.@.@..	@@@....@@@@@@@@......@.@
+	;;	..@...@.@@@@@...@@@.@.@.	@@....@.@@@@@....@....@.
+	;;	..@...@@..@...@.@.@.@.@.	@@....@@..@.....@.@...@.
+	;;	.@....@@@@.@.@@@.@@.@.@.	@.....@@@@....@..@....@.
+	;;	.@.....@@@.@.@.@...@@.@.	@......@@@...@.@......@.
+	;;	.@.....@@@.@..@@.@@..@..	@......@@@....@......@.@
+	;;	.@.@.@..@@@.@...@..@@@@.	@.......@@@........@@@@.
+	;;	.@..@...@@@.@@@@.@@@@@@.	@.......@@@......@@@@@@.
+	;;	.@..@....@@@.@..@@@@@@@.	@........@@@....@@@@@@@.
+	;;	.@..@.....@@@.@@@@....@.	@.........@@@.@@@@....@.
+	;;	..@..@....@@.@@@@..@..@.	@@........@@.@@@@.....@.
+	;;	..@..@@...@@.@@@.@..@@@.	@@........@@.@@@....@@@.
+	;;	...@...@@.@@.@@...@@@@..	@@@.......@@.@@...@@@@.@
+	;;	....@@....@@.@@.@@@@....	@@@@......@@.@@.@@@@..@@
+	;;	......@@..@@.@@@@@......	@@@@@@....@@.@@@@@..@@@@
+	;;	........@@.@.@@@........	@@@@@@@@...@.@@@..@@@@@@
+	;;	..........@.@@..........	@@@@@@@@@@@.@@..@@@@@@@@
+	;;	........................	@@@@@@@@@@@@..@@@@@@@@@@
 
 							;; SPR_FACEB:      EQU &3C
 	DEFB &00, &00, &00, &00, &07, &00, &00, &3F, &C0, &01, &FE, &30, &07, &F1, &C0, &1F
@@ -20790,55 +19603,30 @@ img_head_0:
 	DEFB &00, &01, &40, &00, &01, &40, &00, &01, &40, &00, &03, &40, &00, &03, &80, &00
 	DEFB &07, &F0, &00, &0F, &FC, &00, &3F, &FF, &00, &FF, &FF, &E7, &FF, &FF, &FF, &FF
 
-	;;	........................
-	;;	.............@@@........
-	;;	..........@@@@@@@@......
-	;;	.......@@@@@@@@...@@....
-	;;	.....@@@@@@@...@@@......
-	;;	...@@@@@@...@@@....@....
-	;;	...@@@@..@@@........@...
-	;;	..@....@@............@..
-	;;	..@@@.@..............@..
-	;;	..@@@.@...............@.
-	;;	.@@@.@................@.
-	;;	.@@@.@................@.
-	;;	.@@.@.................@.
-	;;	.@....@...............@.
-	;;	.@....@...............@.
-	;;	.@...@@...............@.
-	;;	.@.@@@...............@..
-	;;	.@.@..............@..@..
-	;;	...@..........@@@@..@...
-	;;	....@@.........@..@@....
-	;;	......@@........@@......
-	;;	........@@@..@@@........
-	;;	...........@@...........
-	;;	........................
-	;;
-	;;	@@@@@@@@@@@@@...@@@@@@@@
-	;;	@@@@@@@@@@...@@@..@@@@@@
-	;;	@@@@@@@...@@@@@@@@..@@@@
-	;;	@@@@@..@@@@@@@@...@@.@@@
-	;;	@@@..@@@@@@@...@@@..@@@@
-	;;	@@.@@@@@@...@@@.....@@@@
-	;;	@@.@@@@..@@@.........@@@
-	;;	@.@....@@.............@@
-	;;	@.@@@.@...............@@
-	;;	@.@@@.@................@
-	;;	.@@@.@.................@
-	;;	.@@@.@.................@
-	;;	.@@.@..................@
-	;;	.@.....................@
-	;;	.@.....................@
-	;;	.@.....................@
-	;;	.@....................@@
-	;;	.@....................@@
-	;;	@....................@@@
-	;;	@@@@................@@@@
-	;;	@@@@@@............@@@@@@
-	;;	@@@@@@@@........@@@@@@@@
-	;;	@@@@@@@@@@@..@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@...@@@@@@@@
+	;;	.............@@@........	@@@@@@@@@@...@@@..@@@@@@
+	;;	..........@@@@@@@@......	@@@@@@@...@@@@@@@@..@@@@
+	;;	.......@@@@@@@@...@@....	@@@@@..@@@@@@@@...@@.@@@
+	;;	.....@@@@@@@...@@@......	@@@..@@@@@@@...@@@..@@@@
+	;;	...@@@@@@...@@@....@....	@@.@@@@@@...@@@.....@@@@
+	;;	...@@@@..@@@........@...	@@.@@@@..@@@.........@@@
+	;;	..@....@@............@..	@.@....@@.............@@
+	;;	..@@@.@..............@..	@.@@@.@...............@@
+	;;	..@@@.@...............@.	@.@@@.@................@
+	;;	.@@@.@................@.	.@@@.@.................@
+	;;	.@@@.@................@.	.@@@.@.................@
+	;;	.@@.@.................@.	.@@.@..................@
+	;;	.@....@...............@.	.@.....................@
+	;;	.@....@...............@.	.@.....................@
+	;;	.@...@@...............@.	.@.....................@
+	;;	.@.@@@...............@..	.@....................@@
+	;;	.@.@..............@..@..	.@....................@@
+	;;	...@..........@@@@..@...	@....................@@@
+	;;	....@@.........@..@@....	@@@@................@@@@
+	;;	......@@........@@......	@@@@@@............@@@@@@
+	;;	........@@@..@@@........	@@@@@@@@........@@@@@@@@
+	;;	...........@@...........	@@@@@@@@@@@..@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
 
 							;; SPR_TAP:        EQU &3D
 	DEFB &00, &00, &00, &00, &3C, &00, &01, &C3, &80, &06, &3C, &60, &0D, &C3, &B0, &1A
@@ -20851,55 +19639,30 @@ img_head_0:
 	DEFB &24, &01, &80, &00, &01, &08, &00, &10, &80, &00, &01, &40, &81, &02, &A0, &00
 	DEFB &05, &D8, &00, &1B, &E6, &00, &67, &F9, &DB, &9F, &FE, &3C, &7F, &FF, &C3, &FF
 
-	;;	........................
-	;;	..........@@@@..........
-	;;	.......@@@....@@@.......
-	;;	.....@@...@@@@...@@.....
-	;;	....@@.@@@....@@@.@@....
-	;;	...@@.@...@..@...@.@@...
-	;;	....@@...@.@@.@...@@....
-	;;	...@.@@...@..@...@@.@...
-	;;	....@..@@@....@@@..@....
-	;;	.....@@...@@@@...@@.....
-	;;	....@..@@@....@@@..@....
-	;;	...@.@....@@@@....@.@...
-	;;	...@@..@........@..@@...
-	;;	..@@.@@...@..@...@@.@@..
-	;;	..@...@@@@....@@@@...@..
-	;;	.@@.@.@@.@@..@@.@@.@.@@.
-	;;	..@@.@@...@..@...@@.@@..
-	;;	.@.@@@@.@.@..@.@.@@@@.@.
-	;;	..@..@@@.@@..@@.@@@..@..
-	;;	...@@..@@@@..@@@@..@@...
-	;;	.....@@...@..@...@@.....
-	;;	.......@@@.@@.@@@.......
-	;;	..........@@@@..........
-	;;	........................
-	;;
-	;;	@@@@@@@@@@....@@@@@@@@@@
-	;;	@@@@@@@...@@@@...@@@@@@@
-	;;	@@@@@..@@@....@@@..@@@@@
-	;;	@@@@.@@..........@@.@@@@
-	;;	@@@.@@............@@.@@@
-	;;	@@.@@..............@@.@@
-	;;	@@@.@@.....@@.....@@.@@@
-	;;	@@...@@..........@@...@@
-	;;	@@@....@@@....@@@....@@@
-	;;	@@@@......@@@@......@@@@
-	;;	@@@.@..............@.@@@
-	;;	@@...@............@...@@
-	;;	@@.....@........@.....@@
-	;;	@.........@..@.........@
-	;;	@......................@
-	;;	....@..............@....
-	;;	@......................@
-	;;	.@......@......@......@.
-	;;	@.@..................@.@
-	;;	@@.@@..............@@.@@
-	;;	@@@..@@..........@@..@@@
-	;;	@@@@@..@@@.@@.@@@..@@@@@
-	;;	@@@@@@@...@@@@...@@@@@@@
-	;;	@@@@@@@@@@....@@@@@@@@@@
+	;;	........................	@@@@@@@@@@....@@@@@@@@@@
+	;;	..........@@@@..........	@@@@@@@...@@@@...@@@@@@@
+	;;	.......@@@....@@@.......	@@@@@..@@@....@@@..@@@@@
+	;;	.....@@...@@@@...@@.....	@@@@.@@..........@@.@@@@
+	;;	....@@.@@@....@@@.@@....	@@@.@@............@@.@@@
+	;;	...@@.@...@..@...@.@@...	@@.@@..............@@.@@
+	;;	....@@...@.@@.@...@@....	@@@.@@.....@@.....@@.@@@
+	;;	...@.@@...@..@...@@.@...	@@...@@..........@@...@@
+	;;	....@..@@@....@@@..@....	@@@....@@@....@@@....@@@
+	;;	.....@@...@@@@...@@.....	@@@@......@@@@......@@@@
+	;;	....@..@@@....@@@..@....	@@@.@..............@.@@@
+	;;	...@.@....@@@@....@.@...	@@...@............@...@@
+	;;	...@@..@........@..@@...	@@.....@........@.....@@
+	;;	..@@.@@...@..@...@@.@@..	@.........@..@.........@
+	;;	..@...@@@@....@@@@...@..	@......................@
+	;;	.@@.@.@@.@@..@@.@@.@.@@.	....@..............@....
+	;;	..@@.@@...@..@...@@.@@..	@......................@
+	;;	.@.@@@@.@.@..@.@.@@@@.@.	.@......@......@......@.
+	;;	..@..@@@.@@..@@.@@@..@..	@.@..................@.@
+	;;	...@@..@@@@..@@@@..@@...	@@.@@..............@@.@@
+	;;	.....@@...@..@...@@.....	@@@..@@..........@@..@@@
+	;;	.......@@@.@@.@@@.......	@@@@@..@@@.@@.@@@..@@@@@
+	;;	..........@@@@..........	@@@@@@@...@@@@...@@@@@@@
+	;;	........................	@@@@@@@@@@....@@@@@@@@@@
 
 							;; SPR_CHIMP:      EQU &3E
 	DEFB &00, &3C, &00, &00, &C3, &00, &01, &00, &00, &02, &00, &C0, &02, &03, &20, &04
@@ -20912,55 +19675,30 @@ img_head_0:
 	DEFB &00, &77, &F0, &07, &EF, &E8, &03, &D7, &D8, &00, &1B, &EC, &00, &37, &C6, &00
 	DEFB &63, &E1, &C3, &87, &F0, &3C, &0F, &F8, &00, &1F, &FE, &00, &7F, &FF, &C3, &FF
 
-	;;	..........@@@@..........
-	;;	........@@....@@........
-	;;	.......@................
-	;;	......@.........@@......
-	;;	......@.......@@..@.....
-	;;	.....@.....@@@..@.@.....
-	;;	.....@....@@..@@........
-	;;	.....@...@..@..@@@@.....
-	;;	...@@....@@@.@@@@.......
-	;;	...@.@....@@.@..@.@.....
-	;;	....@@@.......@.@@@@....
-	;;	.....@......@@@@@@@.....
-	;;	......@.....@@@@@..@....
-	;;	......@..........@@@....
-	;;	.......@.....@@@@@@.....
-	;;	....@.@@......@@@@.@....
-	;;	...@@.@............@@...
-	;;	....@@............@@....
-	;;	...@.@@..........@@.@...
-	;;	....@..@@@....@@@..@....
-	;;	.....@@...@@@@...@@.....
-	;;	.......@@@....@@@.......
-	;;	..........@@@@..........
-	;;	........................
-	;;
-	;;	@@@@@@@@@@....@@@@@@@@@@
-	;;	@@@@@@@@........@@@@@@@@
-	;;	@@@@@@@...........@@@@@@
-	;;	@@@@@@..........@@.@@@@@
-	;;	@@@@@@........@@..@.@@@@
-	;;	@@@@@......@@@....@.@@@@
-	;;	@@@@@.....@@..@@...@@@@@
-	;;	@@@......@.....@@@@.@@@@
-	;;	@@.......@@@.@@@@...@@@@
-	;;	@@...@....@@.@..@.@.@@@@
-	;;	@@@.@@@.......@.@@@@.@@@
-	;;	@@@@.@......@@@@@@@.@@@@
-	;;	@@@@@.......@@@@@..@.@@@
-	;;	@@@@@@...........@@@.@@@
-	;;	@@@@.........@@@@@@.@@@@
-	;;	@@@.@.........@@@@.@.@@@
-	;;	@@.@@..............@@.@@
-	;;	@@@.@@............@@.@@@
-	;;	@@...@@..........@@...@@
-	;;	@@@....@@@....@@@....@@@
-	;;	@@@@......@@@@......@@@@
-	;;	@@@@@..............@@@@@
-	;;	@@@@@@@..........@@@@@@@
-	;;	@@@@@@@@@@....@@@@@@@@@@
+	;;	..........@@@@..........	@@@@@@@@@@....@@@@@@@@@@
+	;;	........@@....@@........	@@@@@@@@........@@@@@@@@
+	;;	.......@................	@@@@@@@...........@@@@@@
+	;;	......@.........@@......	@@@@@@..........@@.@@@@@
+	;;	......@.......@@..@.....	@@@@@@........@@..@.@@@@
+	;;	.....@.....@@@..@.@.....	@@@@@......@@@....@.@@@@
+	;;	.....@....@@..@@........	@@@@@.....@@..@@...@@@@@
+	;;	.....@...@..@..@@@@.....	@@@......@.....@@@@.@@@@
+	;;	...@@....@@@.@@@@.......	@@.......@@@.@@@@...@@@@
+	;;	...@.@....@@.@..@.@.....	@@...@....@@.@..@.@.@@@@
+	;;	....@@@.......@.@@@@....	@@@.@@@.......@.@@@@.@@@
+	;;	.....@......@@@@@@@.....	@@@@.@......@@@@@@@.@@@@
+	;;	......@.....@@@@@..@....	@@@@@.......@@@@@..@.@@@
+	;;	......@..........@@@....	@@@@@@...........@@@.@@@
+	;;	.......@.....@@@@@@.....	@@@@.........@@@@@@.@@@@
+	;;	....@.@@......@@@@.@....	@@@.@.........@@@@.@.@@@
+	;;	...@@.@............@@...	@@.@@..............@@.@@
+	;;	....@@............@@....	@@@.@@............@@.@@@
+	;;	...@.@@..........@@.@...	@@...@@..........@@...@@
+	;;	....@..@@@....@@@..@....	@@@....@@@....@@@....@@@
+	;;	.....@@...@@@@...@@.....	@@@@......@@@@......@@@@
+	;;	.......@@@....@@@.......	@@@@@..............@@@@@
+	;;	..........@@@@..........	@@@@@@@..........@@@@@@@
+	;;	........................	@@@@@@@@@@....@@@@@@@@@@
 
 							;; SPR_CHIMPB:     EQU &3F
 	DEFB &00, &3C, &00, &00, &C3, &00, &01, &00, &80, &02, &00, &40, &00, &00, &20, &04
@@ -20973,55 +19711,30 @@ img_head_0:
 	DEFB &00, &3F, &F0, &00, &0F, &E8, &00, &37, &D8, &00, &1B, &EC, &00, &37, &C6, &00
 	DEFB &63, &E1, &C3, &87, &F0, &3C, &0F, &F8, &00, &1F, &FE, &00, &7F, &FF, &C3, &FF
 
-	;;	..........@@@@..........
-	;;	........@@....@@........
-	;;	.......@........@.......
-	;;	......@..........@......
-	;;	..................@.....
-	;;	.....@............@.....
-	;;	....@@.............@....
-	;;	...................@@...
-	;;	....@@.............@@...
-	;;	...@@....@.........@....
-	;;	...@@...@.@........@....
-	;;	....@...@@@.......@.....
-	;;	...@.....@........@.....
-	;;	....@............@......
-	;;	.................@......
-	;;	....@...........@.@@....
-	;;	...@@............@.@@...
-	;;	....@@............@@....
-	;;	...@.@@..........@@.@...
-	;;	....@..@@@....@@@..@....
-	;;	.....@@...@@@@...@@.....
-	;;	.......@@@....@@@.......
-	;;	..........@@@@..........
-	;;	........................
-	;;
-	;;	@@@@@@@@@@....@@@@@@@@@@
-	;;	@@@@@@@@........@@@@@@@@
-	;;	@@@@@@@..........@@@@@@@
-	;;	@@@@@@............@@@@@@
-	;;	@@@@@..............@@@@@
-	;;	@@@@.@..............@@@@
-	;;	@@@.@@...............@@@
-	;;	@@@@..................@@
-	;;	@@@.@@................@@
-	;;	@@.@@................@@@
-	;;	@@.@@...@...........@@@@
-	;;	@@@.@...@@.........@@@@@
-	;;	@@.@...............@@@@@
-	;;	@@@.@.............@@@@@@
-	;;	@@@@................@@@@
-	;;	@@@.@.............@@.@@@
-	;;	@@.@@..............@@.@@
-	;;	@@@.@@............@@.@@@
-	;;	@@...@@..........@@...@@
-	;;	@@@....@@@....@@@....@@@
-	;;	@@@@......@@@@......@@@@
-	;;	@@@@@..............@@@@@
-	;;	@@@@@@@..........@@@@@@@
-	;;	@@@@@@@@@@....@@@@@@@@@@
+	;;	..........@@@@..........	@@@@@@@@@@....@@@@@@@@@@
+	;;	........@@....@@........	@@@@@@@@........@@@@@@@@
+	;;	.......@........@.......	@@@@@@@..........@@@@@@@
+	;;	......@..........@......	@@@@@@............@@@@@@
+	;;	..................@.....	@@@@@..............@@@@@
+	;;	.....@............@.....	@@@@.@..............@@@@
+	;;	....@@.............@....	@@@.@@...............@@@
+	;;	...................@@...	@@@@..................@@
+	;;	....@@.............@@...	@@@.@@................@@
+	;;	...@@....@.........@....	@@.@@................@@@
+	;;	...@@...@.@........@....	@@.@@...@...........@@@@
+	;;	....@...@@@.......@.....	@@@.@...@@.........@@@@@
+	;;	...@.....@........@.....	@@.@...............@@@@@
+	;;	....@............@......	@@@.@.............@@@@@@
+	;;	.................@......	@@@@................@@@@
+	;;	....@...........@.@@....	@@@.@.............@@.@@@
+	;;	...@@............@.@@...	@@.@@..............@@.@@
+	;;	....@@............@@....	@@@.@@............@@.@@@
+	;;	...@.@@..........@@.@...	@@...@@..........@@...@@
+	;;	....@..@@@....@@@..@....	@@@....@@@....@@@....@@@
+	;;	.....@@...@@@@...@@.....	@@@@......@@@@......@@@@
+	;;	.......@@@....@@@.......	@@@@@..............@@@@@
+	;;	..........@@@@..........	@@@@@@@..........@@@@@@@
+	;;	........................	@@@@@@@@@@....@@@@@@@@@@
 
 							;; SPR_CHARLES:    EQU &40
 	DEFB &00, &00, &00, &00, &7E, &30, &01, &81, &48, &02, &03, &B8, &04, &7F, &98, &34
@@ -21034,55 +19747,30 @@ img_head_0:
 	DEFB &EF, &BF, &F3, &F0, &4F, &EB, &FD, &D7, &DB, &EE, &DB, &ED, &CF, &B7, &C6, &76
 	DEFB &63, &E1, &81, &87, &F0, &3C, &0F, &F8, &00, &1F, &FE, &00, &7F, &FF, &C3, &FF
 
-	;;	........................
-	;;	.........@@@@@@...@@....
-	;;	.......@@......@.@..@...
-	;;	......@.......@@@.@@@...
-	;;	.....@...@@@@@@@@..@@...
-	;;	..@@.@..@@@@@@@..@.@@...
-	;;	.@..@..@@...@@.@@@.@....
-	;;	.@@@.@.@.@@@.@...@.@....
-	;;	.@@..@.@@@...@.@@.......
-	;;	..@@.@.@@.@@.@...@......
-	;;	...@@@@@@@...@@.@@......
-	;;	....@.@@@.@@@@@@.@......
-	;;	.....@@@@@@@.@@@@.......
-	;;	......@@@@@.@@@@@.......
-	;;	......@@@@@@.....@......
-	;;	....@.@@@@@@@@.@@@.@....
-	;;	...@@.@@@@@.@@@.@@.@@...
-	;;	....@@.@@@..@@@@@.@@....
-	;;	...@.@@..@@@.@@..@@.@...
-	;;	....@..@@......@@..@....
-	;;	.....@@...@@@@...@@.....
-	;;	.......@@@....@@@.......
-	;;	..........@@@@..........
-	;;	........................
-	;;
-	;;	@@@@@@@@@@@@@@@@@@..@@@@
-	;;	@@@@@@@@@.......@.@@.@@@
-	;;	@@@@@@@........@.@..@.@@
-	;;	@@@@@@........@@@.@@@.@@
-	;;	@@..@....@@@@@@@@..@@.@@
-	;;	@.@@....@@@@@@@..@.@@.@@
-	;;	.@..@..@@...@@.@@@.@.@@@
-	;;	.@@@.@.@.@@@.@...@.@.@@@
-	;;	.@@..@.@@@...@......@@@@
-	;;	@.@@.@.@@....@...@.@@@@@
-	;;	@@.@@@@@@@...@@.@@.@@@@@
-	;;	@@@.@.@@@.@@@@@@.@.@@@@@
-	;;	@@@@.@@@@@@@.@@@@.@@@@@@
-	;;	@@@@@.@@@@@.@@@@@.@@@@@@
-	;;	@@@@..@@@@@@.....@..@@@@
-	;;	@@@.@.@@@@@@@@.@@@.@.@@@
-	;;	@@.@@.@@@@@.@@@.@@.@@.@@
-	;;	@@@.@@.@@@..@@@@@.@@.@@@
-	;;	@@...@@..@@@.@@..@@...@@
-	;;	@@@....@@......@@....@@@
-	;;	@@@@......@@@@......@@@@
-	;;	@@@@@..............@@@@@
-	;;	@@@@@@@..........@@@@@@@
-	;;	@@@@@@@@@@....@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@..@@@@
+	;;	.........@@@@@@...@@....	@@@@@@@@@.......@.@@.@@@
+	;;	.......@@......@.@..@...	@@@@@@@........@.@..@.@@
+	;;	......@.......@@@.@@@...	@@@@@@........@@@.@@@.@@
+	;;	.....@...@@@@@@@@..@@...	@@..@....@@@@@@@@..@@.@@
+	;;	..@@.@..@@@@@@@..@.@@...	@.@@....@@@@@@@..@.@@.@@
+	;;	.@..@..@@...@@.@@@.@....	.@..@..@@...@@.@@@.@.@@@
+	;;	.@@@.@.@.@@@.@...@.@....	.@@@.@.@.@@@.@...@.@.@@@
+	;;	.@@..@.@@@...@.@@.......	.@@..@.@@@...@......@@@@
+	;;	..@@.@.@@.@@.@...@......	@.@@.@.@@....@...@.@@@@@
+	;;	...@@@@@@@...@@.@@......	@@.@@@@@@@...@@.@@.@@@@@
+	;;	....@.@@@.@@@@@@.@......	@@@.@.@@@.@@@@@@.@.@@@@@
+	;;	.....@@@@@@@.@@@@.......	@@@@.@@@@@@@.@@@@.@@@@@@
+	;;	......@@@@@.@@@@@.......	@@@@@.@@@@@.@@@@@.@@@@@@
+	;;	......@@@@@@.....@......	@@@@..@@@@@@.....@..@@@@
+	;;	....@.@@@@@@@@.@@@.@....	@@@.@.@@@@@@@@.@@@.@.@@@
+	;;	...@@.@@@@@.@@@.@@.@@...	@@.@@.@@@@@.@@@.@@.@@.@@
+	;;	....@@.@@@..@@@@@.@@....	@@@.@@.@@@..@@@@@.@@.@@@
+	;;	...@.@@..@@@.@@..@@.@...	@@...@@..@@@.@@..@@...@@
+	;;	....@..@@......@@..@....	@@@....@@......@@....@@@
+	;;	.....@@...@@@@...@@.....	@@@@......@@@@......@@@@
+	;;	.......@@@....@@@.......	@@@@@..............@@@@@
+	;;	..........@@@@..........	@@@@@@@..........@@@@@@@
+	;;	........................	@@@@@@@@@@....@@@@@@@@@@
 
 							;; SPR_CHARLESB:   EQU &41
 	DEFB &00, &00, &00, &00, &7E, &00, &01, &81, &B0, &02, &00, &78, &02, &00, &38, &04
@@ -21095,55 +19783,30 @@ img_head_0:
 	DEFB &FF, &DF, &F3, &FF, &CF, &EB, &FF, &D7, &DB, &FE, &DB, &ED, &F9, &B7, &C6, &7E
 	DEFB &63, &E1, &81, &87, &F0, &3C, &0F, &F8, &00, &1F, &FE, &00, &7F, &FF, &C3, &FF
 
-	;;	........................
-	;;	.........@@@@@@.........
-	;;	.......@@......@@.@@....
-	;;	......@..........@@@@...
-	;;	......@...........@@@...
-	;;	.....@...@......@.@@@...
-	;;	...@@....@@....@@.@@....
-	;;	..@@@@....@@@@@@..@.....
-	;;	..@@@@......@.....@.....
-	;;	..@@@@@...........@.....
-	;;	...@@@@...........@.....
-	;;	....@@@.@....@@..@......
-	;;	.....@@@@@..@@@@@@......
-	;;	......@@@@@@@@@@@@......
-	;;	......@@@@@@@@@@@@......
-	;;	....@.@@@@@@@@@@@@.@....
-	;;	...@@.@@@@@@@@@.@@.@@...
-	;;	....@@.@@@@@@..@@.@@....
-	;;	...@.@@..@@@@@@..@@.@...
-	;;	....@..@@......@@..@....
-	;;	.....@@...@@@@...@@.....
-	;;	.......@@@....@@@.......
-	;;	..........@@@@..........
-	;;	........................
-	;;
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
-	;;	@@@@@@@@@......@@@..@@@@
-	;;	@@@@@@@...........@@.@@@
-	;;	@@@@@@............@@@.@@
-	;;	@@@@@@.............@@.@@
-	;;	@@@................@@.@@
-	;;	@@.@@..............@.@@@
-	;;	@.@@@@..............@@@@
-	;;	@.@@@@.............@@@@@
-	;;	@.@@@@@............@@@@@
-	;;	@@.@@@@............@@@@@
-	;;	@@@.@@@.@....@@..@.@@@@@
-	;;	@@@@.@@@@@..@@@@@@.@@@@@
-	;;	@@@@@.@@@@@@@@@@@@.@@@@@
-	;;	@@@@..@@@@@@@@@@@@..@@@@
-	;;	@@@.@.@@@@@@@@@@@@.@.@@@
-	;;	@@.@@.@@@@@@@@@.@@.@@.@@
-	;;	@@@.@@.@@@@@@..@@.@@.@@@
-	;;	@@...@@..@@@@@@..@@...@@
-	;;	@@@....@@......@@....@@@
-	;;	@@@@......@@@@......@@@@
-	;;	@@@@@..............@@@@@
-	;;	@@@@@@@..........@@@@@@@
-	;;	@@@@@@@@@@....@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	.........@@@@@@.........	@@@@@@@@@......@@@..@@@@
+	;;	.......@@......@@.@@....	@@@@@@@...........@@.@@@
+	;;	......@..........@@@@...	@@@@@@............@@@.@@
+	;;	......@...........@@@...	@@@@@@.............@@.@@
+	;;	.....@...@......@.@@@...	@@@................@@.@@
+	;;	...@@....@@....@@.@@....	@@.@@..............@.@@@
+	;;	..@@@@....@@@@@@..@.....	@.@@@@..............@@@@
+	;;	..@@@@......@.....@.....	@.@@@@.............@@@@@
+	;;	..@@@@@...........@.....	@.@@@@@............@@@@@
+	;;	...@@@@...........@.....	@@.@@@@............@@@@@
+	;;	....@@@.@....@@..@......	@@@.@@@.@....@@..@.@@@@@
+	;;	.....@@@@@..@@@@@@......	@@@@.@@@@@..@@@@@@.@@@@@
+	;;	......@@@@@@@@@@@@......	@@@@@.@@@@@@@@@@@@.@@@@@
+	;;	......@@@@@@@@@@@@......	@@@@..@@@@@@@@@@@@..@@@@
+	;;	....@.@@@@@@@@@@@@.@....	@@@.@.@@@@@@@@@@@@.@.@@@
+	;;	...@@.@@@@@@@@@.@@.@@...	@@.@@.@@@@@@@@@.@@.@@.@@
+	;;	....@@.@@@@@@..@@.@@....	@@@.@@.@@@@@@..@@.@@.@@@
+	;;	...@.@@..@@@@@@..@@.@...	@@...@@..@@@@@@..@@...@@
+	;;	....@..@@......@@..@....	@@@....@@......@@....@@@
+	;;	.....@@...@@@@...@@.....	@@@@......@@@@......@@@@
+	;;	.......@@@....@@@.......	@@@@@..............@@@@@
+	;;	..........@@@@..........	@@@@@@@..........@@@@@@@
+	;;	........................	@@@@@@@@@@....@@@@@@@@@@
 
 							;; SPR_TRUNK:      EQU &42
 	DEFB &00, &00, &00, &00, &0E, &60, &00, &7F, &B0, &01, &FC, &C8, &03, &CB, &58, &1B
@@ -21156,55 +19819,30 @@ img_head_0:
 	DEFB &06, &03, &F0, &00, &07, &E8, &00, &17, &D8, &00, &1B, &EC, &00, &37, &C6, &00
 	DEFB &63, &E1, &C3, &87, &F0, &3C, &0F, &F8, &00, &1F, &FE, &00, &7F, &FF, &C3, &FF
 
-	;;	........................
-	;;	............@@@..@@.....
-	;;	.........@@@@@@@@.@@....
-	;;	.......@@@@@@@..@@..@...
-	;;	......@@@@..@.@@.@.@@...
-	;;	...@@.@@@.@@..@..@@.@...
-	;;	..@@@@.@@.@..@...@@@....
-	;;	.@@...@@@@...@@@@.@@....
-	;;	.@.@@.@@@@@.@@@@@@.@....
-	;;	..@@@@@@@@@@@@@@@@@.@@..
-	;;	...@@.@@@@@@@.@@@@.@@.@.
-	;;	....@.@@@@@@..@@@@@@..@.
-	;;	.......@@@@@....@@@@@@..
-	;;	........@@@..@@...@@@...
-	;;	.......@..@@@..@@.......
-	;;	....@.@@@@..@@@@.@.@....
-	;;	...@@.@@@@@@....@@.@@...
-	;;	....@@.@@@@@@@@@@.@@....
-	;;	...@.@@...@@@@...@@.@...
-	;;	....@..@@@....@@@..@....
-	;;	.....@@...@@@@...@@.....
-	;;	.......@@@....@@@.......
-	;;	..........@@@@..........
-	;;	........................
-	;;
-	;;	@@@@@@@@@@@@...@@..@@@@@
-	;;	@@@@@@@@@...........@@@@
-	;;	@@@@@@@..............@@@
-	;;	@@@@@@..............@.@@
-	;;	@@@...........@@...@@.@@
-	;;	@@........@@..@.....@.@@
-	;;	@.........@..........@@@
-	;;	.....................@@@
-	;;	...@@.................@@
-	;;	@.@@@@.................@
-	;;	@@.@@...................
-	;;	@@@.@...................
-	;;	@@@@.@.................@
-	;;	@@@@@@.......@@.......@@
-	;;	@@@@.................@@@
-	;;	@@@.@..............@.@@@
-	;;	@@.@@..............@@.@@
-	;;	@@@.@@............@@.@@@
-	;;	@@...@@..........@@...@@
-	;;	@@@....@@@....@@@....@@@
-	;;	@@@@......@@@@......@@@@
-	;;	@@@@@..............@@@@@
-	;;	@@@@@@@..........@@@@@@@
-	;;	@@@@@@@@@@....@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@...@@..@@@@@
+	;;	............@@@..@@.....	@@@@@@@@@...........@@@@
+	;;	.........@@@@@@@@.@@....	@@@@@@@..............@@@
+	;;	.......@@@@@@@..@@..@...	@@@@@@..............@.@@
+	;;	......@@@@..@.@@.@.@@...	@@@...........@@...@@.@@
+	;;	...@@.@@@.@@..@..@@.@...	@@........@@..@.....@.@@
+	;;	..@@@@.@@.@..@...@@@....	@.........@..........@@@
+	;;	.@@...@@@@...@@@@.@@....	.....................@@@
+	;;	.@.@@.@@@@@.@@@@@@.@....	...@@.................@@
+	;;	..@@@@@@@@@@@@@@@@@.@@..	@.@@@@.................@
+	;;	...@@.@@@@@@@.@@@@.@@.@.	@@.@@...................
+	;;	....@.@@@@@@..@@@@@@..@.	@@@.@...................
+	;;	.......@@@@@....@@@@@@..	@@@@.@.................@
+	;;	........@@@..@@...@@@...	@@@@@@.......@@.......@@
+	;;	.......@..@@@..@@.......	@@@@.................@@@
+	;;	....@.@@@@..@@@@.@.@....	@@@.@..............@.@@@
+	;;	...@@.@@@@@@....@@.@@...	@@.@@..............@@.@@
+	;;	....@@.@@@@@@@@@@.@@....	@@@.@@............@@.@@@
+	;;	...@.@@...@@@@...@@.@...	@@...@@..........@@...@@
+	;;	....@..@@@....@@@..@....	@@@....@@@....@@@....@@@
+	;;	.....@@...@@@@...@@.....	@@@@......@@@@......@@@@
+	;;	.......@@@....@@@.......	@@@@@..............@@@@@
+	;;	..........@@@@..........	@@@@@@@..........@@@@@@@
+	;;	........................	@@@@@@@@@@....@@@@@@@@@@
 
 							;; SPR_TRUNKB:     EQU &43
 	DEFB &00, &00, &00, &18, &06, &70, &3C, &3F, &B0, &3E, &FB, &D8, &3D, &FF, &E8, &1D
@@ -21217,55 +19855,30 @@ img_head_0:
 	DEFB &00, &1F, &F0, &00, &0F, &EC, &00, &17, &D8, &00, &1B, &CC, &00, &33, &C6, &00
 	DEFB &63, &E1, &C3, &87, &F0, &3C, &0F, &F8, &00, &1F, &FE, &00, &7F, &FF, &C3, &FF
 
-	;;	........................
-	;;	...@@........@@..@@@....
-	;;	..@@@@....@@@@@@@.@@....
-	;;	..@@@@@.@@@@@.@@@@.@@...
-	;;	..@@@@.@@@@@@@@@@@@.@...
-	;;	...@@@.@@@@@@@@@@@@.@...
-	;;	...@@.@.@@@@@@@@@@@@....
-	;;	.....@@@@@@@@@@@@@@@....
-	;;	.....@@@@@@@@@@@@@@@....
-	;;	....@@@@@@@@@@@@@@@@....
-	;;	....@@@@@.@@@@@@@@@.....
-	;;	.....@@..@@@@@@@@@@.....
-	;;	.......@@@@@@@@@.@......
-	;;	.......@@@@@@@@.@.......
-	;;	.......@@.@@@@@..@......
-	;;	....@@...@@@@@.@@@.@....
-	;;	...@@.@@@.@@@@@@@@.@@...
-	;;	....@@.@@@@@@@@@@.@@....
-	;;	...@.@@...@@@@...@@.@...
-	;;	....@..@@@....@@@..@....
-	;;	.....@@...@@@@...@@.....
-	;;	.......@@@....@@@.......
-	;;	..........@@@@..........
-	;;	........................
-	;;
-	;;	@@@..@@@@@@@@..@@...@@@@
-	;;	@@....@@@@...........@@@
-	;;	@......@.............@@@
-	;;	@.....................@@
-	;;	@.....................@@
-	;;	@@....................@@
-	;;	@@...................@@@
-	;;	@@@..................@@@
-	;;	@@@@.................@@@
-	;;	@@@..................@@@
-	;;	@@@.................@@@@
-	;;	@@@@................@@@@
-	;;	@@@@@..............@@@@@
-	;;	@@@@@@.............@@@@@
-	;;	@@@@................@@@@
-	;;	@@@.@@.............@.@@@
-	;;	@@.@@..............@@.@@
-	;;	@@..@@............@@..@@
-	;;	@@...@@..........@@...@@
-	;;	@@@....@@@....@@@....@@@
-	;;	@@@@......@@@@......@@@@
-	;;	@@@@@..............@@@@@
-	;;	@@@@@@@..........@@@@@@@
-	;;	@@@@@@@@@@....@@@@@@@@@@
+	;;	........................	@@@..@@@@@@@@..@@...@@@@
+	;;	...@@........@@..@@@....	@@....@@@@...........@@@
+	;;	..@@@@....@@@@@@@.@@....	@......@.............@@@
+	;;	..@@@@@.@@@@@.@@@@.@@...	@.....................@@
+	;;	..@@@@.@@@@@@@@@@@@.@...	@.....................@@
+	;;	...@@@.@@@@@@@@@@@@.@...	@@....................@@
+	;;	...@@.@.@@@@@@@@@@@@....	@@...................@@@
+	;;	.....@@@@@@@@@@@@@@@....	@@@..................@@@
+	;;	.....@@@@@@@@@@@@@@@....	@@@@.................@@@
+	;;	....@@@@@@@@@@@@@@@@....	@@@..................@@@
+	;;	....@@@@@.@@@@@@@@@.....	@@@.................@@@@
+	;;	.....@@..@@@@@@@@@@.....	@@@@................@@@@
+	;;	.......@@@@@@@@@.@......	@@@@@..............@@@@@
+	;;	.......@@@@@@@@.@.......	@@@@@@.............@@@@@
+	;;	.......@@.@@@@@..@......	@@@@................@@@@
+	;;	....@@...@@@@@.@@@.@....	@@@.@@.............@.@@@
+	;;	...@@.@@@.@@@@@@@@.@@...	@@.@@..............@@.@@
+	;;	....@@.@@@@@@@@@@.@@....	@@..@@............@@..@@
+	;;	...@.@@...@@@@...@@.@...	@@...@@..........@@...@@
+	;;	....@..@@@....@@@..@....	@@@....@@@....@@@....@@@
+	;;	.....@@...@@@@...@@.....	@@@@......@@@@......@@@@
+	;;	.......@@@....@@@.......	@@@@@..............@@@@@
+	;;	..........@@@@..........	@@@@@@@..........@@@@@@@
+	;;	........................	@@@@@@@@@@....@@@@@@@@@@
 
 							;; SPR_HELIPLAT1:  EQU &44
 	DEFB &00, &00, &00, &00, &3C, &00, &00, &E7, &00, &03, &81, &C0, &0E, &3C, &70, &38
@@ -21278,55 +19891,30 @@ img_head_0:
 	DEFB &00, &03, &70, &00, &0D, &7C, &00, &1E, &8F, &00, &E2, &F0, &01, &FE, &FF, &76
 	DEFB &1E, &FF, &6F, &E1, &FF, &AF, &FF, &FF, &6F, &FF, &FF, &6F, &FF, &FF, &9F, &FF
 
-	;;	........................
-	;;	..........@@@@..........
-	;;	........@@@..@@@........
-	;;	......@@@......@@@......
-	;;	....@@@...@@@@...@@@....
-	;;	..@@@...@@@..@@@...@@@..
-	;;	.@@...@@@......@@@...@@.
-	;;	..@@@...@@@..@@@...@@@..
-	;;	.@..@@@...@@@@...@@@..@.
-	;;	.@@@..@@@......@@@..@@@.
-	;;	.@.@@@..@@@..@@@..@@@.@.
-	;;	.@...@@@..@@@@..@@@...@.
-	;;	..@@.@@.@@....@@.@@.@@..
-	;;	.@..@@@...@..@...@@@....
-	;;	.@@@..@@@.@..@.@@@..@@..
-	;;	.@@@@@..@@@..@@@...@@@@.
-	;;	....@@@@..@..@..@@@...@.
-	;;	...............@@@@@@@@.
-	;;	.........@@@.......@@@@.
-	;;	.........@@.............
-	;;	..........@.............
-	;;	.........@@.............
-	;;	.........@@.............
-	;;	........................
-	;;
-	;;	@@@@@@@@@@....@@@@@@@@@@
-	;;	@@@@@@@@..@@@@..@@@@@@@@
-	;;	@@@@@@..@@@..@@@..@@@@@@
-	;;	@@@@..@@@......@@@..@@@@
-	;;	@@..@@@..........@@@..@@
-	;;	@.@@@..............@@@.@
-	;;	.@@..................@@.
-	;;	@.@@@..............@@@.@
-	;;	....@@@..........@@@....
-	;;	......@@@......@@@......
-	;;	........@@@..@@@........
-	;;	..........@@@@..........
-	;;	@......................@
-	;;	.@....................@@
-	;;	.@@@................@@.@
-	;;	.@@@@@.............@@@@.
-	;;	@...@@@@........@@@...@.
-	;;	@@@@...........@@@@@@@@.
-	;;	@@@@@@@@.@@@.@@....@@@@.
-	;;	@@@@@@@@.@@.@@@@@@@....@
-	;;	@@@@@@@@@.@.@@@@@@@@@@@@
-	;;	@@@@@@@@.@@.@@@@@@@@@@@@
-	;;	@@@@@@@@.@@.@@@@@@@@@@@@
-	;;	@@@@@@@@@..@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@....@@@@@@@@@@
+	;;	..........@@@@..........	@@@@@@@@..@@@@..@@@@@@@@
+	;;	........@@@..@@@........	@@@@@@..@@@..@@@..@@@@@@
+	;;	......@@@......@@@......	@@@@..@@@......@@@..@@@@
+	;;	....@@@...@@@@...@@@....	@@..@@@..........@@@..@@
+	;;	..@@@...@@@..@@@...@@@..	@.@@@..............@@@.@
+	;;	.@@...@@@......@@@...@@.	.@@..................@@.
+	;;	..@@@...@@@..@@@...@@@..	@.@@@..............@@@.@
+	;;	.@..@@@...@@@@...@@@..@.	....@@@..........@@@....
+	;;	.@@@..@@@......@@@..@@@.	......@@@......@@@......
+	;;	.@.@@@..@@@..@@@..@@@.@.	........@@@..@@@........
+	;;	.@...@@@..@@@@..@@@...@.	..........@@@@..........
+	;;	..@@.@@.@@....@@.@@.@@..	@......................@
+	;;	.@..@@@...@..@...@@@....	.@....................@@
+	;;	.@@@..@@@.@..@.@@@..@@..	.@@@................@@.@
+	;;	.@@@@@..@@@..@@@...@@@@.	.@@@@@.............@@@@.
+	;;	....@@@@..@..@..@@@...@.	@...@@@@........@@@...@.
+	;;	...............@@@@@@@@.	@@@@...........@@@@@@@@.
+	;;	.........@@@.......@@@@.	@@@@@@@@.@@@.@@....@@@@.
+	;;	.........@@.............	@@@@@@@@.@@.@@@@@@@....@
+	;;	..........@.............	@@@@@@@@@.@.@@@@@@@@@@@@
+	;;	.........@@.............	@@@@@@@@.@@.@@@@@@@@@@@@
+	;;	.........@@.............	@@@@@@@@.@@.@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@..@@@@@@@@@@@@@
 
 							;; SPR_HELIPLAT2:  EQU &45
 	DEFB &00, &00, &00, &00, &3C, &00, &00, &E7, &00, &03, &81, &C0, &0E, &3C, &70, &38
@@ -21339,55 +19927,30 @@ img_head_0:
 	DEFB &00, &03, &D0, &00, &0F, &EC, &00, &1F, &F2, &01, &EF, &FD, &C2, &77, &FB, &B7
 	DEFB &9B, &F7, &69, &E7, &F6, &DE, &7B, &F9, &BF, &9B, &F7, &7F, &E7, &F8, &FF, &FF
 
-	;;	........................
-	;;	..........@@@@..........
-	;;	........@@@..@@@........
-	;;	......@@@......@@@......
-	;;	....@@@...@@@@...@@@....
-	;;	..@@@...@@@..@@@...@@@..
-	;;	.@@...@@@......@@@...@@.
-	;;	..@@@...@@@..@@@...@@@..
-	;;	.@..@@@...@@@@...@@@..@.
-	;;	.@@@..@@@......@@@..@@@.
-	;;	.@.@@@..@@@..@@@..@@@.@.
-	;;	.@...@@@..@@@@..@@@...@.
-	;;	..@@.@@.@@....@@.@@.@@..
-	;;	....@@@...@..@...@@@....
-	;;	...@..@@@.@..@.@@@......
-	;;	....@@..@@@..@@@........
-	;;	..........@..@.@@@@.....
-	;;	.......@@@....@..@@@....
-	;;	......@@@.@@.@@@@..@@...
-	;;	.....@@@.@@....@@@@.....
-	;;	.....@@.@@.......@@@@...
-	;;	.......@@..........@@...
-	;;	.....@@@................
-	;;	........................
-	;;
-	;;	@@@@@@@@@@....@@@@@@@@@@
-	;;	@@@@@@@@..@@@@..@@@@@@@@
-	;;	@@@@@@..@@@..@@@..@@@@@@
-	;;	@@@@..@@@......@@@..@@@@
-	;;	@@..@@@..........@@@..@@
-	;;	@.@@@..............@@@.@
-	;;	.@@..................@@.
-	;;	@.@@@..............@@@.@
-	;;	....@@@..........@@@....
-	;;	......@@@......@@@......
-	;;	........@@@..@@@........
-	;;	..........@@@@..........
-	;;	@......................@
-	;;	@@....................@@
-	;;	@@.@................@@@@
-	;;	@@@.@@.............@@@@@
-	;;	@@@@..@........@@@@.@@@@
-	;;	@@@@@@.@@@....@..@@@.@@@
-	;;	@@@@@.@@@.@@.@@@@..@@.@@
-	;;	@@@@.@@@.@@.@..@@@@..@@@
-	;;	@@@@.@@.@@.@@@@..@@@@.@@
-	;;	@@@@@..@@.@@@@@@@..@@.@@
-	;;	@@@@.@@@.@@@@@@@@@@..@@@
-	;;	@@@@@...@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@....@@@@@@@@@@
+	;;	..........@@@@..........	@@@@@@@@..@@@@..@@@@@@@@
+	;;	........@@@..@@@........	@@@@@@..@@@..@@@..@@@@@@
+	;;	......@@@......@@@......	@@@@..@@@......@@@..@@@@
+	;;	....@@@...@@@@...@@@....	@@..@@@..........@@@..@@
+	;;	..@@@...@@@..@@@...@@@..	@.@@@..............@@@.@
+	;;	.@@...@@@......@@@...@@.	.@@..................@@.
+	;;	..@@@...@@@..@@@...@@@..	@.@@@..............@@@.@
+	;;	.@..@@@...@@@@...@@@..@.	....@@@..........@@@....
+	;;	.@@@..@@@......@@@..@@@.	......@@@......@@@......
+	;;	.@.@@@..@@@..@@@..@@@.@.	........@@@..@@@........
+	;;	.@...@@@..@@@@..@@@...@.	..........@@@@..........
+	;;	..@@.@@.@@....@@.@@.@@..	@......................@
+	;;	....@@@...@..@...@@@....	@@....................@@
+	;;	...@..@@@.@..@.@@@......	@@.@................@@@@
+	;;	....@@..@@@..@@@........	@@@.@@.............@@@@@
+	;;	..........@..@.@@@@.....	@@@@..@........@@@@.@@@@
+	;;	.......@@@....@..@@@....	@@@@@@.@@@....@..@@@.@@@
+	;;	......@@@.@@.@@@@..@@...	@@@@@.@@@.@@.@@@@..@@.@@
+	;;	.....@@@.@@....@@@@.....	@@@@.@@@.@@.@..@@@@..@@@
+	;;	.....@@.@@.......@@@@...	@@@@.@@.@@.@@@@..@@@@.@@
+	;;	.......@@..........@@...	@@@@@..@@.@@@@@@@..@@.@@
+	;;	.....@@@................	@@@@.@@@.@@@@@@@@@@..@@@
+	;;	........................	@@@@@...@@@@@@@@@@@@@@@@
 
 							;; SPR_BONGO:      EQU &46
 	DEFB &00, &00, &00, &00, &00, &00, &00, &7E, &00, &03, &FF, &C0, &0F, &FF, &F0, &1F
@@ -21400,55 +19963,30 @@ img_head_0:
 	DEFB &FF, &85, &A0, &E7, &05, &10, &6A, &08, &90, &34, &09, &48, &42, &12, &A8, &81
 	DEFB &15, &D5, &00, &AB, &E6, &00, &67, &F9, &81, &9F, &FE, &7E, &7F, &FF, &81, &FF
 
-	;;	........................
-	;;	........................
-	;;	.........@@@@@@.........
-	;;	......@@@@@@@@@@@@......
-	;;	....@@@@@@@@@@@@@@@@....
-	;;	...@@@@@@@@@@@@@@@@@@...
-	;;	..@@@@@@@@@@@@@@@@@@@@..
-	;;	..@@@@@@@@@@@@@@@@@@@@..
-	;;	.@.@@@@@@@@@@@@@@@@@@.@.
-	;;	.@@@@@@@@@@@@@@@@@@@@@@.
-	;;	..@@.@@@@@@@@@@@@@@.@@..
-	;;	.@@@@@@.@@@@@@@@.@@@@@@.
-	;;	.@...@@@@@.@@.@@@@@...@.
-	;;	..@....@@@@@@@@@@....@..
-	;;	..@.@@..@@@..@@@..@@.@..
-	;;	.@.@.@@@.@@.@.@.@@@.@.@.
-	;;	...@.@@@@.@@.@.@@@@.@...
-	;;	.@..@.@@.@....@.@@.@..@.
-	;;	..@.@.@.@..@@..@.@.@.@..
-	;;	...@.@.@..@@@@..@.@.@...
-	;;	.....@@..@@@@@@..@@.....
-	;;	.......@@......@@.......
-	;;	.........@@@@@@.........
-	;;	........................
-	;;
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
-	;;	@@@@@@@@@......@@@@@@@@@
-	;;	@@@@@@...@@@@@@...@@@@@@
-	;;	@@@@..@@@@@@@@@@@@..@@@@
-	;;	@@@.@@@@@@@@@@@@@@@@.@@@
-	;;	@@.@@@@@@@@@@@@@@@@@@.@@
-	;;	@.@@@@@@@@@@@@@@@@@@@@.@
-	;;	@.@@@@@@@@@@@@@@@@@@@@.@
-	;;	.@.@@@@@@@@@@@@@@@@@@.@.
-	;;	.@@@@@@@@@@@@@@@@@@@@@@.
-	;;	@.@@.@@@@@@@@@@@@@@.@@.@
-	;;	.@@@@@@.@@@@@@@@.@@@@@@.
-	;;	.@...@@@@@.@@.@@@@@...@.
-	;;	@.@....@@@@@@@@@@....@.@
-	;;	@.@.....@@@..@@@.....@.@
-	;;	...@.....@@.@.@.....@...
-	;;	@..@......@@.@......@..@
-	;;	.@..@....@....@....@..@.
-	;;	@.@.@...@......@...@.@.@
-	;;	@@.@.@.@........@.@.@.@@
-	;;	@@@..@@..........@@..@@@
-	;;	@@@@@..@@......@@..@@@@@
-	;;	@@@@@@@..@@@@@@..@@@@@@@
-	;;	@@@@@@@@@......@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@......@@@@@@@@@
+	;;	.........@@@@@@.........	@@@@@@...@@@@@@...@@@@@@
+	;;	......@@@@@@@@@@@@......	@@@@..@@@@@@@@@@@@..@@@@
+	;;	....@@@@@@@@@@@@@@@@....	@@@.@@@@@@@@@@@@@@@@.@@@
+	;;	...@@@@@@@@@@@@@@@@@@...	@@.@@@@@@@@@@@@@@@@@@.@@
+	;;	..@@@@@@@@@@@@@@@@@@@@..	@.@@@@@@@@@@@@@@@@@@@@.@
+	;;	..@@@@@@@@@@@@@@@@@@@@..	@.@@@@@@@@@@@@@@@@@@@@.@
+	;;	.@.@@@@@@@@@@@@@@@@@@.@.	.@.@@@@@@@@@@@@@@@@@@.@.
+	;;	.@@@@@@@@@@@@@@@@@@@@@@.	.@@@@@@@@@@@@@@@@@@@@@@.
+	;;	..@@.@@@@@@@@@@@@@@.@@..	@.@@.@@@@@@@@@@@@@@.@@.@
+	;;	.@@@@@@.@@@@@@@@.@@@@@@.	.@@@@@@.@@@@@@@@.@@@@@@.
+	;;	.@...@@@@@.@@.@@@@@...@.	.@...@@@@@.@@.@@@@@...@.
+	;;	..@....@@@@@@@@@@....@..	@.@....@@@@@@@@@@....@.@
+	;;	..@.@@..@@@..@@@..@@.@..	@.@.....@@@..@@@.....@.@
+	;;	.@.@.@@@.@@.@.@.@@@.@.@.	...@.....@@.@.@.....@...
+	;;	...@.@@@@.@@.@.@@@@.@...	@..@......@@.@......@..@
+	;;	.@..@.@@.@....@.@@.@..@.	.@..@....@....@....@..@.
+	;;	..@.@.@.@..@@..@.@.@.@..	@.@.@...@......@...@.@.@
+	;;	...@.@.@..@@@@..@.@.@...	@@.@.@.@........@.@.@.@@
+	;;	.....@@..@@@@@@..@@.....	@@@..@@..........@@..@@@
+	;;	.......@@......@@.......	@@@@@..@@......@@..@@@@@
+	;;	.........@@@@@@.........	@@@@@@@..@@@@@@..@@@@@@@
+	;;	........................	@@@@@@@@@......@@@@@@@@@
 
 							;; SPR_DRUM:       EQU &47
 	DEFB &00, &00, &00, &00, &7E, &00, &03, &FF, &C0, &0F, &FF, &F0, &1F, &FF, &F8, &3F
@@ -21461,55 +19999,30 @@ img_head_0:
 	DEFB &BD, &8D, &98, &3C, &05, &88, &00, &01, &D0, &00, &03, &D8, &00, &03, &E8, &00
 	DEFB &07, &F2, &00, &0F, &FC, &00, &3F, &FF, &81, &FF, &FF, &FF, &FF, &FF, &FF, &FF
 
-	;;	........................
-	;;	.........@@@@@@.........
-	;;	......@@@@@@@@@@@@......
-	;;	....@@@@@@@@@@@@@@@@....
-	;;	...@@@@@@@@@@@@@@@@@@...
-	;;	..@@@@@@@@@@@@@@@@@@@@..
-	;;	..@@@@@@@@@@@@@@@@@@@@..
-	;;	..@@@@@@@@@@@@@@@@@@@@..
-	;;	.@.@@@@@@@@@@@@@@@@@@.@.
-	;;	.@..@@@@@@@@@@@@@@@@..@.
-	;;	..@@..@@@@@@@@@@@@..@@..
-	;;	.@.@.@...@@@@@@...@.@.@.
-	;;	@...@@.@@......@@.@@...@
-	;;	@......@@.@@@@.@@......@
-	;;	@..@@.....@@@@.....@...@
-	;;	@.@.@.@.@.......@.@.@..@
-	;;	.@.@...@.@.@.@.@.@.@..@.
-	;;	.@.@@.@.@.@.@.@.@.@...@.
-	;;	..@.@....@.@.@.@.....@..
-	;;	...@..@..........@..@...
-	;;	....@@...@.@.@....@@....
-	;;	......@@@......@@@......
-	;;	.........@@@@@@.........
-	;;	........................
-	;;
-	;;	@@@@@@@@@......@@@@@@@@@
-	;;	@@@@@@...@@@@@@...@@@@@@
-	;;	@@@@..@@@@@@@@@@@@..@@@@
-	;;	@@@.@@@@@@@@@@@@@@@@.@@@
-	;;	@@.@@@@@@@@@@@@@@@@@@.@@
-	;;	@.@@@@@@@@@@@@@@@@@@@@.@
-	;;	@.@@@@@@@@@@@@@@@@@@@@.@
-	;;	@.@@@@@@@@@@@@@@@@@@@@.@
-	;;	.@.@@@@@@@@@@@@@@@@@@.@.
-	;;	.@..@@@@@@@@@@@@@@@@..@.
-	;;	@.@@..@@@@@@@@@@@@..@@.@
-	;;	@@.@.@...@@@@@@...@.@.@@
-	;;	@.@.@@.@@......@@.@@.@.@
-	;;	@.@....@@.@@@@.@@...@@.@
-	;;	@..@@.....@@@@.......@.@
-	;;	@...@..................@
-	;;	@@.@..................@@
-	;;	@@.@@.................@@
-	;;	@@@.@................@@@
-	;;	@@@@..@.............@@@@
-	;;	@@@@@@............@@@@@@
-	;;	@@@@@@@@@......@@@@@@@@@
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@......@@@@@@@@@
+	;;	.........@@@@@@.........	@@@@@@...@@@@@@...@@@@@@
+	;;	......@@@@@@@@@@@@......	@@@@..@@@@@@@@@@@@..@@@@
+	;;	....@@@@@@@@@@@@@@@@....	@@@.@@@@@@@@@@@@@@@@.@@@
+	;;	...@@@@@@@@@@@@@@@@@@...	@@.@@@@@@@@@@@@@@@@@@.@@
+	;;	..@@@@@@@@@@@@@@@@@@@@..	@.@@@@@@@@@@@@@@@@@@@@.@
+	;;	..@@@@@@@@@@@@@@@@@@@@..	@.@@@@@@@@@@@@@@@@@@@@.@
+	;;	..@@@@@@@@@@@@@@@@@@@@..	@.@@@@@@@@@@@@@@@@@@@@.@
+	;;	.@.@@@@@@@@@@@@@@@@@@.@.	.@.@@@@@@@@@@@@@@@@@@.@.
+	;;	.@..@@@@@@@@@@@@@@@@..@.	.@..@@@@@@@@@@@@@@@@..@.
+	;;	..@@..@@@@@@@@@@@@..@@..	@.@@..@@@@@@@@@@@@..@@.@
+	;;	.@.@.@...@@@@@@...@.@.@.	@@.@.@...@@@@@@...@.@.@@
+	;;	@...@@.@@......@@.@@...@	@.@.@@.@@......@@.@@.@.@
+	;;	@......@@.@@@@.@@......@	@.@....@@.@@@@.@@...@@.@
+	;;	@..@@.....@@@@.....@...@	@..@@.....@@@@.......@.@
+	;;	@.@.@.@.@.......@.@.@..@	@...@..................@
+	;;	.@.@...@.@.@.@.@.@.@..@.	@@.@..................@@
+	;;	.@.@@.@.@.@.@.@.@.@...@.	@@.@@.................@@
+	;;	..@.@....@.@.@.@.....@..	@@@.@................@@@
+	;;	...@..@..........@..@...	@@@@..@.............@@@@
+	;;	....@@...@.@.@....@@....	@@@@@@............@@@@@@
+	;;	......@@@......@@@......	@@@@@@@@@......@@@@@@@@@
+	;;	.........@@@@@@.........	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
 
 							;; SPR_WELL:       EQU &48
 	DEFB &00, &00, &00, &00, &7E, &00, &03, &BD, &C0, &0F, &81, &F0, &14, &7E, &28, &3B
@@ -21522,55 +20035,30 @@ img_head_0:
 	DEFB &00, &01, &80, &00, &01, &C0, &00, &03, &80, &00, &01, &80, &00, &01, &80, &00
 	DEFB &01, &C0, &00, &03, &E0, &00, &07, &F0, &00, &0F, &FC, &00, &3F, &FF, &81, &FF
 
-	;;	........................
-	;;	.........@@@@@@.........
-	;;	......@@@.@@@@.@@@......
-	;;	....@@@@@......@@@@@....
-	;;	...@.@...@@@@@@...@.@...
-	;;	..@@@.@@.@@@@@@.@@.@@@..
-	;;	..@@@.@@........@@.@@@..
-	;;	...@.@............@.@...
-	;;	..@.@@@@@......@@@@@.@..
-	;;	..@...@@.@@@@@@.@@...@..
-	;;	..@.@@...@@@@@@...@@.@..
-	;;	....@@@@........@@@@....
-	;;	..@.@@@@.@@@@@@.@@@@.@..
-	;;	..@@..@@.@@@@@@.@@..@@..
-	;;	..@@@....@@@@@@....@@@..
-	;;	...@@.@@........@@.@@...
-	;;	..@.@.@@@@@..@@@@@.@.@..
-	;;	..@...@@@@@..@@@@@...@..
-	;;	..@.@@..@@@..@@@..@@.@..
-	;;	....@@@@........@@@@....
-	;;	....@@@@.@@@@@@.@@@@....
-	;;	......@@.@@@@@@.@@......
-	;;	.........@@@@@@.........
-	;;	........................
-	;;
-	;;	@@@@@@@@@......@@@@@@@@@
-	;;	@@@@@@...@@@@@@...@@@@@@
-	;;	@@@@..@@@.@@@@.@@@..@@@@
-	;;	@@@.@@@@@......@@@@@.@@@
-	;;	@@.@.@............@.@.@@
-	;;	@.@@@..............@@@.@
-	;;	@.@@@..............@@@.@
-	;;	@..@.@............@.@..@
-	;;	@...@@@@@......@@@@@...@
-	;;	@.....@@.@@@@@@.@@.....@
-	;;	@........@@@@@@........@
-	;;	@@....................@@
-	;;	@......................@
-	;;	@......................@
-	;;	@......................@
-	;;	@@....................@@
-	;;	@......................@
-	;;	@......................@
-	;;	@......................@
-	;;	@@....................@@
-	;;	@@@..................@@@
-	;;	@@@@................@@@@
-	;;	@@@@@@............@@@@@@
-	;;	@@@@@@@@@......@@@@@@@@@
+	;;	........................	@@@@@@@@@......@@@@@@@@@
+	;;	.........@@@@@@.........	@@@@@@...@@@@@@...@@@@@@
+	;;	......@@@.@@@@.@@@......	@@@@..@@@.@@@@.@@@..@@@@
+	;;	....@@@@@......@@@@@....	@@@.@@@@@......@@@@@.@@@
+	;;	...@.@...@@@@@@...@.@...	@@.@.@............@.@.@@
+	;;	..@@@.@@.@@@@@@.@@.@@@..	@.@@@..............@@@.@
+	;;	..@@@.@@........@@.@@@..	@.@@@..............@@@.@
+	;;	...@.@............@.@...	@..@.@............@.@..@
+	;;	..@.@@@@@......@@@@@.@..	@...@@@@@......@@@@@...@
+	;;	..@...@@.@@@@@@.@@...@..	@.....@@.@@@@@@.@@.....@
+	;;	..@.@@...@@@@@@...@@.@..	@........@@@@@@........@
+	;;	....@@@@........@@@@....	@@....................@@
+	;;	..@.@@@@.@@@@@@.@@@@.@..	@......................@
+	;;	..@@..@@.@@@@@@.@@..@@..	@......................@
+	;;	..@@@....@@@@@@....@@@..	@......................@
+	;;	...@@.@@........@@.@@...	@@....................@@
+	;;	..@.@.@@@@@..@@@@@.@.@..	@......................@
+	;;	..@...@@@@@..@@@@@...@..	@......................@
+	;;	..@.@@..@@@..@@@..@@.@..	@......................@
+	;;	....@@@@........@@@@....	@@....................@@
+	;;	....@@@@.@@@@@@.@@@@....	@@@..................@@@
+	;;	......@@.@@@@@@.@@......	@@@@................@@@@
+	;;	.........@@@@@@.........	@@@@@@............@@@@@@
+	;;	........................	@@@@@@@@@......@@@@@@@@@
 
 							;; SPR_STICK:      EQU &49
 	DEFB &00, &7E, &00, &03, &81, &C0, &0C, &00, &30, &10, &00, &08, &20, &00, &04, &20
@@ -21583,55 +20071,30 @@ img_head_0:
 	DEFB &00, &0F, &F8, &00, &1F, &E4, &00, &27, &D8, &00, &1B, &B8, &00, &1D, &DC, &00
 	DEFB &3B, &E6, &00, &67, &F9, &81, &9F, &FE, &7E, &7F, &FF, &99, &FF, &FF, &E7, &FF
 
-	;;	.........@@@@@@.........
-	;;	......@@@......@@@......
-	;;	....@@............@@....
-	;;	...@................@...
-	;;	..@..................@..
-	;;	..@..................@..
-	;;	.@....................@.
-	;;	.@.@................@.@.
-	;;	.@....................@.
-	;;	.@....................@.
-	;;	..@...@..........@...@..
-	;;	..@....@@......@@....@..
-	;;	...@.....@@@@@@.....@...
-	;;	....@@............@@....
-	;;	......@@@......@@@......
-	;;	.....@...@@@@@@...@.....
-	;;	...@@.@..........@.@@...
-	;;	..@@@.@..........@.@@@..
-	;;	...@@@.@@......@@.@@@...
-	;;	.....@@..@@@@@@..@@.....
-	;;	.......@@......@@.......
-	;;	.........@@@@@@.........
-	;;	...........@@...........
-	;;	........................
-	;;
-	;;	@@@@@@@@@......@@@@@@@@@
-	;;	@@@@@@............@@@@@@
-	;;	@@@@................@@@@
-	;;	@@@..................@@@
-	;;	@@....................@@
-	;;	@@....................@@
-	;;	@......................@
-	;;	@......................@
-	;;	@......................@
-	;;	@......................@
-	;;	@@....................@@
-	;;	@@....................@@
-	;;	@@@..................@@@
-	;;	@@@@................@@@@
-	;;	@@@@@..............@@@@@
-	;;	@@@..@............@..@@@
-	;;	@@.@@..............@@.@@
-	;;	@.@@@..............@@@.@
-	;;	@@.@@@............@@@.@@
-	;;	@@@..@@..........@@..@@@
-	;;	@@@@@..@@......@@..@@@@@
-	;;	@@@@@@@..@@@@@@..@@@@@@@
-	;;	@@@@@@@@@..@@..@@@@@@@@@
-	;;	@@@@@@@@@@@..@@@@@@@@@@@
+	;;	.........@@@@@@.........	@@@@@@@@@......@@@@@@@@@
+	;;	......@@@......@@@......	@@@@@@............@@@@@@
+	;;	....@@............@@....	@@@@................@@@@
+	;;	...@................@...	@@@..................@@@
+	;;	..@..................@..	@@....................@@
+	;;	..@..................@..	@@....................@@
+	;;	.@....................@.	@......................@
+	;;	.@.@................@.@.	@......................@
+	;;	.@....................@.	@......................@
+	;;	.@....................@.	@......................@
+	;;	..@...@..........@...@..	@@....................@@
+	;;	..@....@@......@@....@..	@@....................@@
+	;;	...@.....@@@@@@.....@...	@@@..................@@@
+	;;	....@@............@@....	@@@@................@@@@
+	;;	......@@@......@@@......	@@@@@..............@@@@@
+	;;	.....@...@@@@@@...@.....	@@@..@............@..@@@
+	;;	...@@.@..........@.@@...	@@.@@..............@@.@@
+	;;	..@@@.@..........@.@@@..	@.@@@..............@@@.@
+	;;	...@@@.@@......@@.@@@...	@@.@@@............@@@.@@
+	;;	.....@@..@@@@@@..@@.....	@@@..@@..........@@..@@@
+	;;	.......@@......@@.......	@@@@@..@@......@@..@@@@@
+	;;	.........@@@@@@.........	@@@@@@@..@@@@@@..@@@@@@@
+	;;	...........@@...........	@@@@@@@@@..@@..@@@@@@@@@
+	;;	........................	@@@@@@@@@@@..@@@@@@@@@@@
 
 							;; SPR_TRUNKS:     EQU &4A
 	DEFB &00, &00, &00, &00, &3C, &00, &00, &C3, &00, &01, &00, &80, &0F, &00, &F0, &30
@@ -21644,55 +20107,30 @@ img_head_0:
 	DEFB &00, &3A, &B7, &00, &ED, &0D, &C3, &B0, &03, &7E, &C0, &00, &DB, &00, &80, &3C
 	DEFB &01, &C0, &00, &03, &F8, &00, &1F, &FE, &00, &7F, &FF, &00, &FF, &FF, &E7, &FF
 
-	;;	........................
-	;;	..........@@@@..........
-	;;	........@@....@@........
-	;;	.......@........@.......
-	;;	....@@@@........@@@@....
-	;;	..@@....@@.@@.@@....@@..
-	;;	.@........@..@........@.
-	;;	.@......@@.@@.@@......@.
-	;;	.@@@...@........@...@@@.
-	;;	..@@@@@..........@@@@@..
-	;;	..@@@@.@........@.@@@@..
-	;;	.@..@@.@@......@@.@@..@.
-	;;	.@@@...@@@@..@@@@...@@@.
-	;;	.@.@@@..@@@@@@@@..@@@.@.
-	;;	..@@.@@@..@@@@..@@@.@@..
-	;;	.@..@@.@@@....@@@.@@..@.
-	;;	.@@@..@@.@@@@@@.@@..@@@.
-	;;	.@@@@@..@@.@@.@@..@@@@@.
-	;;	..@@@@.@..@@@@..@.@@@@..
-	;;	.....@.@@@....@@@.@.....
-	;;	.......@@@@@@@@@@.......
-	;;	........@@@@@@@@........
-	;;	...........@@...........
-	;;	........................
-	;;
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@....@@@@@@@@@@
-	;;	@@@@@@@@........@@@@@@@@
-	;;	@@@@@@@..........@@@@@@@
-	;;	@@@@................@@@@
-	;;	@@.........@@.........@@
-	;;	..........@..@..........
-	;;	...........@@...........
-	;;	........................
-	;;	@......................@
-	;;	@......................@
-	;;	.@....................@.
-	;;	.@@@................@@@.
-	;;	.@.@@@............@@@.@.
-	;;	@.@@.@@@........@@@.@@.@
-	;;	....@@.@@@....@@@.@@....
-	;;	......@@.@@@@@@.@@......
-	;;	........@@.@@.@@........
-	;;	@.........@@@@.........@
-	;;	@@....................@@
-	;;	@@@@@..............@@@@@
-	;;	@@@@@@@..........@@@@@@@
-	;;	@@@@@@@@........@@@@@@@@
-	;;	@@@@@@@@@@@..@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	..........@@@@..........	@@@@@@@@@@....@@@@@@@@@@
+	;;	........@@....@@........	@@@@@@@@........@@@@@@@@
+	;;	.......@........@.......	@@@@@@@..........@@@@@@@
+	;;	....@@@@........@@@@....	@@@@................@@@@
+	;;	..@@....@@.@@.@@....@@..	@@.........@@.........@@
+	;;	.@........@..@........@.	..........@..@..........
+	;;	.@......@@.@@.@@......@.	...........@@...........
+	;;	.@@@...@........@...@@@.	........................
+	;;	..@@@@@..........@@@@@..	@......................@
+	;;	..@@@@.@........@.@@@@..	@......................@
+	;;	.@..@@.@@......@@.@@..@.	.@....................@.
+	;;	.@@@...@@@@..@@@@...@@@.	.@@@................@@@.
+	;;	.@.@@@..@@@@@@@@..@@@.@.	.@.@@@............@@@.@.
+	;;	..@@.@@@..@@@@..@@@.@@..	@.@@.@@@........@@@.@@.@
+	;;	.@..@@.@@@....@@@.@@..@.	....@@.@@@....@@@.@@....
+	;;	.@@@..@@.@@@@@@.@@..@@@.	......@@.@@@@@@.@@......
+	;;	.@@@@@..@@.@@.@@..@@@@@.	........@@.@@.@@........
+	;;	..@@@@.@..@@@@..@.@@@@..	@.........@@@@.........@
+	;;	.....@.@@@....@@@.@.....	@@....................@@
+	;;	.......@@@@@@@@@@.......	@@@@@..............@@@@@
+	;;	........@@@@@@@@........	@@@@@@@..........@@@@@@@
+	;;	...........@@...........	@@@@@@@@........@@@@@@@@
+	;;	........................	@@@@@@@@@@@..@@@@@@@@@@@
 
 							;; SPR_DECK:       EQU &4B
 	DEFB &00, &00, &00, &00, &18, &00, &00, &66, &00, &01, &89, &80, &06, &54, &60, &18
@@ -21705,55 +20143,30 @@ img_head_0:
 	DEFB &81, &E6, &79, &E7, &9E, &9E, &7E, &79, &87, &99, &E1, &81, &E7, &81, &C0, &7E
 	DEFB &03, &E0, &18, &07, &F8, &00, &1F, &FE, &00, &7F, &FF, &81, &FF, &FF, &E7, &FF
 
-	;;	........................
-	;;	...........@@...........
-	;;	.........@@..@@.........
-	;;	.......@@...@..@@.......
-	;;	.....@@..@.@.@...@@.....
-	;;	...@@...@.@.@.@.@..@@...
-	;;	..@@.@.@.@.@.@.@.@..@@..
-	;;	..@@..@.@.@.@.@.@.@.@@..
-	;;	..@@@..@.@.@.@.@...@@@..
-	;;	.@.@@@@...@.@.@..@@@@.@.
-	;;	.@@..@@@@..@...@@@@..@@.
-	;;	.@@@@..@@@@..@@@@..@@@@.
-	;;	...@@@@..@@@@@@..@@@@...
-	;;	.@@..@@@@..@@..@@@@..@@.
-	;;	.@@@@..@@@@..@@@@..@@@@.
-	;;	...@@@@..@@@@@@..@@@@...
-	;;	..@..@@@@..@@..@@@@..@..
-	;;	..@@@..@@@@..@@@@..@@@..
-	;;	...@@@@..@@@@@@..@@@@...
-	;;	.....@@@@..@@..@@@@.....
-	;;	.......@@@@..@@@@.......
-	;;	.........@@@@@@.........
-	;;	...........@@...........
-	;;	........................
-	;;
-	;;	@@@@@@@@@@@..@@@@@@@@@@@
-	;;	@@@@@@@@@......@@@@@@@@@
-	;;	@@@@@@@..........@@@@@@@
-	;;	@@@@@.......@......@@@@@
-	;;	@@@......@.@.@.......@@@
-	;;	@@......@.@.@.@.@.....@@
-	;;	@....@.@.@.@.@.@.@.....@
-	;;	@.....@.@.@.@.@.@.@....@
-	;;	@......@.@.@.@.@.......@
-	;;	.@........@.@.@.......@.
-	;;	.@@........@.........@@.
-	;;	.@@@@..............@@@@.
-	;;	@..@@@@..........@@@@..@
-	;;	.@@..@@@@......@@@@..@@.
-	;;	.@@@@..@@@@..@@@@..@@@@.
-	;;	@..@@@@..@@@@@@..@@@@..@
-	;;	@....@@@@..@@..@@@@....@
-	;;	@......@@@@..@@@@......@
-	;;	@@.......@@@@@@.......@@
-	;;	@@@........@@........@@@
-	;;	@@@@@..............@@@@@
-	;;	@@@@@@@..........@@@@@@@
-	;;	@@@@@@@@@......@@@@@@@@@
-	;;	@@@@@@@@@@@..@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@..@@@@@@@@@@@
+	;;	...........@@...........	@@@@@@@@@......@@@@@@@@@
+	;;	.........@@..@@.........	@@@@@@@..........@@@@@@@
+	;;	.......@@...@..@@.......	@@@@@.......@......@@@@@
+	;;	.....@@..@.@.@...@@.....	@@@......@.@.@.......@@@
+	;;	...@@...@.@.@.@.@..@@...	@@......@.@.@.@.@.....@@
+	;;	..@@.@.@.@.@.@.@.@..@@..	@....@.@.@.@.@.@.@.....@
+	;;	..@@..@.@.@.@.@.@.@.@@..	@.....@.@.@.@.@.@.@....@
+	;;	..@@@..@.@.@.@.@...@@@..	@......@.@.@.@.@.......@
+	;;	.@.@@@@...@.@.@..@@@@.@.	.@........@.@.@.......@.
+	;;	.@@..@@@@..@...@@@@..@@.	.@@........@.........@@.
+	;;	.@@@@..@@@@..@@@@..@@@@.	.@@@@..............@@@@.
+	;;	...@@@@..@@@@@@..@@@@...	@..@@@@..........@@@@..@
+	;;	.@@..@@@@..@@..@@@@..@@.	.@@..@@@@......@@@@..@@.
+	;;	.@@@@..@@@@..@@@@..@@@@.	.@@@@..@@@@..@@@@..@@@@.
+	;;	...@@@@..@@@@@@..@@@@...	@..@@@@..@@@@@@..@@@@..@
+	;;	..@..@@@@..@@..@@@@..@..	@....@@@@..@@..@@@@....@
+	;;	..@@@..@@@@..@@@@..@@@..	@......@@@@..@@@@......@
+	;;	...@@@@..@@@@@@..@@@@...	@@.......@@@@@@.......@@
+	;;	.....@@@@..@@..@@@@.....	@@@........@@........@@@
+	;;	.......@@@@..@@@@.......	@@@@@..............@@@@@
+	;;	.........@@@@@@.........	@@@@@@@..........@@@@@@@
+	;;	...........@@...........	@@@@@@@@@......@@@@@@@@@
+	;;	........................	@@@@@@@@@@@..@@@@@@@@@@@
 
 							;; SPR_BALL:       EQU &4C
 	DEFB &00, &00, &00, &00, &7E, &00, &01, &FF, &80, &07, &FF, &E0, &0F, &FF, &F0, &1D
@@ -21766,55 +20179,30 @@ img_head_0:
 	DEFB &00, &00, &00, &00, &00, &80, &00, &01, &80, &00, &01, &C0, &00, &03, &C0, &00
 	DEFB &03, &E0, &00, &07, &F0, &00, &0F, &F8, &00, &1F, &FE, &00, &7F, &FF, &81, &FF
 
-	;;	........................
-	;;	.........@@@@@@.........
-	;;	.......@@@@@@@@@@.......
-	;;	.....@@@@@@@@@@@@@@.....
-	;;	....@@@@@@@@@@@@@@@@....
-	;;	...@@@.@@@@@@@@@@@@@@...
-	;;	...@@.@@@@@@@@@@@@@@@...
-	;;	..@@..@@@@@@@@@@@@@@@@..
-	;;	..@@.@@@@@@@@@@@@@@@@@..
-	;;	.@@@.@@@@@@@@@@@@@@@@@@.
-	;;	.@@@@@@@@@@@@@@@@@@@@@@.
-	;;	.@@@.@@@@@@@@@@@@@@@@@@.
-	;;	.@@@@@@@@@@@@@@@@@@@@@@.
-	;;	.@@@@@@@@@@@@@@@@@@@@@@.
-	;;	.@@@@@@@@@@@@@@@@@@@@@@.
-	;;	..@@@@@@@@@@@@@@@@@@@@..
-	;;	..@@@@@@@@@@@@@@@@@@@@..
-	;;	...@@@@@@@@@@@@@@@@@@...
-	;;	...@@@@@@@@@@@@@@@@@@...
-	;;	....@@@@@@@@@@@@@@@@....
-	;;	.....@@@@@@@@@@@@@@.....
-	;;	.......@@@@@@@@@@.......
-	;;	.........@@@@@@.........
-	;;	........................
-	;;
-	;;	@@@@@@@@@......@@@@@@@@@
-	;;	@@@@@@@..........@@@@@@@
-	;;	@@@@@..............@@@@@
-	;;	@@@@................@@@@
-	;;	@@@..................@@@
-	;;	@@....................@@
-	;;	@@....................@@
-	;;	@......................@
-	;;	@......................@
-	;;	........................
-	;;	........................
-	;;	........................
-	;;	........................
-	;;	........................
-	;;	........................
-	;;	@......................@
-	;;	@......................@
-	;;	@@....................@@
-	;;	@@....................@@
-	;;	@@@..................@@@
-	;;	@@@@................@@@@
-	;;	@@@@@..............@@@@@
-	;;	@@@@@@@..........@@@@@@@
-	;;	@@@@@@@@@......@@@@@@@@@
+	;;	........................	@@@@@@@@@......@@@@@@@@@
+	;;	.........@@@@@@.........	@@@@@@@..........@@@@@@@
+	;;	.......@@@@@@@@@@.......	@@@@@..............@@@@@
+	;;	.....@@@@@@@@@@@@@@.....	@@@@................@@@@
+	;;	....@@@@@@@@@@@@@@@@....	@@@..................@@@
+	;;	...@@@.@@@@@@@@@@@@@@...	@@....................@@
+	;;	...@@.@@@@@@@@@@@@@@@...	@@....................@@
+	;;	..@@..@@@@@@@@@@@@@@@@..	@......................@
+	;;	..@@.@@@@@@@@@@@@@@@@@..	@......................@
+	;;	.@@@.@@@@@@@@@@@@@@@@@@.	........................
+	;;	.@@@@@@@@@@@@@@@@@@@@@@.	........................
+	;;	.@@@.@@@@@@@@@@@@@@@@@@.	........................
+	;;	.@@@@@@@@@@@@@@@@@@@@@@.	........................
+	;;	.@@@@@@@@@@@@@@@@@@@@@@.	........................
+	;;	.@@@@@@@@@@@@@@@@@@@@@@.	........................
+	;;	..@@@@@@@@@@@@@@@@@@@@..	@......................@
+	;;	..@@@@@@@@@@@@@@@@@@@@..	@......................@
+	;;	...@@@@@@@@@@@@@@@@@@...	@@....................@@
+	;;	...@@@@@@@@@@@@@@@@@@...	@@....................@@
+	;;	....@@@@@@@@@@@@@@@@....	@@@..................@@@
+	;;	.....@@@@@@@@@@@@@@.....	@@@@................@@@@
+	;;	.......@@@@@@@@@@.......	@@@@@..............@@@@@
+	;;	.........@@@@@@.........	@@@@@@@..........@@@@@@@
+	;;	........................	@@@@@@@@@......@@@@@@@@@
 
 					;; SPR_HEAD_FLYING:       EQU &4D
 	DEFB &00, &00, &00, &00, &1F, &00, &00, &7F, &C0, &00, &FF, &E0, &01, &FF, &20, &01
@@ -21828,56 +20216,30 @@ img_head_0:
 	DEFB &3F, &03, &07, &BF, &02, &83, &9B, &CC, &E1, &0C, &31, &E0, &06, &63, &C4, &07
 	DEFB &9F, &EF, &08, &7F, &FF, &9F, &FF, &FF, &FF, &FF, &FF, &FF, &FF, &FF, &FF, &FF
 
-	;;	........................
-	;;	...........@@@@@........
-	;;	.........@@@@@@@@@......
-	;;	........@@@@@@@@@@@.....
-	;;	.......@@@@@@@@@..@.....
-	;;	.......@@@@@@..@@@@@....
-	;;	......@@@@@@.@@@@@@@....
-	;;	......@@@@@@@@@@@.@@@@..
-	;;	......@@@@@@@@.@@.@...@.
-	;;	..@..@.@@@@@@@.@@@.....@
-	;;	...@@@.@@@@@@@@@@@.....@
-	;;	....@.@@@@@@@@@@@......@
-	;;	...@.@@@@..@@@@@.@.....@
-	;;	..@@.@@@..@@@@@@......@.
-	;;	.@@..@@@@.@@@@@@......@.
-	;;	...@@.@@@..@@.@@@@..@@@.
-	;;	....@@.@.@@.@@....@@@@..
-	;;	....@.@.@@@@.@@..@@.....
-	;;	...@....@.@@.@@@@.......
-	;;	.........@@.............
-	;;	........................
-	;;	........................
-	;;	........................
-	;;	........................
-	;;
-	;;	@@@@@@@@@@@.....@@@@@@@@
-	;;	@@@@@@@@@..@@@@@..@@@@@@
-	;;	@@@@@@@@.@@@@@@@@@.@@@@@
-	;;	@@@@@@@.@@@@@@@@@@@.@@@@
-	;;	@@@@@@.@@@@@@@@@..@.@@@@
-	;;	@@@@@@.@@@@@@..@@@@@.@@@
-	;;	@@@@@.@@@@@@.@@@@@@@.@@@
-	;;	@@@@@.@@@@@@@@@@@.@@@@@@
-	;;	@@.@@.@@@@@@@@.@@.@...@@
-	;;	@......@@@@@@@.@@@.....@
-	;;	@@.....@@@@@@@@@@@.....@
-	;;	@@@...@@@@@@@@@@@......@
-	;;	@@...@@@@..@@@@@.@.....@
-	;;	@....@@@..@@@@@@......@@
-	;;	.....@@@@.@@@@@@......@.
-	;;	@.....@@@..@@.@@@@..@@..
-	;;	@@@....@....@@....@@...@
-	;;	@@@..........@@..@@...@@
-	;;	@@...@.......@@@@..@@@@@
-	;;	@@@.@@@@....@....@@@@@@@
-	;;	@@@@@@@@@..@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@
-
+	;;	........................	@@@@@@@@@@@.....@@@@@@@@
+	;;	...........@@@@@........	@@@@@@@@@..@@@@@..@@@@@@
+	;;	.........@@@@@@@@@......	@@@@@@@@.@@@@@@@@@.@@@@@
+	;;	........@@@@@@@@@@@.....	@@@@@@@.@@@@@@@@@@@.@@@@
+	;;	.......@@@@@@@@@..@.....	@@@@@@.@@@@@@@@@..@.@@@@
+	;;	.......@@@@@@..@@@@@....	@@@@@@.@@@@@@..@@@@@.@@@
+	;;	......@@@@@@.@@@@@@@....	@@@@@.@@@@@@.@@@@@@@.@@@
+	;;	......@@@@@@@@@@@.@@@@..	@@@@@.@@@@@@@@@@@.@@@@@@
+	;;	......@@@@@@@@.@@.@...@.	@@.@@.@@@@@@@@.@@.@...@@
+	;;	..@..@.@@@@@@@.@@@.....@	@......@@@@@@@.@@@.....@
+	;;	...@@@.@@@@@@@@@@@.....@	@@.....@@@@@@@@@@@.....@
+	;;	....@.@@@@@@@@@@@......@	@@@...@@@@@@@@@@@......@
+	;;	...@.@@@@..@@@@@.@.....@	@@...@@@@..@@@@@.@.....@
+	;;	..@@.@@@..@@@@@@......@.	@....@@@..@@@@@@......@@
+	;;	.@@..@@@@.@@@@@@......@.	.....@@@@.@@@@@@......@.
+	;;	...@@.@@@..@@.@@@@..@@@.	@.....@@@..@@.@@@@..@@..
+	;;	....@@.@.@@.@@....@@@@..	@@@....@....@@....@@...@
+	;;	....@.@.@@@@.@@..@@.....	@@@..........@@..@@...@@
+	;;	...@....@.@@.@@@@.......	@@...@.......@@@@..@@@@@
+	;;	.........@@.............	@@@.@@@@....@....@@@@@@@
+	;;	........................	@@@@@@@@@..@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	........................	@@@@@@@@@@@@@@@@@@@@@@@@
 
 ;; -----------------------------------------------------------------------------------------------------------
 SPR_DOORSTEP			EQU		&54
@@ -21892,6 +20254,7 @@ SPR_HUSHPUPPY			EQU		&5C
 SPR_BOOK				EQU		&5D
 SPR_TOASTER				EQU		&5E
 SPR_CUSHION				EQU		&5F
+SPR_1st_4x28_sprite		EQU		SPR_DOORSTEP		;; &54
 
 ;; -----------------------------------------------------------------------------------------------------------
 img_4x28_bin:			;; SPR_DOORSTEP:       EQU &54
@@ -21903,35 +20266,6 @@ img_4x28_bin:			;; SPR_DOORSTEP:       EQU &54
 	DEFB &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00
 	DEFB &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00
 
-	;;	................................
-	;;	..............@@@@..............
-	;;	............@@@..@@@............
-	;;	..........@@@......@@@..........
-	;;	........@@@..@@@@@...@@@........
-	;;	......@@@..@@@@@@@@@.@@@@.......
-	;;	....@@@..@@@@@@@@@@@@@..........
-	;;	..@@@...@@@@@@@@@@@@@.@@@.......
-	;;	..@@@...@@@@@@@@@@.....@........
-	;;	.@..@@@..@@@@@@@@.@@@.@@@.......
-	;;	.@@@..@@@..@@@.....@...@........
-	;;	.@..@@..@@@@@.@@@.@@@.@@@.......
-	;;	.@.@..@@.......@...@............
-	;;	.@..@@..@.@@@.@@@.@@@...........
-	;;	..@@..@.@..@...@................
-	;;	....@@..@.@@@.@@@...............
-	;;	......@@@..@....................
-	;;	........@.@@@...................
-	;;	................................
-	;;	................................
-	;;	................................
-	;;	................................
-	;;	................................
-	;;	................................
-	;;	................................
-	;;	................................
-	;;	................................
-	;;	................................
-
 	DEFB &FF, &FC, &3F, &FF, &FF, &F0, &0F, &FF, &FF, &C0, &03, &FF, &FF, &00, &00, &FF
 	DEFB &FC, &00, &00, &3F, &F0, &00, &00, &3F, &C0, &00, &00, &3F, &80, &00, &03, &BF
 	DEFB &00, &00, &01, &3F, &00, &00, &3B, &BF, &00, &00, &11, &3F, &00, &03, &BB, &BF
@@ -21940,34 +20274,34 @@ img_4x28_bin:			;; SPR_DOORSTEP:       EQU &54
 	DEFB &FF, &FF, &FF, &FF, &FF, &FF, &FF, &FF, &FF, &FF, &FF, &FF, &FF, &FF, &FF, &FF
 	DEFB &FF, &FF, &FF, &FF, &FF, &FF, &FF, &FF, &FF, &FF, &FF, &FF, &FF, &FF, &FF, &FF
 
-	;;	@@@@@@@@@@@@@@....@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@........@@@@@@@@@@@@
-	;;	@@@@@@@@@@............@@@@@@@@@@
-	;;	@@@@@@@@................@@@@@@@@
-	;;	@@@@@@....................@@@@@@
-	;;	@@@@......................@@@@@@
-	;;	@@........................@@@@@@
-	;;	@.....................@@@.@@@@@@
-	;;	.......................@..@@@@@@
-	;;	..................@@@.@@@.@@@@@@
-	;;	...................@...@..@@@@@@
-	;;	..............@@@.@@@.@@@.@@@@@@
-	;;	...@...........@...@.....@@@@@@@
-	;;	....@@....@@@.@@@.@@@.@@@@@@@@@@
-	;;	......@....@...@.....@@@@@@@@@@@
-	;;	@@........@@@.@@@.@@@@@@@@@@@@@@
-	;;	@@@@.......@.....@@@@@@@@@@@@@@@
-	;;	@@@@@@....@@@.@@@@@@@@@@@@@@@@@@
-	;;	@@@@@@@@.....@@@@@@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	................................	@@@@@@@@@@@@@@....@@@@@@@@@@@@@@
+	;;	..............@@@@..............	@@@@@@@@@@@@........@@@@@@@@@@@@
+	;;	............@@@..@@@............	@@@@@@@@@@............@@@@@@@@@@
+	;;	..........@@@......@@@..........	@@@@@@@@................@@@@@@@@
+	;;	........@@@..@@@@@...@@@........	@@@@@@....................@@@@@@
+	;;	......@@@..@@@@@@@@@.@@@@.......	@@@@......................@@@@@@
+	;;	....@@@..@@@@@@@@@@@@@..........	@@........................@@@@@@
+	;;	..@@@...@@@@@@@@@@@@@.@@@.......	@.....................@@@.@@@@@@
+	;;	..@@@...@@@@@@@@@@.....@........	.......................@..@@@@@@
+	;;	.@..@@@..@@@@@@@@.@@@.@@@.......	..................@@@.@@@.@@@@@@
+	;;	.@@@..@@@..@@@.....@...@........	...................@...@..@@@@@@
+	;;	.@..@@..@@@@@.@@@.@@@.@@@.......	..............@@@.@@@.@@@.@@@@@@
+	;;	.@.@..@@.......@...@............	...@...........@...@.....@@@@@@@
+	;;	.@..@@..@.@@@.@@@.@@@...........	....@@....@@@.@@@.@@@.@@@@@@@@@@
+	;;	..@@..@.@..@...@................	......@....@...@.....@@@@@@@@@@@
+	;;	....@@..@.@@@.@@@...............	@@........@@@.@@@.@@@@@@@@@@@@@@
+	;;	......@@@..@....................	@@@@.......@.....@@@@@@@@@@@@@@@
+	;;	........@.@@@...................	@@@@@@....@@@.@@@@@@@@@@@@@@@@@@
+	;;	................................	@@@@@@@@.....@@@@@@@@@@@@@@@@@@@
+	;;	................................	@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	................................	@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	................................	@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	................................	@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	................................	@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	................................	@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	................................	@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	................................	@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	................................	@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
 							;; SPR_SANDWICH:   EQU &55
 	DEFB &00, &00, &00, &00, &00, &07, &80, &00, &00, &1F, &C0, &00, &00, &7F, &B8, &00
@@ -21985,63 +20319,34 @@ img_4x28_bin:			;; SPR_DOORSTEP:       EQU &54
 	DEFB &85, &01, &80, &A1, &C2, &0C, &30, &43, &F0, &03, &C0, &0F, &FC, &00, &00, &3F
 	DEFB &FF, &00, &00, &FF, &FF, &C0, &03, &FF, &FF, &F0, &0F, &FF, &FF, &FD, &3F, &FF
 
-	;;	................................
-	;;	.............@@@@...............
-	;;	...........@@@@@@@..............
-	;;	.........@@@@@@@@.@@@...........
-	;;	.......@@@@@@@.@@@@@@@@@........
-	;;	.....@@@@@@@@@@@@@@@@@@@@@......
-	;;	...@@@@@@@.@@@@@@@@@@@@@@@@@....
-	;;	..@@@@@@@@@@@@@@@@@@@@@@@@@@@@..
-	;;	.@..@@@@.@@@@@@@@@@@@@@@@@@@..@.
-	;;	.@@@..@@@@@@@@@@@@@@@@@@@@..@@@.
-	;;	.@@@@@..@@@@@@@@@@@@@@@@..@@@@@.
-	;;	..@@@.@@..@@@@@@@@@@@@..@@@@@@..
-	;;	....@.@@@@..@@@@@@@@..@@@@@@....
-	;;	..@@...@@@@@..@@@@..@@@@@@..@@..
-	;;	....@@@.@@@@@@....@@@@@@..@@....
-	;;	...@...@..@@@@@@@@@@@@..@@..@...
-	;;	..@.@@@..@..@@@@@@@@..@@..@@.@..
-	;;	.@...@@@@..@..@.@@..@@..@@@...@.
-	;;	.@@@.@@@@@@.@@....@@..@@@@@.@@@.
-	;;	.@@@.@@@@@@@..@@@@..@@@@@@@.@@@.
-	;;	..@@.@@@@......@@......@@@@.@@..
-	;;	....@.@@.@..@@....@@..@.@@.@....
-	;;	......@.@@@@..@@@@..@@@@.@......
-	;;	........@@@@@@....@@@@@@........
-	;;	..........@@@@@@@@@@@@..........
-	;;	............@@@@@@@@............
-	;;	..............@.@@..............
-	;;	................................
-	;;
-	;;	@@@@@@@@@@@@@....@@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@..@@@@.@@@@@@@@@@@@@@
-	;;	@@@@@@@@@..@@@@@@@...@@@@@@@@@@@
-	;;	@@@@@@@..@@@@@@@@.@@@...@@@@@@@@
-	;;	@@@@@..@@@@@@@.@@@@@@@@@..@@@@@@
-	;;	@@@..@@@@@@@@@@@@@@@@@@@@@..@@@@
-	;;	@@.@@@@@@@.@@@@@@@@@@@@@@@@@..@@
-	;;	@.@@@@@@@@@@@@@@@@@@@@@@@@@@@@.@
-	;;	....@@@@.@@@@@@@@@@@@@@@@@@@....
-	;;	......@@@@@@@@@@@@@@@@@@@@......
-	;;	........@@@@@@@@@@@@@@@@........
-	;;	@.........@@@@@@@@@@@@.........@
-	;;	@@..........@@@@@@@@..........@@
-	;;	@.@@..........@@@@..........@@.@
-	;;	@@..@@@...................@@..@@
-	;;	@@.@...@................@@..@.@@
-	;;	@.@..@...@............@@..@..@.@
-	;;	......@.@..@........@@...@......
-	;;	.....@.@.@..@@....@@..@.@.@.....
-	;;	......@.@.@...@@@@...@.@.@......
-	;;	@....@.@.......@@.......@.@....@
-	;;	@@....@.....@@....@@.....@....@@
-	;;	@@@@..........@@@@..........@@@@
-	;;	@@@@@@....................@@@@@@
-	;;	@@@@@@@@................@@@@@@@@
-	;;	@@@@@@@@@@............@@@@@@@@@@
-	;;	@@@@@@@@@@@@........@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@.@..@@@@@@@@@@@@@@
+	;;	................................	@@@@@@@@@@@@@....@@@@@@@@@@@@@@@
+	;;	.............@@@@...............	@@@@@@@@@@@..@@@@.@@@@@@@@@@@@@@
+	;;	...........@@@@@@@..............	@@@@@@@@@..@@@@@@@...@@@@@@@@@@@
+	;;	.........@@@@@@@@.@@@...........	@@@@@@@..@@@@@@@@.@@@...@@@@@@@@
+	;;	.......@@@@@@@.@@@@@@@@@........	@@@@@..@@@@@@@.@@@@@@@@@..@@@@@@
+	;;	.....@@@@@@@@@@@@@@@@@@@@@......	@@@..@@@@@@@@@@@@@@@@@@@@@..@@@@
+	;;	...@@@@@@@.@@@@@@@@@@@@@@@@@....	@@.@@@@@@@.@@@@@@@@@@@@@@@@@..@@
+	;;	..@@@@@@@@@@@@@@@@@@@@@@@@@@@@..	@.@@@@@@@@@@@@@@@@@@@@@@@@@@@@.@
+	;;	.@..@@@@.@@@@@@@@@@@@@@@@@@@..@.	....@@@@.@@@@@@@@@@@@@@@@@@@....
+	;;	.@@@..@@@@@@@@@@@@@@@@@@@@..@@@.	......@@@@@@@@@@@@@@@@@@@@......
+	;;	.@@@@@..@@@@@@@@@@@@@@@@..@@@@@.	........@@@@@@@@@@@@@@@@........
+	;;	..@@@.@@..@@@@@@@@@@@@..@@@@@@..	@.........@@@@@@@@@@@@.........@
+	;;	....@.@@@@..@@@@@@@@..@@@@@@....	@@..........@@@@@@@@..........@@
+	;;	..@@...@@@@@..@@@@..@@@@@@..@@..	@.@@..........@@@@..........@@.@
+	;;	....@@@.@@@@@@....@@@@@@..@@....	@@..@@@...................@@..@@
+	;;	...@...@..@@@@@@@@@@@@..@@..@...	@@.@...@................@@..@.@@
+	;;	..@.@@@..@..@@@@@@@@..@@..@@.@..	@.@..@...@............@@..@..@.@
+	;;	.@...@@@@..@..@.@@..@@..@@@...@.	......@.@..@........@@...@......
+	;;	.@@@.@@@@@@.@@....@@..@@@@@.@@@.	.....@.@.@..@@....@@..@.@.@.....
+	;;	.@@@.@@@@@@@..@@@@..@@@@@@@.@@@.	......@.@.@...@@@@...@.@.@......
+	;;	..@@.@@@@......@@......@@@@.@@..	@....@.@.......@@.......@.@....@
+	;;	....@.@@.@..@@....@@..@.@@.@....	@@....@.....@@....@@.....@....@@
+	;;	......@.@@@@..@@@@..@@@@.@......	@@@@..........@@@@..........@@@@
+	;;	........@@@@@@....@@@@@@........	@@@@@@....................@@@@@@
+	;;	..........@@@@@@@@@@@@..........	@@@@@@@@................@@@@@@@@
+	;;	............@@@@@@@@............	@@@@@@@@@@............@@@@@@@@@@
+	;;	..............@.@@..............	@@@@@@@@@@@@........@@@@@@@@@@@@
+	;;	................................	@@@@@@@@@@@@@@.@..@@@@@@@@@@@@@@
 
 						;; SPR_ROLLERS:    EQU &56
 	DEFB &00, &00, &00, &00, &00, &01, &80, &00, &00, &06, &C0, &00, &00, &19, &E0, &00
@@ -22059,63 +20364,34 @@ img_4x28_bin:			;; SPR_DOORSTEP:       EQU &54
 	DEFB &C0, &00, &00, &03, &E4, &00, &00, &07, &FC, &00, &00, &0F, &FE, &00, &00, &3F
 	DEFB &FF, &20, &00, &FF, &FF, &E0, &03, &FF, &FF, &F0, &0F, &FF, &FF, &F9, &BF, &FF
 
-	;;	................................
-	;;	...............@@...............
-	;;	.............@@.@@..............
-	;;	...........@@..@@@@.............
-	;;	.........@@..@@@@@..@@..........
-	;;	.......@@..@@@@@..@@.@@.........
-	;;	.....@@..@@@@@..@@..@@@@........
-	;;	...@@..@@@@@..@@..@@@@@..@@@....
-	;;	..@@@@.@@@..@@..@@@@@..@@..@@...
-	;;	..@..@@...@@..@@@@@..@@..@@@@@..
-	;;	...@@.@.@@..@@@@@..@@..@@@@@@@..
-	;;	..@@.@.@@@@.@@@..@@..@@@@@@@@@..
-	;;	..@@.@.@..@@...@@..@@@@@@@@@@.@.
-	;;	..@@..@.@@.@.@@..@@@@@@@@@@...@.
-	;;	..@@.@.@@.@.@@@@.@@@@@@@@...@.@.
-	;;	..@@...@@.@.@..@@.@@@@@...@@@.@.
-	;;	..@@.@.@@..@.@@.@.@@@...@@@@@.@.
-	;;	..@@...@@.@.@@.@@.@...@@@@@@@.@.
-	;;	..@@.@.@@...@@.@.@..@@@@@@@@@.@.
-	;;	..@@...@@.@.@@..@.@@@@@@@@@@@...
-	;;	...@@..@@...@@.@@.@@@@@@@@@@@...
-	;;	.......@@.@.@@..@.@@@@@@@@@@....
-	;;	.......@@...@@.@@.@@@@@@@@......
-	;;	........@@..@@..@.@@@@@@........
-	;;	............@@.@@.@@@@..........
-	;;	............@@..@.@@............
-	;;	.............@@..@..............
-	;;	................................
-	;;
-	;;	@@@@@@@@@@@@@@@..@@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@..@@.@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@..@@.@@.@@@@@@@@@@@@@
-	;;	@@@@@@@@@..@@..@@@@...@@@@@@@@@@
-	;;	@@@@@@@..@@..@@@@@..@@.@@@@@@@@@
-	;;	@@@@@..@@..@@@@@..@@.@@.@@@@@@@@
-	;;	@@@..@@..@@@@@..@@..@@@@....@@@@
-	;;	@@.@@..@@@@@..@@..@@@@@..@@@.@@@
-	;;	@.@@@@.@@@..@@..@@@@@..@@..@@.@@
-	;;	@.@..@@...@@..@@@@@..@@..@@@@@.@
-	;;	@@....@.@@..@@@@@..@@..@@@@@@@.@
-	;;	@....@.@@@@.@@@..@@..@@@@@@@@@.@
-	;;	@....@.@..@@...@@..@@@@@@@@@@...
-	;;	@..........@.@@..@@@@@@@@@@.....
-	;;	@.........@.@@@@.@@@@@@@@.......
-	;;	@.........@.@..@@.@@@@@.........
-	;;	@...............@.@@@...........
-	;;	@..............@@.@.............
-	;;	@..............@.@..............
-	;;	@..............................@
-	;;	@@............................@@
-	;;	@@@..@.......................@@@
-	;;	@@@@@@......................@@@@
-	;;	@@@@@@@...................@@@@@@
-	;;	@@@@@@@@..@.............@@@@@@@@
-	;;	@@@@@@@@@@@...........@@@@@@@@@@
-	;;	@@@@@@@@@@@@........@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@..@@.@@@@@@@@@@@@@@
+	;;	................................	@@@@@@@@@@@@@@@..@@@@@@@@@@@@@@@
+	;;	...............@@...............	@@@@@@@@@@@@@..@@.@@@@@@@@@@@@@@
+	;;	.............@@.@@..............	@@@@@@@@@@@..@@.@@.@@@@@@@@@@@@@
+	;;	...........@@..@@@@.............	@@@@@@@@@..@@..@@@@...@@@@@@@@@@
+	;;	.........@@..@@@@@..@@..........	@@@@@@@..@@..@@@@@..@@.@@@@@@@@@
+	;;	.......@@..@@@@@..@@.@@.........	@@@@@..@@..@@@@@..@@.@@.@@@@@@@@
+	;;	.....@@..@@@@@..@@..@@@@........	@@@..@@..@@@@@..@@..@@@@....@@@@
+	;;	...@@..@@@@@..@@..@@@@@..@@@....	@@.@@..@@@@@..@@..@@@@@..@@@.@@@
+	;;	..@@@@.@@@..@@..@@@@@..@@..@@...	@.@@@@.@@@..@@..@@@@@..@@..@@.@@
+	;;	..@..@@...@@..@@@@@..@@..@@@@@..	@.@..@@...@@..@@@@@..@@..@@@@@.@
+	;;	...@@.@.@@..@@@@@..@@..@@@@@@@..	@@....@.@@..@@@@@..@@..@@@@@@@.@
+	;;	..@@.@.@@@@.@@@..@@..@@@@@@@@@..	@....@.@@@@.@@@..@@..@@@@@@@@@.@
+	;;	..@@.@.@..@@...@@..@@@@@@@@@@.@.	@....@.@..@@...@@..@@@@@@@@@@...
+	;;	..@@..@.@@.@.@@..@@@@@@@@@@...@.	@..........@.@@..@@@@@@@@@@.....
+	;;	..@@.@.@@.@.@@@@.@@@@@@@@...@.@.	@.........@.@@@@.@@@@@@@@.......
+	;;	..@@...@@.@.@..@@.@@@@@...@@@.@.	@.........@.@..@@.@@@@@.........
+	;;	..@@.@.@@..@.@@.@.@@@...@@@@@.@.	@...............@.@@@...........
+	;;	..@@...@@.@.@@.@@.@...@@@@@@@.@.	@..............@@.@.............
+	;;	..@@.@.@@...@@.@.@..@@@@@@@@@.@.	@..............@.@..............
+	;;	..@@...@@.@.@@..@.@@@@@@@@@@@...	@..............................@
+	;;	...@@..@@...@@.@@.@@@@@@@@@@@...	@@............................@@
+	;;	.......@@.@.@@..@.@@@@@@@@@@....	@@@..@.......................@@@
+	;;	.......@@...@@.@@.@@@@@@@@......	@@@@@@......................@@@@
+	;;	........@@..@@..@.@@@@@@........	@@@@@@@...................@@@@@@
+	;;	............@@.@@.@@@@..........	@@@@@@@@..@.............@@@@@@@@
+	;;	............@@..@.@@............	@@@@@@@@@@@...........@@@@@@@@@@
+	;;	.............@@..@..............	@@@@@@@@@@@@........@@@@@@@@@@@@
+	;;	................................	@@@@@@@@@@@@@..@@.@@@@@@@@@@@@@@
 
 							;; SPR_TELEPORT:   EQU &57
 	DEFB &00, &00, &00, &00, &00, &00, &00, &00, &00, &03, &C0, &00, &00, &1C, &38, &00
@@ -22133,63 +20409,34 @@ img_4x28_bin:			;; SPR_DOORSTEP:       EQU &54
 	DEFB &B9, &54, &2A, &9D, &CE, &A8, &15, &73, &F3, &54, &2A, &CF, &FC, &E8, &17, &3F
 	DEFB &FF, &34, &2C, &FF, &FF, &CC, &33, &FF, &FF, &F0, &0F, &FF, &FF, &FC, &3F, &FF
 
-	;;	................................
-	;;	................................
-	;;	..............@@@@..............
-	;;	...........@@@....@@@...........
-	;;	.........@@...@..@...@@.........
-	;;	.......@@..@@@@...@.@..@@.......
-	;;	......@@.@@@@@@..@.@.@..@@......
-	;;	.....@@.@@@@@@....@.@.@..@@.....
-	;;	....@@.........@@.........@@....
-	;;	...@.@.@.@.@.@....@@@@@@@.@.@...
-	;;	..@..@@.@.@.@.@..@@@@@@@.@@..@..
-	;;	..@@..@@.@.@.@...@@@@@@.@@..@@..
-	;;	.@.@@@.@@...@.@..@@@@..@@.@@@.@.
-	;;	.@.@@@@..@@......@...@@..@@@@.@.
-	;;	.@@.@@@@@..@@@....@@@..@@@@@.@@.
-	;;	.@@.@@@@@@@...@@@@...@@@@@@@.@@.
-	;;	.@@@.@@@@@@@@......@@@@@@@@.@@@.
-	;;	.@@@.@@@@@@@@@.@@.@@@@@@@@@.@@@.
-	;;	.@@@@..........@@..........@@@@.
-	;;	.@@@@.@.@.@.@..@@..@.@.@.@.@@@@.
-	;;	..@@@..@.@.@.@.@@.@.@.@.@..@@@..
-	;;	....@@@.@.@.@..@@..@.@.@.@@@....
-	;;	......@@.@.@.@.@@.@.@.@.@@......
-	;;	........@@@.@..@@..@.@@@........
-	;;	..........@@.@.@@.@.@@..........
-	;;	............@@.@@.@@............
-	;;	..............@@@@..............
-	;;	................................
-	;;
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@....@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@..........@@@@@@@@@@@
-	;;	@@@@@@@@@..............@@@@@@@@@
-	;;	@@@@@@@..........@.......@@@@@@@
-	;;	@@@@@@............@.@.....@@@@@@
-	;;	@@@@@............@.@.@.....@@@@@
-	;;	@@@@..............@.@.@.....@@@@
-	;;	@@@............@@............@@@
-	;;	@@.....@.@.@.@................@@
-	;;	@.@.....@.@.@.@..............@.@
-	;;	@.@@.....@.@.@..............@@.@
-	;;	.@.@@@......@.@...........@@@.@.
-	;;	.@.@@@@..................@@@@.@.
-	;;	.@@.@@@@@..............@@@@@.@@.
-	;;	.@@.@@@@@@@..........@@@@@@@.@@.
-	;;	.@@@.@@@@@@@@......@@@@@@@@.@@@.
-	;;	.@@@.@@@@@@@@@....@@@@@@@@@.@@@.
-	;;	.@@@@......................@@@@.
-	;;	.@@@@.@.@.@.@......@.@.@.@.@@@@.
-	;;	@.@@@..@.@.@.@....@.@.@.@..@@@.@
-	;;	@@..@@@.@.@.@......@.@.@.@@@..@@
-	;;	@@@@..@@.@.@.@....@.@.@.@@..@@@@
-	;;	@@@@@@..@@@.@......@.@@@..@@@@@@
-	;;	@@@@@@@@..@@.@....@.@@..@@@@@@@@
-	;;	@@@@@@@@@@..@@....@@..@@@@@@@@@@
-	;;	@@@@@@@@@@@@........@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@....@@@@@@@@@@@@@@
+	;;	................................	@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	................................	@@@@@@@@@@@@@@....@@@@@@@@@@@@@@
+	;;	..............@@@@..............	@@@@@@@@@@@..........@@@@@@@@@@@
+	;;	...........@@@....@@@...........	@@@@@@@@@..............@@@@@@@@@
+	;;	.........@@...@..@...@@.........	@@@@@@@..........@.......@@@@@@@
+	;;	.......@@..@@@@...@.@..@@.......	@@@@@@............@.@.....@@@@@@
+	;;	......@@.@@@@@@..@.@.@..@@......	@@@@@............@.@.@.....@@@@@
+	;;	.....@@.@@@@@@....@.@.@..@@.....	@@@@..............@.@.@.....@@@@
+	;;	....@@.........@@.........@@....	@@@............@@............@@@
+	;;	...@.@.@.@.@.@....@@@@@@@.@.@...	@@.....@.@.@.@................@@
+	;;	..@..@@.@.@.@.@..@@@@@@@.@@..@..	@.@.....@.@.@.@..............@.@
+	;;	..@@..@@.@.@.@...@@@@@@.@@..@@..	@.@@.....@.@.@..............@@.@
+	;;	.@.@@@.@@...@.@..@@@@..@@.@@@.@.	.@.@@@......@.@...........@@@.@.
+	;;	.@.@@@@..@@......@...@@..@@@@.@.	.@.@@@@..................@@@@.@.
+	;;	.@@.@@@@@..@@@....@@@..@@@@@.@@.	.@@.@@@@@..............@@@@@.@@.
+	;;	.@@.@@@@@@@...@@@@...@@@@@@@.@@.	.@@.@@@@@@@..........@@@@@@@.@@.
+	;;	.@@@.@@@@@@@@......@@@@@@@@.@@@.	.@@@.@@@@@@@@......@@@@@@@@.@@@.
+	;;	.@@@.@@@@@@@@@.@@.@@@@@@@@@.@@@.	.@@@.@@@@@@@@@....@@@@@@@@@.@@@.
+	;;	.@@@@..........@@..........@@@@.	.@@@@......................@@@@.
+	;;	.@@@@.@.@.@.@..@@..@.@.@.@.@@@@.	.@@@@.@.@.@.@......@.@.@.@.@@@@.
+	;;	..@@@..@.@.@.@.@@.@.@.@.@..@@@..	@.@@@..@.@.@.@....@.@.@.@..@@@.@
+	;;	....@@@.@.@.@..@@..@.@.@.@@@....	@@..@@@.@.@.@......@.@.@.@@@..@@
+	;;	......@@.@.@.@.@@.@.@.@.@@......	@@@@..@@.@.@.@....@.@.@.@@..@@@@
+	;;	........@@@.@..@@..@.@@@........	@@@@@@..@@@.@......@.@@@..@@@@@@
+	;;	..........@@.@.@@.@.@@..........	@@@@@@@@..@@.@....@.@@..@@@@@@@@
+	;;	............@@.@@.@@............	@@@@@@@@@@..@@....@@..@@@@@@@@@@
+	;;	..............@@@@..............	@@@@@@@@@@@@........@@@@@@@@@@@@
+	;;	................................	@@@@@@@@@@@@@@....@@@@@@@@@@@@@@
 
 							;; SPR_LAVAPIT:   EQU &58
 	DEFB &00, &00, &00, &00, &00, &03, &C0, &00, &00, &1C, &38, &00, &00, &61, &C6, &00
@@ -22207,63 +20454,34 @@ img_4x28_bin:			;; SPR_DOORSTEP:       EQU &54
 	DEFB &B3, &68, &16, &CD, &CE, &6D, &76, &73, &F2, &CD, &BB, &4F, &FC, &D9, &BB, &3F
 	DEFB &FF, &33, &9C, &FF, &FF, &CE, &D3, &FF, &FF, &F2, &CF, &FF, &FF, &FD, &3F, &FF
 
-	;;	................................
-	;;	..............@@@@..............
-	;;	...........@@@....@@@...........
-	;;	.........@@....@@@...@@.........
-	;;	.......@@...@.@.@.@@@..@@.......
-	;;	......@@..@.@.@.@.@.@@@.@@......
-	;;	.....@@..@.@.@.@.@.@.@@..@@.....
-	;;	....@.@@..@.@.@.@.@.@@@.@@.@....
-	;;	...@..@.@...@.@.@.@@@..@@@.@@...
-	;;	..@@.@@.@@@....@.@...@@@.@@.@@..
-	;;	..@.@@..@@.@@@....@@@@.@.@@@.@..
-	;;	...@@@.@@..@.@@@@@@..@.@@.@@@...
-	;;	.@.@@.@@.@@@.@@.@.@@.@@.@@.@@.@.
-	;;	.@@..@@@.@@..@..@.@@..@@.@@..@@.
-	;;	..@@..@.@@@.@@.@@..@@.@@@...@@..
-	;;	.@.@@@..@@.@@..@@@.@@@.@..@@@.@.
-	;;	..@..@@@...@@.@@.@@.@...@@@..@..
-	;;	.@@.@..@@@@...@@@@...@@@@..@.@@.
-	;;	.@.@@@....@@@@....@@@@....@@..@.
-	;;	.@.@@.@@.@...@@@@@@...@.@@.@@.@.
-	;;	..@@..@@.@@.@......@.@@.@@..@@..
-	;;	....@@@..@@.@@.@.@@@.@@..@@@....
-	;;	......@.@@..@@.@@.@@@.@@.@......
-	;;	........@@.@@..@@.@@@.@@........
-	;;	..........@@..@@@..@@@..........
-	;;	............@@@.@@.@............
-	;;	..............@.@@..............
-	;;	................................
-	;;
-	;;	@@@@@@@@@@@@@@....@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@...@@@@...@@@@@@@@@@@
-	;;	@@@@@@@@@..@@@....@@@..@@@@@@@@@
-	;;	@@@@@@@..@@..........@@..@@@@@@@
-	;;	@@@@@@.@@..............@@.@@@@@@
-	;;	@@@@@.@@................@@.@@@@@
-	;;	@@@@.@@..................@@.@@@@
-	;;	@@@.@.@@................@@.@.@@@
-	;;	@@.@..@.@..............@@@.@@.@@
-	;;	@.@@.@@.@@@..........@@@.@@.@@.@
-	;;	@.@.@@..@@.@@@....@@@@.@.@@@.@.@
-	;;	@..@@@.@@..@.@@@@@@..@.@@.@@@..@
-	;;	...@@.@@.@@@.@@.@.@@.@@.@@.@@...
-	;;	.....@@@.@@..@..@.@@..@@.@@.....
-	;;	@.....@.@@@.@@.@@..@@.@@@......@
-	;;	.@......@@.@@..@@@.@@@.@......@.
-	;;	@.@........@@.@@.@@.@........@.@
-	;;	.@@.@.........@@@@.........@.@@.
-	;;	.@.@@@....................@@..@.
-	;;	.@.@@.@@.@............@.@@.@@.@.
-	;;	@.@@..@@.@@.@......@.@@.@@..@@.@
-	;;	@@..@@@..@@.@@.@.@@@.@@..@@@..@@
-	;;	@@@@..@.@@..@@.@@.@@@.@@.@..@@@@
-	;;	@@@@@@..@@.@@..@@.@@@.@@..@@@@@@
-	;;	@@@@@@@@..@@..@@@..@@@..@@@@@@@@
-	;;	@@@@@@@@@@..@@@.@@.@..@@@@@@@@@@
-	;;	@@@@@@@@@@@@..@.@@..@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@.@..@@@@@@@@@@@@@@
+	;;	................................	@@@@@@@@@@@@@@....@@@@@@@@@@@@@@
+	;;	..............@@@@..............	@@@@@@@@@@@...@@@@...@@@@@@@@@@@
+	;;	...........@@@....@@@...........	@@@@@@@@@..@@@....@@@..@@@@@@@@@
+	;;	.........@@....@@@...@@.........	@@@@@@@..@@..........@@..@@@@@@@
+	;;	.......@@...@.@.@.@@@..@@.......	@@@@@@.@@..............@@.@@@@@@
+	;;	......@@..@.@.@.@.@.@@@.@@......	@@@@@.@@................@@.@@@@@
+	;;	.....@@..@.@.@.@.@.@.@@..@@.....	@@@@.@@..................@@.@@@@
+	;;	....@.@@..@.@.@.@.@.@@@.@@.@....	@@@.@.@@................@@.@.@@@
+	;;	...@..@.@...@.@.@.@@@..@@@.@@...	@@.@..@.@..............@@@.@@.@@
+	;;	..@@.@@.@@@....@.@...@@@.@@.@@..	@.@@.@@.@@@..........@@@.@@.@@.@
+	;;	..@.@@..@@.@@@....@@@@.@.@@@.@..	@.@.@@..@@.@@@....@@@@.@.@@@.@.@
+	;;	...@@@.@@..@.@@@@@@..@.@@.@@@...	@..@@@.@@..@.@@@@@@..@.@@.@@@..@
+	;;	.@.@@.@@.@@@.@@.@.@@.@@.@@.@@.@.	...@@.@@.@@@.@@.@.@@.@@.@@.@@...
+	;;	.@@..@@@.@@..@..@.@@..@@.@@..@@.	.....@@@.@@..@..@.@@..@@.@@.....
+	;;	..@@..@.@@@.@@.@@..@@.@@@...@@..	@.....@.@@@.@@.@@..@@.@@@......@
+	;;	.@.@@@..@@.@@..@@@.@@@.@..@@@.@.	.@......@@.@@..@@@.@@@.@......@.
+	;;	..@..@@@...@@.@@.@@.@...@@@..@..	@.@........@@.@@.@@.@........@.@
+	;;	.@@.@..@@@@...@@@@...@@@@..@.@@.	.@@.@.........@@@@.........@.@@.
+	;;	.@.@@@....@@@@....@@@@....@@..@.	.@.@@@....................@@..@.
+	;;	.@.@@.@@.@...@@@@@@...@.@@.@@.@.	.@.@@.@@.@............@.@@.@@.@.
+	;;	..@@..@@.@@.@......@.@@.@@..@@..	@.@@..@@.@@.@......@.@@.@@..@@.@
+	;;	....@@@..@@.@@.@.@@@.@@..@@@....	@@..@@@..@@.@@.@.@@@.@@..@@@..@@
+	;;	......@.@@..@@.@@.@@@.@@.@......	@@@@..@.@@..@@.@@.@@@.@@.@..@@@@
+	;;	........@@.@@..@@.@@@.@@........	@@@@@@..@@.@@..@@.@@@.@@..@@@@@@
+	;;	..........@@..@@@..@@@..........	@@@@@@@@..@@..@@@..@@@..@@@@@@@@
+	;;	............@@@.@@.@............	@@@@@@@@@@..@@@.@@.@..@@@@@@@@@@
+	;;	..............@.@@..............	@@@@@@@@@@@@..@.@@..@@@@@@@@@@@@
+	;;	................................	@@@@@@@@@@@@@@.@..@@@@@@@@@@@@@@
 
 							;; SPR_PAD:        EQU &59
 	DEFB &00, &00, &00, &00, &00, &03, &C0, &00, &00, &0E, &70, &00, &00, &39, &9C, &00
@@ -22281,63 +20499,34 @@ img_4x28_bin:			;; SPR_DOORSTEP:       EQU &54
 	DEFB &83, &40, &02, &C1, &C0, &78, &1E, &03, &F0, &34, &2C, &0F, &FC, &07, &E0, &3F
 	DEFB &FF, &03, &C0, &FF, &FF, &C0, &03, &FF, &FF, &F0, &0F, &FF, &FF, &FC, &3F, &FF
 
-	;;	................................
-	;;	..............@@@@..............
-	;;	............@@@..@@@............
-	;;	..........@@@..@@..@@@..........
-	;;	........@@@..@@..@@..@@@........
-	;;	......@@@..@@..@@..@@..@@@......
-	;;	....@@@..@@..@@@@@@..@@..@@@....
-	;;	..@@@..@@...@@....@@...@@..@@@..
-	;;	..@@@..@.@@..........@@.@..@@@..
-	;;	....@@@..@.@@......@@.@..@@@....
-	;;	..@@..@@@..@.@@..@@.@..@@@..@@..
-	;;	...@@@..@@@..@.@@.@..@@@..@@@...
-	;;	..@...@@..@@@..@@..@@@..@@...@..
-	;;	.@.....@@@..@@@..@@@..@@@.....@.
-	;;	.@@@@.@...@@..@@@@..@@...@.@@@@.
-	;;	..@@.@.....@@@....@@@.....@.@@..
-	;;	.@...@@@@.@...@@@@...@.@@@@...@.
-	;;	.@@@@.@@.@.....@@.....@.@@.@@@@.
-	;;	..@@.@...@@@@.@..@.@@@@...@.@@..
-	;;	.@...@@@@.@@.@....@.@@.@@@@...@.
-	;;	..@@..@@.@...@@@@@@...@.@@..@@..
-	;;	....@@...@@@@.@@@@.@@@@...@@....
-	;;	......@@..@@.@....@.@@..@@......
-	;;	........@@...@@@@@@...@@........
-	;;	..........@@..@@@@..@@..........
-	;;	............@@....@@............
-	;;	..............@@@@..............
-	;;	................................
-	;;
-	;;	@@@@@@@@@@@@@@....@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@..@@@@..@@@@@@@@@@@@
-	;;	@@@@@@@@@@..@@@..@@@..@@@@@@@@@@
-	;;	@@@@@@@@..@@@......@@@..@@@@@@@@
-	;;	@@@@@@..@@@..........@@@..@@@@@@
-	;;	@@@@..@@@..............@@@..@@@@
-	;;	@@..@@@..................@@@..@@
-	;;	@.@@@......................@@@.@
-	;;	@.@@@......................@@@.@
-	;;	@@..@@@..................@@@..@@
-	;;	@.....@@@..............@@@.....@
-	;;	@@......@@@..........@@@......@@
-	;;	@.........@@@......@@@.........@
-	;;	............@@@..@@@............
-	;;	..............@@@@..............
-	;;	@..............................@
-	;;	.@............................@.
-	;;	.@@@@......................@@@@.
-	;;	@.@@.@....................@.@@.@
-	;;	.....@@@@..............@@@@.....
-	;;	@.....@@.@............@.@@.....@
-	;;	@@.......@@@@......@@@@.......@@
-	;;	@@@@......@@.@....@.@@......@@@@
-	;;	@@@@@@.......@@@@@@.......@@@@@@
-	;;	@@@@@@@@......@@@@......@@@@@@@@
-	;;	@@@@@@@@@@............@@@@@@@@@@
-	;;	@@@@@@@@@@@@........@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@....@@@@@@@@@@@@@@
+	;;	................................	@@@@@@@@@@@@@@....@@@@@@@@@@@@@@
+	;;	..............@@@@..............	@@@@@@@@@@@@..@@@@..@@@@@@@@@@@@
+	;;	............@@@..@@@............	@@@@@@@@@@..@@@..@@@..@@@@@@@@@@
+	;;	..........@@@..@@..@@@..........	@@@@@@@@..@@@......@@@..@@@@@@@@
+	;;	........@@@..@@..@@..@@@........	@@@@@@..@@@..........@@@..@@@@@@
+	;;	......@@@..@@..@@..@@..@@@......	@@@@..@@@..............@@@..@@@@
+	;;	....@@@..@@..@@@@@@..@@..@@@....	@@..@@@..................@@@..@@
+	;;	..@@@..@@...@@....@@...@@..@@@..	@.@@@......................@@@.@
+	;;	..@@@..@.@@..........@@.@..@@@..	@.@@@......................@@@.@
+	;;	....@@@..@.@@......@@.@..@@@....	@@..@@@..................@@@..@@
+	;;	..@@..@@@..@.@@..@@.@..@@@..@@..	@.....@@@..............@@@.....@
+	;;	...@@@..@@@..@.@@.@..@@@..@@@...	@@......@@@..........@@@......@@
+	;;	..@...@@..@@@..@@..@@@..@@...@..	@.........@@@......@@@.........@
+	;;	.@.....@@@..@@@..@@@..@@@.....@.	............@@@..@@@............
+	;;	.@@@@.@...@@..@@@@..@@...@.@@@@.	..............@@@@..............
+	;;	..@@.@.....@@@....@@@.....@.@@..	@..............................@
+	;;	.@...@@@@.@...@@@@...@.@@@@...@.	.@............................@.
+	;;	.@@@@.@@.@.....@@.....@.@@.@@@@.	.@@@@......................@@@@.
+	;;	..@@.@...@@@@.@..@.@@@@...@.@@..	@.@@.@....................@.@@.@
+	;;	.@...@@@@.@@.@....@.@@.@@@@...@.	.....@@@@..............@@@@.....
+	;;	..@@..@@.@...@@@@@@...@.@@..@@..	@.....@@.@............@.@@.....@
+	;;	....@@...@@@@.@@@@.@@@@...@@....	@@.......@@@@......@@@@.......@@
+	;;	......@@..@@.@....@.@@..@@......	@@@@......@@.@....@.@@......@@@@
+	;;	........@@...@@@@@@...@@........	@@@@@@.......@@@@@@.......@@@@@@
+	;;	..........@@..@@@@..@@..........	@@@@@@@@......@@@@......@@@@@@@@
+	;;	............@@....@@............	@@@@@@@@@@............@@@@@@@@@@
+	;;	..............@@@@..............	@@@@@@@@@@@@........@@@@@@@@@@@@
+	;;	................................	@@@@@@@@@@@@@@....@@@@@@@@@@@@@@
 
 							;; SPR_ANVIL:      EQU &5A
 	DEFB &00, &00, &00, &00, &00, &03, &C0, &00, &00, &0C, &30, &00, &00, &33, &CC, &00
@@ -22355,63 +20544,34 @@ img_4x28_bin:			;; SPR_DOORSTEP:       EQU &54
 	DEFB &80, &07, &E0, &01, &C0, &01, &80, &03, &F0, &00, &00, &0F, &FC, &00, &00, &3F
 	DEFB &FF, &00, &00, &FF, &FF, &C0, &03, &FF, &FF, &F0, &0F, &FF, &FF, &FC, &3F, &FF
 
-	;;	................................
-	;;	..............@@@@..............
-	;;	............@@....@@............
-	;;	..........@@..@@@@..@@..........
-	;;	........@@..@@....@@..@@........
-	;;	......@@..@@..@@@@..@@..@@......
-	;;	....@@..@@..@@....@@..@@..@@....
-	;;	..@@..@@..@@..@@@@..@@..@@..@@..
-	;;	..@@..@@..@@..@@@@..@@..@@..@@..
-	;;	...@@@..@@..@@....@@..@@..@@@...
-	;;	.....@@@..@@..@@@@..@@..@@@.....
-	;;	......@@@@..@@....@@..@@@.......
-	;;	......@@@@@@..@@@@..@@@..@......
-	;;	....@.@@@@@@@@....@@@..@@.@@....
-	;;	..@@.@@@@@@@.@@@@@@..@@@@@..@@..
-	;;	.@.@@@@@@@@@...........@@..@@.@.
-	;;	.@@..@@@@@@@.............@@..@@.
-	;;	.@.@@..@@@@@@..........@@..@@.@.
-	;;	.@.@.@@..@@@@........@@..@@.@.@.
-	;;	.@.@.@.@@..@@@@....@@..@@.@.@.@.
-	;;	..@@.@.@.@@..@@@@@@..@@.@.@.@@..
-	;;	....@@.@.@.@@..@@..@@.@.@.@@....
-	;;	......@@.@.@.@@..@@.@.@.@@......
-	;;	........@@.@.@.@@.@.@.@@........
-	;;	..........@@.@.@@.@.@@..........
-	;;	............@@.@@.@@............
-	;;	..............@@@@..............
-	;;	................................
-	;;
-	;;	@@@@@@@@@@@@@@....@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@..@@@@..@@@@@@@@@@@@
-	;;	@@@@@@@@@@..@@....@@..@@@@@@@@@@
-	;;	@@@@@@@@..@@........@@..@@@@@@@@
-	;;	@@@@@@..@@............@@..@@@@@@
-	;;	@@@@..@@......@@@@......@@..@@@@
-	;;	@@..@@......@@....@@......@@..@@
-	;;	@.@@......@@........@@......@@.@
-	;;	@.@@......@@........@@......@@.@
-	;;	@@.@@@......@@....@@......@@@.@@
-	;;	@@@..@@@......@@@@......@@@..@@@
-	;;	@@@@@.@@@@............@@@..@@@@@
-	;;	@@@@..@@@@@@........@@@..@..@@@@
-	;;	@@..@.@@@@@@@@....@@@..@@.@@..@@
-	;;	@.@@.@@@@@@@.@@@@@@..@@@@@..@@.@
-	;;	...@@@@@@@@@.......@@..@@..@@...
-	;;	.....@@@@@@@.@@@@@@@@@@..@@.....
-	;;	.......@@@@@@.@@@@@@@..@@.......
-	;;	.........@@@@..@@@@..@@.........
-	;;	...........@@@@....@@...........
-	;;	@............@@@@@@............@
-	;;	@@.............@@.............@@
-	;;	@@@@........................@@@@
-	;;	@@@@@@....................@@@@@@
-	;;	@@@@@@@@................@@@@@@@@
-	;;	@@@@@@@@@@............@@@@@@@@@@
-	;;	@@@@@@@@@@@@........@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@....@@@@@@@@@@@@@@
+	;;	................................	@@@@@@@@@@@@@@....@@@@@@@@@@@@@@
+	;;	..............@@@@..............	@@@@@@@@@@@@..@@@@..@@@@@@@@@@@@
+	;;	............@@....@@............	@@@@@@@@@@..@@....@@..@@@@@@@@@@
+	;;	..........@@..@@@@..@@..........	@@@@@@@@..@@........@@..@@@@@@@@
+	;;	........@@..@@....@@..@@........	@@@@@@..@@............@@..@@@@@@
+	;;	......@@..@@..@@@@..@@..@@......	@@@@..@@......@@@@......@@..@@@@
+	;;	....@@..@@..@@....@@..@@..@@....	@@..@@......@@....@@......@@..@@
+	;;	..@@..@@..@@..@@@@..@@..@@..@@..	@.@@......@@........@@......@@.@
+	;;	..@@..@@..@@..@@@@..@@..@@..@@..	@.@@......@@........@@......@@.@
+	;;	...@@@..@@..@@....@@..@@..@@@...	@@.@@@......@@....@@......@@@.@@
+	;;	.....@@@..@@..@@@@..@@..@@@.....	@@@..@@@......@@@@......@@@..@@@
+	;;	......@@@@..@@....@@..@@@.......	@@@@@.@@@@............@@@..@@@@@
+	;;	......@@@@@@..@@@@..@@@..@......	@@@@..@@@@@@........@@@..@..@@@@
+	;;	....@.@@@@@@@@....@@@..@@.@@....	@@..@.@@@@@@@@....@@@..@@.@@..@@
+	;;	..@@.@@@@@@@.@@@@@@..@@@@@..@@..	@.@@.@@@@@@@.@@@@@@..@@@@@..@@.@
+	;;	.@.@@@@@@@@@...........@@..@@.@.	...@@@@@@@@@.......@@..@@..@@...
+	;;	.@@..@@@@@@@.............@@..@@.	.....@@@@@@@.@@@@@@@@@@..@@.....
+	;;	.@.@@..@@@@@@..........@@..@@.@.	.......@@@@@@.@@@@@@@..@@.......
+	;;	.@.@.@@..@@@@........@@..@@.@.@.	.........@@@@..@@@@..@@.........
+	;;	.@.@.@.@@..@@@@....@@..@@.@.@.@.	...........@@@@....@@...........
+	;;	..@@.@.@.@@..@@@@@@..@@.@.@.@@..	@............@@@@@@............@
+	;;	....@@.@.@.@@..@@..@@.@.@.@@....	@@.............@@.............@@
+	;;	......@@.@.@.@@..@@.@.@.@@......	@@@@........................@@@@
+	;;	........@@.@.@.@@.@.@.@@........	@@@@@@....................@@@@@@
+	;;	..........@@.@.@@.@.@@..........	@@@@@@@@................@@@@@@@@
+	;;	............@@.@@.@@............	@@@@@@@@@@............@@@@@@@@@@
+	;;	..............@@@@..............	@@@@@@@@@@@@........@@@@@@@@@@@@
+	;;	................................	@@@@@@@@@@@@@@....@@@@@@@@@@@@@@
 
 							;; SPR_SPIKES:     EQU &5B
 	DEFB &00, &00, &00, &00, &00, &00, &00, &00, &00, &08, &10, &00, &00, &08, &10, &00
@@ -22429,63 +20589,34 @@ img_4x28_bin:			;; SPR_DOORSTEP:       EQU &54
 	DEFB &81, &D0, &0B, &81, &C0, &DC, &3B, &03, &F0, &1E, &78, &0F, &FC, &0C, &30, &3F
 	DEFB &FF, &00, &00, &FF, &FF, &C0, &03, &FF, &FF, &F0, &0F, &FF, &FF, &FC, &3F, &FF
 
-	;;	................................
-	;;	................................
-	;;	............@......@............
-	;;	............@......@............
-	;;	........@...@@....@@...@........
-	;;	........@..@@@....@@@..@........
-	;;	....@...@@.@@@.@@.@@@.@@...@....
-	;;	....@..@@@.@@@@..@@@@.@@@..@....
-	;;	....@..@@@.@@@@..@@@@.@@@..@....
-	;;	...@.@.@@@@.@@@..@@@.@@@@.@.@...
-	;;	...@.@.@@.@.@@@..@@@.@.@@.@.@...
-	;;	....@@.@.@..@@@..@@@..@.@.@@....
-	;;	..@.@@@..@..@......@..@..@@@.@..
-	;;	.@@.@@@.@@...@....@...@@.@@@.@@.
-	;;	..@@..@.@@@..@....@..@@@.@..@@..
-	;;	....@@..@@@.@@....@@.@@@..@@....
-	;;	...@..@@..@.@@@..@@@.@..@@..@...
-	;;	...@@@..@@..@@@..@@@..@@..@@@...
-	;;	.@.@@@.@..@@..@..@..@@..@.@@@.@.
-	;;	.@@.@@.@@@..@@....@@..@@@.@@.@@.
-	;;	..@@...@@@.@..@@@@..@.@@@...@@..
-	;;	....@@@.@@.@@@....@@@.@@.@@@....
-	;;	......@@...@@@@..@@@@...@@......
-	;;	........@@@.@@....@@.@@@........
-	;;	..........@@..@..@..@@..........
-	;;	............@@@@@@@@............
-	;;	..............@@@@..............
-	;;	................................
-	;;
-	;;	@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@.@@@@@@.@@@@@@@@@@@@
-	;;	@@@@@@@@@@@.@.@@@@.@.@@@@@@@@@@@
-	;;	@@@@@@@@.@@.@.@@@@.@.@@.@@@@@@@@
-	;;	@@@@@@@.@.@.@@.@@.@@.@.@.@@@@@@@
-	;;	@@@@.@@.@..@@@....@@@..@.@@.@@@@
-	;;	@@@.@.@.@@.@@@....@@@.@@.@.@.@@@
-	;;	@@@.@..@@@.@@@@..@@@@.@@@..@.@@@
-	;;	@@@.@..@@@.@@@@..@@@@.@@@..@.@@@
-	;;	@@.@.@.@@@@.@@@..@@@.@@@@.@.@.@@
-	;;	@@.@.@.@@.@.@@@..@@@.@.@@.@.@.@@
-	;;	@@..@@.@.@..@@@..@@@..@.@.@@..@@
-	;;	@...@@@..@..@......@..@..@@@...@
-	;;	....@@@.@@...@....@...@@.@@@....
-	;;	@.....@.@@@..@....@..@@@.@.....@
-	;;	@@......@@@.@@....@@.@@@......@@
-	;;	@@.@......@.@@@..@@@.@......@.@@
-	;;	@..@@@......@@@..@@@......@@@..@
-	;;	...@@@.@......@..@......@.@@@...
-	;;	....@@.@@@............@@@.@@....
-	;;	@......@@@.@........@.@@@......@
-	;;	@@......@@.@@@....@@@.@@......@@
-	;;	@@@@.......@@@@..@@@@.......@@@@
-	;;	@@@@@@......@@....@@......@@@@@@
-	;;	@@@@@@@@................@@@@@@@@
-	;;	@@@@@@@@@@............@@@@@@@@@@
-	;;	@@@@@@@@@@@@........@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@....@@@@@@@@@@@@@@
+	;;	................................	@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+	;;	................................	@@@@@@@@@@@@.@@@@@@.@@@@@@@@@@@@
+	;;	............@......@............	@@@@@@@@@@@.@.@@@@.@.@@@@@@@@@@@
+	;;	............@......@............	@@@@@@@@.@@.@.@@@@.@.@@.@@@@@@@@
+	;;	........@...@@....@@...@........	@@@@@@@.@.@.@@.@@.@@.@.@.@@@@@@@
+	;;	........@..@@@....@@@..@........	@@@@.@@.@..@@@....@@@..@.@@.@@@@
+	;;	....@...@@.@@@.@@.@@@.@@...@....	@@@.@.@.@@.@@@....@@@.@@.@.@.@@@
+	;;	....@..@@@.@@@@..@@@@.@@@..@....	@@@.@..@@@.@@@@..@@@@.@@@..@.@@@
+	;;	....@..@@@.@@@@..@@@@.@@@..@....	@@@.@..@@@.@@@@..@@@@.@@@..@.@@@
+	;;	...@.@.@@@@.@@@..@@@.@@@@.@.@...	@@.@.@.@@@@.@@@..@@@.@@@@.@.@.@@
+	;;	...@.@.@@.@.@@@..@@@.@.@@.@.@...	@@.@.@.@@.@.@@@..@@@.@.@@.@.@.@@
+	;;	....@@.@.@..@@@..@@@..@.@.@@....	@@..@@.@.@..@@@..@@@..@.@.@@..@@
+	;;	..@.@@@..@..@......@..@..@@@.@..	@...@@@..@..@......@..@..@@@...@
+	;;	.@@.@@@.@@...@....@...@@.@@@.@@.	....@@@.@@...@....@...@@.@@@....
+	;;	..@@..@.@@@..@....@..@@@.@..@@..	@.....@.@@@..@....@..@@@.@.....@
+	;;	....@@..@@@.@@....@@.@@@..@@....	@@......@@@.@@....@@.@@@......@@
+	;;	...@..@@..@.@@@..@@@.@..@@..@...	@@.@......@.@@@..@@@.@......@.@@
+	;;	...@@@..@@..@@@..@@@..@@..@@@...	@..@@@......@@@..@@@......@@@..@
+	;;	.@.@@@.@..@@..@..@..@@..@.@@@.@.	...@@@.@......@..@......@.@@@...
+	;;	.@@.@@.@@@..@@....@@..@@@.@@.@@.	....@@.@@@............@@@.@@....
+	;;	..@@...@@@.@..@@@@..@.@@@...@@..	@......@@@.@........@.@@@......@
+	;;	....@@@.@@.@@@....@@@.@@.@@@....	@@......@@.@@@....@@@.@@......@@
+	;;	......@@...@@@@..@@@@...@@......	@@@@.......@@@@..@@@@.......@@@@
+	;;	........@@@.@@....@@.@@@........	@@@@@@......@@....@@......@@@@@@
+	;;	..........@@..@..@..@@..........	@@@@@@@@................@@@@@@@@
+	;;	............@@@@@@@@............	@@@@@@@@@@............@@@@@@@@@@
+	;;	..............@@@@..............	@@@@@@@@@@@@........@@@@@@@@@@@@
+	;;	................................	@@@@@@@@@@@@@@....@@@@@@@@@@@@@@
 
 							;; SPR_HUSHPUPPY:  EQU &5C
 	DEFB &00, &00, &00, &00, &00, &01, &C0, &00, &00, &07, &F0, &00, &00, &0F, &F8, &00
@@ -22503,63 +20634,34 @@ img_4x28_bin:			;; SPR_DOORSTEP:       EQU &54
 	DEFB &A0, &00, &41, &FB, &D0, &01, &F1, &77, &FC, &07, &F1, &4F, &FF, &0F, &FA, &BF
 	DEFB &FF, &EB, &F7, &FF, &FF, &EA, &EF, &FF, &FF, &F2, &9F, &FF, &FF, &FD, &7F, &FF
 
-	;;	................................
-	;;	...............@@@..............
-	;;	.............@@@@@@@............
-	;;	............@@@@@@@@@...........
-	;;	...........@@@@@@@@@.@@@........
-	;;	.........@@@@@....@@@@@@@@......
-	;;	.......@@@@@........@@@@@@@.....
-	;;	...@@@....@..........@@@@@@@.@..
-	;;	..@@@@@@@@...........@@@@@@@.@@.
-	;;	.@@...@@@@@@@.......@@@@.@@@@...
-	;;	.@@.@@@@@@@@@@@...@@@@@.@@@@@...
-	;;	...@@@@..@@@@@@@.@@@@@@.@@@@@...
-	;;	...@@.@@.@@@@@@@...@@@@.@@@@@@..
-	;;	..@@.@.@@@@..@@@@@@.@@@@.@@@@@..
-	;;	..@@...@@@@@.@@@@@@@.@@@..@@@@@.
-	;;	..@@@.@@@@.@@@@..@@@@.@..@..@@@.
-	;;	..@@@@@@@.@.@@@@.@@@@..@@@@@.@@.
-	;;	.@.@...@@...@@@@@.@@..@@@@@@@@@.
-	;;	.@.@..@.@@.@@@@@@...@.@@@@@@@@@.
-	;;	.@.@@...@@@@@@@@@.@@@@.@@@@@@@..
-	;;	..@.@.@@@@@@.@@..@.@@@.@@@@@@...
-	;;	......@@@@@@...@@@@@@@.@.@@@....
-	;;	........@@@..@@@@@@@@@.@.@......
-	;;	............@@@@@@@@@...........
-	;;	............@.@@@@@@............
-	;;	............@.@.@@@.............
-	;;	..............@.@...............
-	;;	................................
-	;;
-	;;	@@@@@@@@@@@@@@@...@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@.......@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@.........@@@@@@@@@@@
-	;;	@@@@@@@@@@@.............@@@@@@@@
-	;;	@@@@@@@@@.................@@@@@@
-	;;	@@@@@@@.....................@@@@
-	;;	@@@...........................@@
-	;;	@@...........................@.@
-	;;	@............................@@.
-	;;	...............................@
-	;;	..............................@@
-	;;	@.............................@@
-	;;	@@.............................@
-	;;	@....@.........................@
-	;;	@...............................
-	;;	@........................@......
-	;;	@.........@............@@@@@....
-	;;	.@....................@@@@@@@...
-	;;	.@....@...............@@@@@@@@..
-	;;	.@.....................@@@@@@@.@
-	;;	@.@..............@.....@@@@@@.@@
-	;;	@@.@...........@@@@@...@.@@@.@@@
-	;;	@@@@@@.......@@@@@@@...@.@..@@@@
-	;;	@@@@@@@@....@@@@@@@@@.@.@.@@@@@@
-	;;	@@@@@@@@@@@.@.@@@@@@.@@@@@@@@@@@
-	;;	@@@@@@@@@@@.@.@.@@@.@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@..@.@..@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@.@.@@@@@@@@@@@@@@@
+	;;	................................	@@@@@@@@@@@@@@@...@@@@@@@@@@@@@@
+	;;	...............@@@..............	@@@@@@@@@@@@@.......@@@@@@@@@@@@
+	;;	.............@@@@@@@............	@@@@@@@@@@@@.........@@@@@@@@@@@
+	;;	............@@@@@@@@@...........	@@@@@@@@@@@.............@@@@@@@@
+	;;	...........@@@@@@@@@.@@@........	@@@@@@@@@.................@@@@@@
+	;;	.........@@@@@....@@@@@@@@......	@@@@@@@.....................@@@@
+	;;	.......@@@@@........@@@@@@@.....	@@@...........................@@
+	;;	...@@@....@..........@@@@@@@.@..	@@...........................@.@
+	;;	..@@@@@@@@...........@@@@@@@.@@.	@............................@@.
+	;;	.@@...@@@@@@@.......@@@@.@@@@...	...............................@
+	;;	.@@.@@@@@@@@@@@...@@@@@.@@@@@...	..............................@@
+	;;	...@@@@..@@@@@@@.@@@@@@.@@@@@...	@.............................@@
+	;;	...@@.@@.@@@@@@@...@@@@.@@@@@@..	@@.............................@
+	;;	..@@.@.@@@@..@@@@@@.@@@@.@@@@@..	@....@.........................@
+	;;	..@@...@@@@@.@@@@@@@.@@@..@@@@@.	@...............................
+	;;	..@@@.@@@@.@@@@..@@@@.@..@..@@@.	@........................@......
+	;;	..@@@@@@@.@.@@@@.@@@@..@@@@@.@@.	@.........@............@@@@@....
+	;;	.@.@...@@...@@@@@.@@..@@@@@@@@@.	.@....................@@@@@@@...
+	;;	.@.@..@.@@.@@@@@@...@.@@@@@@@@@.	.@....@...............@@@@@@@@..
+	;;	.@.@@...@@@@@@@@@.@@@@.@@@@@@@..	.@.....................@@@@@@@.@
+	;;	..@.@.@@@@@@.@@..@.@@@.@@@@@@...	@.@..............@.....@@@@@@.@@
+	;;	......@@@@@@...@@@@@@@.@.@@@....	@@.@...........@@@@@...@.@@@.@@@
+	;;	........@@@..@@@@@@@@@.@.@......	@@@@@@.......@@@@@@@...@.@..@@@@
+	;;	............@@@@@@@@@...........	@@@@@@@@....@@@@@@@@@.@.@.@@@@@@
+	;;	............@.@@@@@@............	@@@@@@@@@@@.@.@@@@@@.@@@@@@@@@@@
+	;;	............@.@.@@@.............	@@@@@@@@@@@.@.@.@@@.@@@@@@@@@@@@
+	;;	..............@.@...............	@@@@@@@@@@@@..@.@..@@@@@@@@@@@@@
+	;;	................................	@@@@@@@@@@@@@@.@.@@@@@@@@@@@@@@@
 
 							;; SPR_BOOK:       EQU &5D
 	DEFB &00, &00, &00, &00, &00, &03, &C0, &00, &00, &0E, &70, &00, &00, &39, &9C, &00
@@ -22577,63 +20679,34 @@ img_4x28_bin:			;; SPR_DOORSTEP:       EQU &54
 	DEFB &C8, &21, &99, &81, &F4, &20, &66, &03, &F8, &21, &98, &0F, &FE, &20, &60, &3F
 	DEFB &FF, &10, &80, &FF, &FF, &E0, &03, &FF, &FF, &F8, &0F, &FF, &FF, &FE, &3F, &FF
 
-	;;	................................
-	;;	..............@@@@..............
-	;;	............@@@..@@@............
-	;;	..........@@@..@@..@@@..........
-	;;	........@@@..@@..@@..@@@........
-	;;	......@@@..@@..@@..@@..@@@......
-	;;	....@@@..@@..@@@@@@..@@..@@@....
-	;;	...@@@.@@..@@@@@@@@@@..@@.@@@@..
-	;;	...@@@@..@@..@@@@@@..@@..@@@@@@.
-	;;	..@..@@@@..@@..@@..@@..@@@@@@...
-	;;	..@@@..@@@@..@@..@@..@@@@@@.....
-	;;	.@@@.@@..@@@@..@@..@@@@@@....@@.
-	;;	.@@@.@.@@..@@@@..@@@@@@....@@...
-	;;	.@@.@@.@@@@..@@@@@@@@....@@..@@.
-	;;	.@@.@.@@@@.@@..@@@@....@@..@@...
-	;;	.@@.@.@@@@.@.@@.@....@@..@@..@@.
-	;;	.@@.@.@@@.@@.@@@...@@..@@..@@...
-	;;	.@@.@.@@@.@.@@@..@@..@@..@@..@@.
-	;;	..@.@.@@@.@.@@..@..@@..@@..@@...
-	;;	..@.@.@@@.@.@@...@@..@@..@@..@@.
-	;;	....@.@@@.@.@@.@@..@@..@@..@@@..
-	;;	.....@.@@.@.@@...@@..@@..@@@....
-	;;	.......@@.@.@@.@@..@@..@@@......
-	;;	........@.@.@@...@@..@@@........
-	;;	...........@.@@.@..@@@..........
-	;;	.............@@@.@@@............
-	;;	...............@@@..............
-	;;	................................
-	;;
-	;;	@@@@@@@@@@@@@@....@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@........@@@@@@@@@@@@
-	;;	@@@@@@@@@@............@@@@@@@@@@
-	;;	@@@@@@@@.......@@.......@@@@@@@@
-	;;	@@@@@@.......@@..@@.......@@@@@@
-	;;	@@@@.......@@......@@.......@@@@
-	;;	@@@......@@..........@@.......@@
-	;;	@@.....@@..............@@......@
-	;;	@@.......@@..........@@.........
-	;;	@..........@@......@@..........@
-	;;	@............@@..@@............@
-	;;	.....@@........@@............@@.
-	;;	.....@.....................@@..@
-	;;	....@@...................@@..@@.
-	;;	....@......@@..........@@..@@..@
-	;;	....@......@.........@@..@@..@@.
-	;;	....@.....@@.......@@..@@..@@..@
-	;;	....@.....@......@@..@@..@@..@@.
-	;;	@...@.....@.....@..@@..@@..@@..@
-	;;	@...@.....@......@@..@@..@@.....
-	;;	@@..@.....@....@@..@@..@@......@
-	;;	@@@@.@....@......@@..@@.......@@
-	;;	@@@@@.....@....@@..@@.......@@@@
-	;;	@@@@@@@...@......@@.......@@@@@@
-	;;	@@@@@@@@...@....@.......@@@@@@@@
-	;;	@@@@@@@@@@@...........@@@@@@@@@@
-	;;	@@@@@@@@@@@@@.......@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@@...@@@@@@@@@@@@@@
+	;;	................................	@@@@@@@@@@@@@@....@@@@@@@@@@@@@@
+	;;	..............@@@@..............	@@@@@@@@@@@@........@@@@@@@@@@@@
+	;;	............@@@..@@@............	@@@@@@@@@@............@@@@@@@@@@
+	;;	..........@@@..@@..@@@..........	@@@@@@@@.......@@.......@@@@@@@@
+	;;	........@@@..@@..@@..@@@........	@@@@@@.......@@..@@.......@@@@@@
+	;;	......@@@..@@..@@..@@..@@@......	@@@@.......@@......@@.......@@@@
+	;;	....@@@..@@..@@@@@@..@@..@@@....	@@@......@@..........@@.......@@
+	;;	...@@@.@@..@@@@@@@@@@..@@.@@@@..	@@.....@@..............@@......@
+	;;	...@@@@..@@..@@@@@@..@@..@@@@@@.	@@.......@@..........@@.........
+	;;	..@..@@@@..@@..@@..@@..@@@@@@...	@..........@@......@@..........@
+	;;	..@@@..@@@@..@@..@@..@@@@@@.....	@............@@..@@............@
+	;;	.@@@.@@..@@@@..@@..@@@@@@....@@.	.....@@........@@............@@.
+	;;	.@@@.@.@@..@@@@..@@@@@@....@@...	.....@.....................@@..@
+	;;	.@@.@@.@@@@..@@@@@@@@....@@..@@.	....@@...................@@..@@.
+	;;	.@@.@.@@@@.@@..@@@@....@@..@@...	....@......@@..........@@..@@..@
+	;;	.@@.@.@@@@.@.@@.@....@@..@@..@@.	....@......@.........@@..@@..@@.
+	;;	.@@.@.@@@.@@.@@@...@@..@@..@@...	....@.....@@.......@@..@@..@@..@
+	;;	.@@.@.@@@.@.@@@..@@..@@..@@..@@.	....@.....@......@@..@@..@@..@@.
+	;;	..@.@.@@@.@.@@..@..@@..@@..@@...	@...@.....@.....@..@@..@@..@@..@
+	;;	..@.@.@@@.@.@@...@@..@@..@@..@@.	@...@.....@......@@..@@..@@.....
+	;;	....@.@@@.@.@@.@@..@@..@@..@@@..	@@..@.....@....@@..@@..@@......@
+	;;	.....@.@@.@.@@...@@..@@..@@@....	@@@@.@....@......@@..@@.......@@
+	;;	.......@@.@.@@.@@..@@..@@@......	@@@@@.....@....@@..@@.......@@@@
+	;;	........@.@.@@...@@..@@@........	@@@@@@@...@......@@.......@@@@@@
+	;;	...........@.@@.@..@@@..........	@@@@@@@@...@....@.......@@@@@@@@
+	;;	.............@@@.@@@............	@@@@@@@@@@@...........@@@@@@@@@@
+	;;	...............@@@..............	@@@@@@@@@@@@@.......@@@@@@@@@@@@
+	;;	................................	@@@@@@@@@@@@@@@...@@@@@@@@@@@@@@
 
 							;; SPR_TOASTER:    EQU &5E
 	DEFB &00, &00, &00, &00, &00, &03, &80, &00, &00, &0F, &E0, &00, &00, &3C, &78, &00
@@ -22651,63 +20724,34 @@ img_4x28_bin:			;; SPR_DOORSTEP:       EQU &54
 	DEFB &DE, &5D, &00, &01, &E7, &97, &06, &03, &F9, &E5, &0C, &0F, &FE, &79, &00, &3F
 	DEFB &FF, &9E, &80, &FF, &FF, &E7, &83, &FF, &FF, &F9, &CF, &FF, &FF, &FE, &3F, &FF
 
-	;;	................................
-	;;	..............@@@...............
-	;;	............@@@@@@@.............
-	;;	..........@@@@...@@@@...........
-	;;	........@@@@@..@@..@@@@.........
-	;;	......@@@@@@@@...@@..@@@@.......
-	;;	....@@@@...@@@@@...@@..@@@@.....
-	;;	...@@@@..@@..@@@@@...@@..@@@@...
-	;;	..@@@@@@...@@..@@@@@...@@.@@@@..
-	;;	...@@@@@@@...@@..@@@@@...@@@@@..
-	;;	.@@..@@@@@@@...@@..@@@@@@@@@@@@.
-	;;	.@@@@..@@@@@@@...@@.@@@@@@..@@@.
-	;;	.@@@@@@..@@@@@@@...@@@@@@.@@.@@.
-	;;	.@@@@@@@@..@@@@@@@@@@@@@@..@.@@.
-	;;	.@.@@@@@@@@..@@@@@@@..@@@.@@.@@.
-	;;	.@@@.@@@@@@@@..@.@@.@@.@@..@.@@.
-	;;	.@.@@@.@@@@@@@@..@@..@.@@..@.@@.
-	;;	.@.@.@@@.@@@@@@@.@@.@@.@@....@@.
-	;;	.@@..@.@@@.@@@@@.@@..@.@@..@@.@.
-	;;	..@@@..@.@@@.@@@.@@..@.@@.@@..@.
-	;;	...@@@@..@.@@@.@.@@....@@@..@@..
-	;;	.....@@@@..@.@@@.@@..@@.@@@@....
-	;;	.......@@@@..@.@.@@.@@..@@......
-	;;	.........@@@@..@.@@@..@@........
-	;;	...........@@@@.@.@@@@..........
-	;;	.............@@@@.@@............
-	;;	...............@@@..............
-	;;	................................
-	;;
-	;;	@@@@@@@@@@@@@@...@@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@.......@@@@@@@@@@@@@
-	;;	@@@@@@@@@@...........@@@@@@@@@@@
-	;;	@@@@@@@@...............@@@@@@@@@
-	;;	@@@@@@.........@@........@@@@@@@
-	;;	@@@@.............@@........@@@@@
-	;;	@@@................@@........@@@
-	;;	@@.......@@..........@@.......@@
-	;;	@..........@@..........@@......@
-	;;	@............@@................@
-	;;	.@@............@@...............
-	;;	.@@@@............@@.............
-	;;	.@@@@@@.........................
-	;;	.@@@@@@@@.......................
-	;;	.@.@@@@@@@@.....................
-	;;	.@@@.@@@@@@@@...................
-	;;	.@.@@@.@@@@@@@@.................
-	;;	.@.@.@@@.@@@@@@@................
-	;;	.@@..@.@@@.@@@@@...........@@...
-	;;	@.@@@..@.@@@.@@@..........@@....
-	;;	@@.@@@@..@.@@@.@...............@
-	;;	@@@..@@@@..@.@@@.....@@.......@@
-	;;	@@@@@..@@@@..@.@....@@......@@@@
-	;;	@@@@@@@..@@@@..@..........@@@@@@
-	;;	@@@@@@@@@..@@@@.@.......@@@@@@@@
-	;;	@@@@@@@@@@@..@@@@.....@@@@@@@@@@
-	;;	@@@@@@@@@@@@@..@@@..@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@@...@@@@@@@@@@@@@@
+	;;	................................	@@@@@@@@@@@@@@...@@@@@@@@@@@@@@@
+	;;	..............@@@...............	@@@@@@@@@@@@.......@@@@@@@@@@@@@
+	;;	............@@@@@@@.............	@@@@@@@@@@...........@@@@@@@@@@@
+	;;	..........@@@@...@@@@...........	@@@@@@@@...............@@@@@@@@@
+	;;	........@@@@@..@@..@@@@.........	@@@@@@.........@@........@@@@@@@
+	;;	......@@@@@@@@...@@..@@@@.......	@@@@.............@@........@@@@@
+	;;	....@@@@...@@@@@...@@..@@@@.....	@@@................@@........@@@
+	;;	...@@@@..@@..@@@@@...@@..@@@@...	@@.......@@..........@@.......@@
+	;;	..@@@@@@...@@..@@@@@...@@.@@@@..	@..........@@..........@@......@
+	;;	...@@@@@@@...@@..@@@@@...@@@@@..	@............@@................@
+	;;	.@@..@@@@@@@...@@..@@@@@@@@@@@@.	.@@............@@...............
+	;;	.@@@@..@@@@@@@...@@.@@@@@@..@@@.	.@@@@............@@.............
+	;;	.@@@@@@..@@@@@@@...@@@@@@.@@.@@.	.@@@@@@.........................
+	;;	.@@@@@@@@..@@@@@@@@@@@@@@..@.@@.	.@@@@@@@@.......................
+	;;	.@.@@@@@@@@..@@@@@@@..@@@.@@.@@.	.@.@@@@@@@@.....................
+	;;	.@@@.@@@@@@@@..@.@@.@@.@@..@.@@.	.@@@.@@@@@@@@...................
+	;;	.@.@@@.@@@@@@@@..@@..@.@@..@.@@.	.@.@@@.@@@@@@@@.................
+	;;	.@.@.@@@.@@@@@@@.@@.@@.@@....@@.	.@.@.@@@.@@@@@@@................
+	;;	.@@..@.@@@.@@@@@.@@..@.@@..@@.@.	.@@..@.@@@.@@@@@...........@@...
+	;;	..@@@..@.@@@.@@@.@@..@.@@.@@..@.	@.@@@..@.@@@.@@@..........@@....
+	;;	...@@@@..@.@@@.@.@@....@@@..@@..	@@.@@@@..@.@@@.@...............@
+	;;	.....@@@@..@.@@@.@@..@@.@@@@....	@@@..@@@@..@.@@@.....@@.......@@
+	;;	.......@@@@..@.@.@@.@@..@@......	@@@@@..@@@@..@.@....@@......@@@@
+	;;	.........@@@@..@.@@@..@@........	@@@@@@@..@@@@..@..........@@@@@@
+	;;	...........@@@@.@.@@@@..........	@@@@@@@@@..@@@@.@.......@@@@@@@@
+	;;	.............@@@@.@@............	@@@@@@@@@@@..@@@@.....@@@@@@@@@@
+	;;	...............@@@..............	@@@@@@@@@@@@@..@@@..@@@@@@@@@@@@
+	;;	................................	@@@@@@@@@@@@@@@...@@@@@@@@@@@@@@
 
 							;; SPR_CUSHION:    EQU &5F
 	DEFB &00, &00, &00, &00, &00, &02, &C0, &00, &00, &0D, &30, &00, &00, &33, &CC, &00
@@ -22725,63 +20769,34 @@ img_4x28_bin:			;; SPR_DOORSTEP:       EQU &54
 	DEFB &80, &00, &00, &01, &C0, &00, &00, &03, &F0, &00, &00, &0F, &FC, &00, &00, &3F
 	DEFB &FF, &00, &00, &FF, &FF, &C0, &03, &FF, &FF, &F0, &0F, &FF, &FF, &FC, &3F, &FF
 
-	;;	................................
-	;;	..............@.@@..............
-	;;	............@@.@..@@............
-	;;	..........@@..@@@@..@@..........
-	;;	........@@..@@@@@@@@..@@........
-	;;	......@@..@@@@@@@@@@@@..@@......
-	;;	....@@..@@@@@@@@@@@@@@@@..@@....
-	;;	..@@..@@@@@@@@@@@@@@@@@@@@..@@..
-	;;	.@..@@@@@@@@@@@@@@@@@@@@@@@@..@.
-	;;	..@@..@@@@@@@@@@@@@@@@@@@@..@@..
-	;;	.@@.@@..@@@@@@@@@@@@@@@@..@@.@@.
-	;;	..@.@.@@..@@@@@@@@@@@@..@@.@.@..
-	;;	.@..@.@@.@..@@@@@@@@..@@.@.@..@.
-	;;	.@@@..@.@.@@..@@@@..@@@@@@..@@@.
-	;;	...@@@..@@@@.@....@.@@.@..@@@...
-	;;	.@@..@@@..@.@@.@.@@@.@..@@@...@.
-	;;	..@@...@@@..@.@@.@.@..@@@..@.@..
-	;;	.@@.@.@..@@@..@.@@..@@@..@.@.@@.
-	;;	.@..@@.@@..@@@....@@@..@.@.@@.@.
-	;;	.@.@@.@@.@...@@@@@@..@@.@.@.@.@.
-	;;	..@@..@@.@@.@......@..@.@@..@@..
-	;;	....@@@..@@.@.@.@.@@.@@..@@@....
-	;;	......@.@@.@@@.@@.@@..@@.@......
-	;;	........@@.@.@.@@..@@.@@........
-	;;	..........@@@..@@@..@@..........
-	;;	............@.@@.@@@............
-	;;	..............@@.@..............
-	;;	................................
-	;;
-	;;	@@@@@@@@@@@@@@.@..@@@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@........@@@@@@@@@@@@
-	;;	@@@@@@@@@@............@@@@@@@@@@
-	;;	@@@@@@@@.......@.@......@@@@@@@@
-	;;	@@@@@@......@.@.@.@.......@@@@@@
-	;;	@@@@.......@.@.@.@.@.@......@@@@
-	;;	@@......@.@.@.@.@.@.@.@.......@@
-	;;	@......@.@.@.@.@.@.@.@.@.@.....@
-	;;	....@.@.@.@.@.@.@.@.@.@.@.@.....
-	;;	@......@.@.@.@.@.@.@.@.@.@.....@
-	;;	........@.@.@.@.@.@.@.@.........
-	;;	@..........@.@.@.@.@.@.........@
-	;;	.@..........@.@.@.@...........@.
-	;;	.@@@...........@.@..........@@@.
-	;;	@..@@@....................@@@..@
-	;;	.....@@@................@@@.....
-	;;	@......@@@............@@@......@
-	;;	.........@@@........@@@.........
-	;;	...........@@@....@@@...........
-	;;	.............@@@@@@.............
-	;;	@..............................@
-	;;	@@............................@@
-	;;	@@@@........................@@@@
-	;;	@@@@@@....................@@@@@@
-	;;	@@@@@@@@................@@@@@@@@
-	;;	@@@@@@@@@@............@@@@@@@@@@
-	;;	@@@@@@@@@@@@........@@@@@@@@@@@@
-	;;	@@@@@@@@@@@@@@....@@@@@@@@@@@@@@
+	;;	................................	@@@@@@@@@@@@@@.@..@@@@@@@@@@@@@@
+	;;	..............@.@@..............	@@@@@@@@@@@@........@@@@@@@@@@@@
+	;;	............@@.@..@@............	@@@@@@@@@@............@@@@@@@@@@
+	;;	..........@@..@@@@..@@..........	@@@@@@@@.......@.@......@@@@@@@@
+	;;	........@@..@@@@@@@@..@@........	@@@@@@......@.@.@.@.......@@@@@@
+	;;	......@@..@@@@@@@@@@@@..@@......	@@@@.......@.@.@.@.@.@......@@@@
+	;;	....@@..@@@@@@@@@@@@@@@@..@@....	@@......@.@.@.@.@.@.@.@.......@@
+	;;	..@@..@@@@@@@@@@@@@@@@@@@@..@@..	@......@.@.@.@.@.@.@.@.@.@.....@
+	;;	.@..@@@@@@@@@@@@@@@@@@@@@@@@..@.	....@.@.@.@.@.@.@.@.@.@.@.@.....
+	;;	..@@..@@@@@@@@@@@@@@@@@@@@..@@..	@......@.@.@.@.@.@.@.@.@.@.....@
+	;;	.@@.@@..@@@@@@@@@@@@@@@@..@@.@@.	........@.@.@.@.@.@.@.@.........
+	;;	..@.@.@@..@@@@@@@@@@@@..@@.@.@..	@..........@.@.@.@.@.@.........@
+	;;	.@..@.@@.@..@@@@@@@@..@@.@.@..@.	.@..........@.@.@.@...........@.
+	;;	.@@@..@.@.@@..@@@@..@@@@@@..@@@.	.@@@...........@.@..........@@@.
+	;;	...@@@..@@@@.@....@.@@.@..@@@...	@..@@@....................@@@..@
+	;;	.@@..@@@..@.@@.@.@@@.@..@@@...@.	.....@@@................@@@.....
+	;;	..@@...@@@..@.@@.@.@..@@@..@.@..	@......@@@............@@@......@
+	;;	.@@.@.@..@@@..@.@@..@@@..@.@.@@.	.........@@@........@@@.........
+	;;	.@..@@.@@..@@@....@@@..@.@.@@.@.	...........@@@....@@@...........
+	;;	.@.@@.@@.@...@@@@@@..@@.@.@.@.@.	.............@@@@@@.............
+	;;	..@@..@@.@@.@......@..@.@@..@@..	@..............................@
+	;;	....@@@..@@.@.@.@.@@.@@..@@@....	@@............................@@
+	;;	......@.@@.@@@.@@.@@..@@.@......	@@@@........................@@@@
+	;;	........@@.@.@.@@..@@.@@........	@@@@@@....................@@@@@@
+	;;	..........@@@..@@@..@@..........	@@@@@@@@................@@@@@@@@
+	;;	............@.@@.@@@............	@@@@@@@@@@............@@@@@@@@@@
+	;;	..............@@.@..............	@@@@@@@@@@@@........@@@@@@@@@@@@
+	;;	................................	@@@@@@@@@@@@@@....@@@@@@@@@@@@@@
 
 ;; -----------------------------------------------------------------------------------------------------------
 img_2x24_bin:
@@ -23007,7 +21022,7 @@ floor_tile_pattern7: 				;; Empty tile
 	DEFB &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00
 
 ;; -----------------------------------------------------------------------------------------------------------
-.Char_symbol_data: 			;; (Note: addr=AB58 before the block move, &B630 after)
+.Char_symbol_data: 			;; 1x8 (Note: addr=AB58 before the block move, &B630 after)
 	DEFB &00, &00, &00, &00, &00, &00, &00, &00		;;, &charID &00: Space
 		;;       ................
 		;;       ................
@@ -23581,11 +21596,11 @@ floor_tile_pattern7: 				;; Empty tile
 	;;	...@@@@@@@@@.... ................ : ...ooooooooo....
 	;;	.....@@@@@...... ..@.........@... : ..c..ooooo..c...
 
-.image_pillar_btm:				;; 4x4 *2 Pillar Bottom
+.image_pillar_btm:				;; 4x8 *2 Pillar Bottom
 	DEFB &00, &78, &00, &3C, &00, &7F, &00, &FC, &00, &3F, &00, &F8, &00, &0F, &00, &E0
 	;;  B888-B897 : This is missing from the DSK file I used in the file HEADOVER.III !
 	;;  Thus I can see a glitch at the bottom of the pillars.
-	;;  In another DSK version we see it should be 16 "00" bytes and indeed it gets rid of the glich.
+	;;  In another DSK version, we see it should be 16 "00" bytes and indeed it gets rid of the glich.
 	DEFB &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00
 	;; (shown as "msk1+msk2 img1+img2 : result" so it is easier to see the result)
 	;;
@@ -23629,15 +21644,16 @@ Other_Character_state:
 	;; &1D bytes (29)
 	DEFS 	1							;; Saved ObjListIdx
 	DEFS 	2							;; Saved Object_Destination
-	DEFS 	2							;; Saved ObjListAPtr
-	DEFS 	2							;; Saved ObjListBPtr
+	DEFS 	2							;; Saved ObjListF2NPtr
+	DEFS 	2							;; Saved ObjListN2FPtr
 	DEFS 	20							;; Saved ObjectLists
 	DEFS 	2							;; Saved Saved_Object_Destination
 	;; &19 bytes (25)
-	DEFS 	1							;; Saved ???
-	DEFS 	3		 					;; Saved (fire) object EntryPosn
-	DEFS 	1  							;; Saved ???
-	DEFS 	2		     				;; Saved Carrying
+OCS_Saved:
+	DEFS 	1							;; Saved room access code
+	DEFS 	3		 					;; Saved object EntryPosition_uvz
+	DEFS 	1  							;; Saved selected character
+	DEFS 	2		     				;; Saved Carried_Object
 	DEFS 	18							;; Saved &12 bytes FiredObj_variables
 	;; &3F0 bytes
 	DEFS 	&03F0						;; Saved Objects buffer
