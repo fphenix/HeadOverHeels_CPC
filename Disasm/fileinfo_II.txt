@@ -1,5 +1,5 @@
 ;; -----------------------------------------------------------------------------------------------------------
-;; Disassembly of "Head over Heels" - Amstrad CPC
+;; Disassembly of "Head over Heels" - Amstrad CPC - Jon Ritman and Bernie Drummond / Ocean
 ;; Author : Fred Limouzin (fphenix@hotmail.com)
 ;;
 ;; -----------------------------------------------------------------------------------------------------------
@@ -1021,23 +1021,33 @@ program_Gate_array_colors:
 ;; -----------------------------------------------------------------------------------------------------------CPC
 ;; Table for the Color Scheme 4 colors
 ;; (Index = color Scheme number * 4)
-C_GREY					EQU		&00
-C_CREAM					EQU		&03
+C_BLACK					EQU		&14	;; Firmware color 0, Hardware color &14 (program &54)
 C_DKBLUE				EQU		&04
-C_PURPLE				EQU		&05
-C_DKCYAN				EQU		&06
-C_PINK					EQU		&07
-C_YELLOW				EQU		&0A
-C_WHITE					EQU		&0B
-C_RED					EQU		&0C
-C_ORANGE				EQU		&0E
-C_CYAN					EQU		&13
-C_BLACK					EQU		&14
 C_BLUE					EQU		&15
-C_DKGREEN				EQU		&16
+C_MAROON				EQU		&1C
 C_MAGENTA				EQU		&18
-C_DARKRED				EQU		&1C
 C_MAUVE					EQU		&1D
+C_RED					EQU		&0C
+C_PURPLE				EQU		&05 ;; or &08
+C_MAGENTAVIF			EQU		&0D
+C_DKGREEN				EQU		&16
+C_DKCYAN				EQU		&06
+C_SKYBLUE				EQU		&17
+C_DRKYELLOW				EQU		&1E
+C_GREY					EQU		&00 ;; or &01
+C_PASTELBLUE			EQU		&1F
+C_ORANGE				EQU		&0E
+C_PINK					EQU		&07
+C_DARKPINK				EQU		&0F
+C_GREEN					EQU		&12
+C_SEAGREEN				EQU		&02	;; or &11
+C_CYAN					EQU		&13
+C_LIME					EQU		&1A
+C_PSTLGREEN				EQU		&19
+C_TURQUOISE				EQU		&1B
+C_YELLOW				EQU		&0A
+C_CREAM					EQU		&03	;; or &09
+C_WHITE					EQU		&0B	;; Firmware color 26, Hardware color &0B (program &4B)
 
 COLOR_SCHEME_ALLBLACK	EQU		8
 
@@ -1051,8 +1061,8 @@ array_Color_Schemes:
 	056C 14 06 0E 0B	DEFB 	C_BLACK,   C_DKCYAN,  C_ORANGE,	 C_WHITE		;; Color Scheme 06 : Black, DarkCyan, Orange, White (Exemple : screen showing the worlds/crowns ("The Blacktooth Empire") or the "Salute you" screen); note DarkCyan is a vert-de-gris kinda color
 	0570 14 0C 15 03	DEFB 	C_BLACK,   C_RED, 	  C_BLUE, 	 C_CREAM		;; Color Scheme 07 : Black, Red, Blue, Pastel_yellow (This is probably the one for Room 1)
 	0574 14 14 14 14	DEFB 	C_BLACK,   C_BLACK,   C_BLACK, 	 C_BLACK		;; Color Scheme 08 : Black, Black, Black, Black (Screen Off)
-	0578 00 04 1C 0A	DEFB 	C_GREY,    C_DKBLUE,  C_DARKRED, C_YELLOW		;; Color Scheme 09 : Grey, DarkBlue, DarkRed, Yellow (Exemple: Game, Controls, Sound and Sensitivity menues)
-	057C 1C 0A 13 07	DEFB 	C_DARKRED, C_YELLOW,  C_CYAN, 	 C_PINK			;; Color Scheme 0A : DarkRed, Yellow, Cyan, Pink (Exemple: Main menu)
+	0578 00 04 1C 0A	DEFB 	C_GREY,    C_DKBLUE,  C_MAROON,  C_YELLOW		;; Color Scheme 09 : Grey, DarkBlue, DarkRed, Yellow (Exemple: Game, Controls, Sound and Sensitivity menues)
+	057C 1C 0A 13 07	DEFB 	C_MAROON,  C_YELLOW,  C_CYAN, 	 C_PINK			;; Color Scheme 0A : DarkRed, Yellow, Cyan, Pink (Exemple: Main menu)
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Look-up the char ID in A (note: this value already had a minus &20)
@@ -6376,7 +6386,7 @@ GROUND_LEVEL			EQU 	&C0
 	1F5A E6 08          AND 	&08											;; test bit3 (Nw wall)
 test_if_wall_far_V:
 	1F5C 28 1C          JR		Z,test_if_wall_far_U						;; if 0 then has Nw wall jump test_if_wall_far_U, else:
-	;; Draw the room in V direction (Nw side)								;; current room has no Nw wall (can see further in next room)
+	;; Draw the room in V direction (Nw side)								; current room has no Nw wall (can see further in next room)
 	1F5E 3E 01          LD A,&01
 	1F60 CD C1 39       CALL 	SetObjList									;; index 1 in obj list
 	1F63 ED 4B 0E 01    LD		BC,(current_Room_ID)						;; get current_Room_ID
@@ -7770,7 +7780,6 @@ br_25B3
 	25B3 32 58 46       LD		(access_new_room_code),A					;; update access_new_room_code (0=Stay,1=Down,2=Right,3=Up,4=Left,5=Below,6=Above,7=Teleport)
 br_25B6
 	25B6 CD 87 27       CALL 	CharThing4
-
 br_25B9:
 	25B9 CD 3B 2B       CALL	Get_curr_Char_variables						;; HL = pointer on current selected character's variables
 	25BC E5             PUSH	HL
@@ -8791,6 +8800,7 @@ Facing_in_new_Room_tab:
 	2C58				DEFB	FACING_DOWN, FACING_RIGHT, FACING_UP, FACING_LEFT		;; Down Right Up Left
 	2C5C				DEFB	FACING_DOWN, FACING_DOWN								;; Below Above
 
+;; -----------------------------------------------------------------------------------------------------------
 WallSideBitmap: 									;; index 0 = 8 = bit3, index 1 = 4 = bit2 etc.
 	2C5E 08 04 02 01	DEFB	&08, &04, &02, &01
 
@@ -14520,7 +14530,7 @@ dsc_loop:
 	4BA8 23             INC 	HL
 	4BA9 13             INC 	DE											;; next byte
 	4BAA 10 F8          DJNZ 	dsc_loop
-	4BAC 21 04 10       LD		HL,&1004									;; sprite size : x=2x4 (2 pix per byte) ; y=16 (&10)
+	4BAC 21 04 10       LD		HL,&10 * WORD_HIGH_BYTE + &04				;; sprite size : x=2x4 (2 pix per byte) ; y=16 (&10)
 	4BAF 11 AD 4A       LD		DE,Double_size_char_buffer					;; Double_size_char_buffer
 	4BB2 C9             RET
 
