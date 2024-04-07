@@ -4,13 +4,12 @@
 ;; Author : Fred Limouzin (fphenix@hotmail.com)
 ;; Tool used: mostly WinApe and Notepad++!
 ;; -----------------------------------------------------------------------------------------------------------
-;; Bonus work of the Head Over Heels dissassembly. WORK UNDER PROGRESS
-;; Note that Batman was the base game HoH was developped from.
+;; THis is a Bonus work of the Head Over Heels dissassembly.  WORK UNDER PROGRESS
+;; Note that Batman was the base game "HoH" was developped from, hence many functions are identical.
 ;; -----------------------------------------------------------------------------------------------------------
 
 						ORG		&0100
 						run		Entry
-
 Stack:
 Entry:
 	0100 C3 03 01       JP Reentry
@@ -49,7 +48,7 @@ RoomID_Batman_1st		EQU		&8A40					;; This is first room ID (8A4)
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Main : Entry point and main loop
 ;; Game_over : Entry point after a game has been played
-.Game_over:																	;; when "game over" branch here and continue at 'Main'
+.Game_over:													;; when "game over" branch here and continue at 'Main'
 	0117 CD 7C 24    	CALL Game_over_screen
 Main:
 	011A 31 00 01       LD SP,Stack
@@ -70,7 +69,7 @@ Enter_New_Room
 	0136 AF             XOR A
 	0137 32 11 01       LD (Do_Objects_Phase),A
 	013A ED 4B 0E 01    LD BC,(current_Room_ID)
-	013E CD 0D 1B       CALL 1B0D ;; ?? Do_Enter_Room ??
+	013E CD 0D 1B       CALL EnterRoom
 Main_loop
 	0141 CD DA 01       CALL Check_User_Input
 	0144 CD 5A 02       CALL Do_Objects
@@ -94,58 +93,67 @@ test_right_posish		;; test if the Batman sprite is in the right position in the 
 	0165 01 05 00       LD BC,5
 test_posish_loop
 	0168 1A             LD A,(DE)
-	0169 ED A1          CPI			;; CP (HL) ; INC HL; DEC BC
+	0169 ED A1          CPI							;; CP (HL) ; INC HL; DEC BC
 	016B 13             INC DE
-	016C C0             RET NZ		;; leave if Batman not at the right position
-	016D EA 68 01       JP PE,test_posish_loop ;; at CPI if BC != 0, V is set (loop), if BC=0 V is reset (cont)
+	016C C0             RET NZ						;; leave if Batman not at the right position
+	016D EA 68 01       JP PE,test_posish_loop		;; at CPI, if BC != 0, V (overflow floag) is set (loop), if BC=0 V is reset (cont)
 beat_the_game:
 	0170 CD 4D 0A       CALL Play_Batman_Theme
 	0173 CD 44 37       CALL Wait_key_pressed
-	0176 CD F2 24       CALL 24F2
+	0176 CD F2 24       CALL Batcraft_complete_screen
 	0179 3E FF          LD A,&FF
 	017B 32 16 01       LD (win_state),A
 	017E C3 17 01       JP Game_over
 
+;; -----------------------------------------------------------------------------------------------------------
+;; position for winning the game
 test_posish_data
-	0181 				DEFB &08, &14, &28, &B4, &10 ;; Winning position : Flag, U,V,Z,Sprite
+	0181 				DEFB &08, &14, &28, &B4, SPR_BATMAN_0 ;; Winning position : Flag, U,V,Z,Sprite
 
 ;; -----------------------------------------------------------------------------------------------------------
+;; Go_to_room ???
 	0186 3A         	LD A,(access_new_room_code)
 	0189 3D          	DEC A
 	018A 2A 0E 01       LD HL,(current_Room_ID)
-	018D FE 05          CP 05
-	018F 30 25          JR NC,01B6
+	018D FE 05          CP &05
+	018F 30 25          JR NC,&01B6
 	0191 1F             RRA
-	0192 38 0B          JR c,019F
-	0194 11 10 F0       LD DE,F010
+	0192 38 0B          JR c,&019F
+	0194 11 10 F0       LD DE,&F010
 	0197 1F             RRA
-	0198 30 01          JR NC,019B
+	0198 30 01          JR NC,&019B
 	019A 53             LD D,E
+
 	019B 7C             LD A,H
 	019C 82             ADD A,D
-	019D 18 0D          JR 01AC
-	019F 11 01 FF       LD DE,FF01
+	019D 18 0D          JR &01AC
+
+	019F 11 01 FF       LD DE,&FF01
 	01A2 1F             RRA
-	01A3 30 01          JR NC,01A6
+	01A3 30 01          JR NC,&01A6
 	01A5 53             LD D,E
+
 	01A6 7C             LD A,H
 	01A7 82             ADD A,D
 	01A8 AC             XOR H
-	01A9 E6 0F          AND 0F
+	01A9 E6 0F          AND &0F
 	01AB AC             XOR H
+
 	01AC 67             LD H,A
+
 	01AD 22 0E 01       LD (current_Room_ID),HL
 
 	01B0 31 00 01       LD SP,Stack
 	01B3 C3 36 01       JP Enter_New_Room
 
 	01B6 1F             RRA
-	01B7 3E 10          LD A,10
-	01B9 38 02          JR c,01BD
+	01B7 3E 10          LD A,&10
+	01B9 38 02          JR c,&01BD
 	01BB 3E F0          LD A,&F0
+
 	01BD 85             ADD A,L
 	01BE 6F             LD L,A
-	01BF 18 EC          JR 01AD
+	01BF 18 EC          JR &01AD
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Controls the frame rate (FPS) by syncing with a number of VSYNC.
@@ -182,12 +190,13 @@ us_skip
 	01DD CB 7F          BIT 7,A
 	01DF 21 14 01       LD HL,action_key_pressed
 	01E2 36 00          LD (HL),0
-	01E4 20 02          JR NZ,01E8
+	01E4 20 02          JR NZ,cuiskp
 	01E6 36 FF          LD (HL),&FF
+cuiskp:
 	01E8 CB 77          BIT 6,A
-	01EA 20 1C          JR NZ,0208
+	01EA 20 1C          JR NZ,Update_key
 ;;Check_Pause
-	01EC CD B2 0B       CALL 0BB2
+	01EC CD B2 0B       CALL Silence_all_Voices
 	01EF CD 05 08       CALL Wait_anykey_released
 	01F2 3E BE          LD A,Print_Paused
 	01F4 CD 15 3C       CALL Print_String
@@ -201,6 +210,7 @@ leave_pause
 	0203 CD 42 02       CALL LeavePause
 	0206 18 D2          JR Check_User_Input
 
+Update_key
 	0208 4F             LD C,A
 	0209 1F             RRA
 	020A CD 16 36       CALL DirCode_from_LRDU
@@ -259,10 +269,10 @@ rls_1
 ;; leave pause
 LeavePause
 	0242 CD 2E 1B       CALL Update_Screen_Periph
-	0245 21 50 4C       LD HL,&4C50
+	0245 21 50 4C       LD HL,&4C * WORD_HIGH_BYTE + &50
 pause_message_draw_over_loop
 	0248 E5             PUSH HL
-	0249 11 88 60       LD DE,&6088
+	0249 11 88 60       LD DE,&60 * WORD_HIGH_BYTE + &88
 	024C CD 1C 15       CALL Draw_View
 	024F E1             POP HL
 	0250 7D             LD A,L
@@ -422,7 +432,7 @@ array_CRTC_init_values:
 
 ;; -----------------------------------------------------------------------------------------------------------
 VSYNC_wait_value:
-	02EC 06				DEFB 	&06
+	02EC 06				DEFB 	6
 
 ;; -----------------------------------------------------------------------------------------------------------CPC
 ;; The interrupt is only run every VSYNC_wait_value VSYNCs
@@ -490,8 +500,8 @@ Y_START					EQU		&40
 .DrawBlacked:
 	0329 3E 08          LD A,8
 	032B CD 5D 03       CALL Set_colors
-	032E 21 40 30       LD HL,&30 * 256 + &40			;; first box X extent (min=&30, first block up to &40, 16 pix, 4pix per byts (mode1) so 4 bytes per block);
-	0331 11 57 40       LD DE,&40 * 256 + &57			;; first box Y extent (min=&40, first block up to &57, 23 lines per block)
+	032E 21 40 30       LD HL,&30 * WORD_HIGH_BYTE + &40			;; first box X extent (min=&30, first block up to &40, 16 pix, 4pix per byts (mode1) so 4 bytes per block);
+	0331 11 57 40       LD DE,&40 * WORD_HIGH_BYTE + &57			;; first box Y extent (min=&40, first block up to &57, 23 lines per block)
 dbl_loop1
 	0334 E5             PUSH HL
 	0335 D5             PUSH DE
@@ -504,7 +514,7 @@ dbl_loop1
 	033F 6F             LD L,A
 	0340 FE D1          CP &D1		;; 209
 	0342 38 F0          JR c,dbl_loop1
-	0344 21 40 30       LD HL,&30 * 256 + &40
+	0344 21 40 30       LD HL,&30 * WORD_HIGH_BYTE + &40
 	0347 53             LD D,E
 	0348 7B             LD A,E
 	0349 C6 2A          ADD A,&2A	;; 42
@@ -561,43 +571,48 @@ program_Gate_array_colors
 ;; -----------------------------------------------------------------------------------------------------------CPC
 ;; Table for the Color Scheme 4 colors
 ;; (Index = color Scheme number * 4)
-C_GREY					EQU		&00
-C_CREAM					EQU		&03
+C_BLACK					EQU		&14	;; Firmware color 0, Hardware color &14 (program &54)
 C_DKBLUE				EQU		&04
-C_PURPLE				EQU		&05
-C_DKCYAN				EQU		&06
-C_PINK					EQU		&07
-C_YELLOW				EQU		&0A
-C_WHITE					EQU		&0B
-C_RED					EQU		&0C
-C_TODO3					EQU		&0D
-C_ORANGE				EQU		&0E
-C_CYAN					EQU		&13
-C_BLACK					EQU		&14
 C_BLUE					EQU		&15
-C_DKGREEN				EQU		&16
-C_TODO5					EQU		&17
+C_MAROON				EQU		&1C
 C_MAGENTA				EQU		&18
-C_TODO4					EQU		&1A
-C_TODO2					EQU		&1B
-C_DARKRED				EQU		&1C
 C_MAUVE					EQU		&1D
-C_TODO					EQU		&1E
+C_RED					EQU		&0C
+C_PURPLE				EQU		&05 ;; or &08
+C_MAGENTAVIF			EQU		&0D
+C_DKGREEN				EQU		&16
+C_DKCYAN				EQU		&06
+C_SKYBLUE				EQU		&17
+C_DRKYELLOW				EQU		&1E
+C_GREY					EQU		&00 ;; or &01
+C_PASTELBLUE			EQU		&1F
+C_ORANGE				EQU		&0E
+C_PINK					EQU		&07
+C_DARKPINK				EQU		&0F
+C_GREEN					EQU		&12
+C_SEAGREEN				EQU		&02	;; or &11
+C_CYAN					EQU		&13
+C_LIME					EQU		&1A
+C_PSTLGREEN				EQU		&19
+C_TURQUOISE				EQU		&1B
+C_YELLOW				EQU		&0A
+C_CREAM					EQU		&03	;; or &09
+C_WHITE					EQU		&0B	;; Firmware color 26, Hardware color &0B (program &4B)
 
 COLOR_SCHEME_ALLBLACK	EQU		8
 
 array_Color_Schemes:
-	0385 14 0C 15 0A    DEFB  C_BLACK, C_RED, 	  C_BLUE,    C_YELLOW	;; Scheme 0
-	0389 14 15 0C 13    DEFB  C_BLACK, C_BLUE, 	  C_RED,     C_CYAN		;; Scheme 1
-	038D 14 1E 0C 1B    DEFB  C_BLACK, C_TODO,    C_RED,     C_TODO2	;; Scheme 2
-	0391 14 16 17 0E    DEFB  C_BLACK, C_DKGREEN, C_TODO5,   C_ORANGE	;; Scheme 3
-	0395 14 0C 0D 1A    DEFB  C_BLACK, C_RED,     C_TODO3,   C_TODO4	;; Scheme 4
-	0399 14 15 1E 1B    DEFB  C_BLACK, C_BLUE,    C_TODO,    C_TODO2	;; Scheme 5
-	039D 14 15 0C 0A    DEFB  C_BLACK, C_BLUE,    C_RED,     C_YELLOW	;; Scheme 6
-	03A1 14 0C 16 03    DEFB  C_BLACK, C_RED,     C_DKGREEN, C_CREAM	;; Scheme 7
-	03A5 14 14 14 14    DEFB  C_BLACK, C_BLACK,   C_BLACK,   C_BLACK	;; Scheme 8
-	03A9 14 0C 15 0A    DEFB  C_BLACK, C_RED,     C_BLUE,    C_YELLOW	;; Scheme 9
-	03AD 14 16 15 0A    DEFB  C_BLACK, C_DKGREEN, C_BLUE,    C_YELLOW	;; Scheme 10
+	0385 14 0C 15 0A    DEFB  C_BLACK, C_RED,		C_BLUE,		  C_YELLOW		;; Scheme 0
+	0389 14 15 0C 13    DEFB  C_BLACK, C_BLUE,		C_RED,		  C_CYAN		;; Scheme 1
+	038D 14 1E 0C 1B    DEFB  C_BLACK, C_DRKYELLOW,	C_RED,		  C_TURQUOISE	;; Scheme 2
+	0391 14 16 17 0E    DEFB  C_BLACK, C_DKGREEN,	C_SKYBLUE,	  C_ORANGE		;; Scheme 3
+	0395 14 0C 0D 1A    DEFB  C_BLACK, C_RED,		C_MAGENTAVIF, C_LIME		;; Scheme 4
+	0399 14 15 1E 1B    DEFB  C_BLACK, C_BLUE,		C_DRKYELLOW,  C_TURQUOISE	;; Scheme 5
+	039D 14 15 0C 0A    DEFB  C_BLACK, C_BLUE,		C_RED,		  C_YELLOW		;; Scheme 6
+	03A1 14 0C 16 03    DEFB  C_BLACK, C_RED,		C_DKGREEN,	  C_CREAM		;; Scheme 7
+	03A5 14 14 14 14    DEFB  C_BLACK, C_BLACK,		C_BLACK,	  C_BLACK		;; Scheme 8
+	03A9 14 0C 15 0A    DEFB  C_BLACK, C_RED,		C_BLUE,		  C_YELLOW		;; Scheme 9
+	03AD 14 16 15 0A    DEFB  C_BLACK, C_DKGREEN,	C_BLUE,		  C_YELLOW		;; Scheme 10
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Tap foot if facing us and not moving
@@ -1319,8 +1334,8 @@ SCREEN_LENGTH			EQU		&4000
 
 ;; -----------------------------------------------------------------------------------------------------------
 clr_screen:
-	06C8 21 00 C0       LD HL,&C000
-	06CB 01 00 40       LD BC,&4000
+	06C8 21 00 C0       LD HL,SCREEN_ADDR_START
+	06CB 01 00 40       LD BC,SCREEN_LENGTH
 	06CE C3 A8 1B       JP Erase_forward_Block_RAM
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -1407,16 +1422,16 @@ KEPMAP_SHIFT			EQU		2 * 8 + 5		;; &15 : line=2, bitnb=5, "Shift" key
 KEPMAP_ESC				EQU		8 * 8 + 2		;; &42 : line=8, bitnb=2, "ESC" key
 
 .Char_Set:													;;     bit:  0    1    2   3     4   5    6    7
-	072A 		DEFB &5E, &60, &5F, &39, &36, &33, &AF, &2E	;; (line 0) "Up", "Right", "Down", "9", "6", "3", "ENTER", "."
-	0732 		DEFB &61, &A7, &37, &38, &35, &31, &32, &30 ;; line 1 "Left", "COPY", "7", "8", "5", "1", "2", 0"
-	073A 		DEFB &AE, &5B, &AF, &5D, &34, &A2, &5C, &A6 ;; line 2 "CLR", "[", "|RETURN", "]", "4", "|SHIFT", "\", "CTRL"
-	0742 		DEFB &5E, &2D, &40, &50, &3B, &3A, &2F, &2E ;; line 3 "^", "-", "@", "P", ";", ":", "/", ","
-	074A 		DEFB &30, &39, &4F, &49, &4C, &4B, &4D, &2C ;; line 4 "0", "9", "O", "I", "L", "K", "M", "."
-	0752 		DEFB &38, &37, &55, &59, &48, &4A, &4E, &A0 ;; line 5 "8", "7", "U", "Y", "H", "J", "N", "SPACE"
-	075A 		DEFB &36, &35, &52, &54, &47, &46, &42, &56 ;; line 6 "6", "5", "R", "T", "G", "F", "B", "V"
-	0762 		DEFB &34, &33, &45, &57, &53, &44, &43, &58 ;; line 7 "4", "3", "E", "W", "S", "D", "C", "X"
-	076A 		DEFB &31, &32, &A8, &51, &A3, &41, &A5, &5A ;; line 8 "1", "2", ESC, "Q", TAB, "A", LOCK, "Z"
-	0772 		DEFB &B9, &BA, &BC, &BB, &B8, &B8, &58, &A4 ;; line 9 JOYU, JOYD, JOYL, JOYR, JOYF, JOYF, (unused), DEL
+	072A 				DEFB &5E, &60, &5F, &39, &36, &33, &AF, &2E	;; (line 0) "Up", "Right", "Down", "9", "6", "3", "ENTER", "."
+	0732 				DEFB &61, &A7, &37, &38, &35, &31, &32, &30 ;; line 1 "Left", "COPY", "7", "8", "5", "1", "2", 0"
+	073A 				DEFB &AE, &5B, &AF, &5D, &34, &A2, &5C, &A6 ;; line 2 "CLR", "[", "|RETURN", "]", "4", "|SHIFT", "\", "CTRL"
+	0742 				DEFB &5E, &2D, &40, &50, &3B, &3A, &2F, &2E ;; line 3 "^", "-", "@", "P", ";", ":", "/", ","
+	074A 				DEFB &30, &39, &4F, &49, &4C, &4B, &4D, &2C ;; line 4 "0", "9", "O", "I", "L", "K", "M", "."
+	0752 				DEFB &38, &37, &55, &59, &48, &4A, &4E, &A0 ;; line 5 "8", "7", "U", "Y", "H", "J", "N", "SPACE"
+	075A 				DEFB &36, &35, &52, &54, &47, &46, &42, &56 ;; line 6 "6", "5", "R", "T", "G", "F", "B", "V"
+	0762 				DEFB &34, &33, &45, &57, &53, &44, &43, &58 ;; line 7 "4", "3", "E", "W", "S", "D", "C", "X"
+	076A 				DEFB &31, &32, &A8, &51, &A3, &41, &A5, &5A ;; line 8 "1", "2", ESC, "Q", TAB, "A", LOCK, "Z"
+	0772 				DEFB &B9, &BA, &BC, &BB, &B8, &B8, &58, &A4 ;; line 9 JOYU, JOYD, JOYL, JOYR, JOYF, JOYF, (unused), DEL
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; These are the map codes for the keyboard (CPC 6128) when scanning the
@@ -1472,7 +1487,7 @@ scan_loop_1
 
 find_key_pressed
 	07E2 3D             DEC A
-	07E3 01 7F FF       LD BC,&FF7F
+	07E3 01 7F FF       LD BC,&FF * WORD_HIGH_BYTE + &7F
 fkp_1
 	07E6 CB 01          RLC C
 	07E8 04             INC B
@@ -1537,7 +1552,7 @@ fkp_1
 .Get_Key_Map_Addr:
 	081D 11 7A 07       LD DE,Array_Key_map
 	0820 6F             LD L,A
-	0821 26 00          LD H,00
+	0821 26 00          LD H,0
 	0823 19             ADD HL,DE
 	0824 C9             RET
 
@@ -1733,165 +1748,165 @@ Keyboard_scanning_ending:
 	091F C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
-	0920 00             DEFB 0
+	0920 00             DEFB 0		;; ref note
 	0921 09             DEFB 9
-	0922 00             DEFB 0
+	0922 00             DEFB 0		;; envp num
 silence_sound
 	0923 00             DEFB 0
 	0924 FF FF          DEFB &FF, &FF
 
 ;; -----------------------------------------------------------------------------------------------------------
-	0926 14             DEFB 20
+	0926 14             DEFB 20		;; ref note
 	0927 08             DEFB 8
-	0928 00             DEFB 0
+	0928 00             DEFB 0		;; envp num
 
 	0929 00             DEFB 0
 	092A 				DEFB &81, &B9, &A1, &E1, &FF, &00
 
 ;; -----------------------------------------------------------------------------------------------------------
-	0930 14             DEFB 20
+	0930 14             DEFB 20		;; ref note
 	0931 08             DEFB 8
-	0932 00             DEFB 0
+	0932 00             DEFB 0		;; envp num
 
 	0933 00             DEFB 0
 	0934 				DEFB &80, &B8, &A0, &E0, &FF, &00
 
 ;; -----------------------------------------------------------------------------------------------------------
-	093A 14             DEFB 20
+	093A 14             DEFB 20		;; ref note
 	093B 08             DEFB 8
-	093C 00             DEFB 0
+	093C 00             DEFB 0		;; envp num
 
 	093D 00             DEFB 0
 	093E 				DEFB &81, &79, &69, &59, &49, &41, &FF, &00
 
 ;; -----------------------------------------------------------------------------------------------------------
-	0946 1E				DEFB 30
+	0946 1E				DEFB 30		;; ref note
 	0947 08          	DEFB 8
-	0948 04             DEFB 4
+	0948 04             DEFB 4		;; envp num
 
 	0949 00             DEFB 0
 	094A 				DEFB &30, &50, &68, &90, &FF, &FF
 
 ;; -----------------------------------------------------------------------------------------------------------
-	0950 14             DEFB 20
+	0950 14             DEFB 20		;; ref note
 	0951 01				DEFB 1
-	0952 06				DEFB 6
+	0952 06				DEFB 6		;; envp num
 
 	0953 00       		DEFB 0
 	0954 54 FF FF       DEFB &54, &FF, &FF
 
 ;; -----------------------------------------------------------------------------------------------------------
-	0957 14             DEFB 20
+	0957 14             DEFB 20		;; ref note
 	0958 08             DEFB 8
-	0959 00             DEFB 0
+	0959 00             DEFB 0		;; envp num
 
 	095A 00             DEFB 0
 	095B 10 FF FF       DEFB &10, &FF, &FF
 
 ;; -----------------------------------------------------------------------------------------------------------
-	095E 14             DEFB 20
+	095E 14             DEFB 20		;; ref note
 	095F 08             DEFB 8
-	0960 04             DEFB 4
+	0960 04             DEFB 4		;; envp num
 
 	0961 00             DEFB 0
 	0962 18 FF FF     	DEFB &18, &FF, &FF
 
 ;; -----------------------------------------------------------------------------------------------------------
-	0965 1E				DEFB 30
+	0965 1E				DEFB 30		;; ref note
 	0966 08          	DEFB 8
-	0967 04             DEFB 4
+	0967 04             DEFB 4		;; envp num
 
 	0968 00             DEFB 0
 	0969 A2 FF FF       DEFB &A2, &FF, &FF
 
 ;; -----------------------------------------------------------------------------------------------------------
-	096C 12             DEFB 18
+	096C 12             DEFB 18		;; ref note
 	096D 08             DEFB 8
-	096E 02             DEFB 2
+	096E 02             DEFB 2		;; envp num
 
 	096F 00             DEFB 0
 	0970 11 FF FF       DEFB &11, &FF, &FF
 
 ;; -----------------------------------------------------------------------------------------------------------
-	0973 1E				DEFB 30
+	0973 1E				DEFB 30		;; ref note
 	0974 08          	DEFB 8
-	0975 04             DEFB 4
+	0975 04             DEFB 4		;; envp num
 
 	0976 00             DEFB 0
 	0977 30 FF FF       DEFB &30, &FF, &FF
 
 ;; -----------------------------------------------------------------------------------------------------------
-	097A 14             DEFB 20
+	097A 14             DEFB 20		;; ref note
 	097B 08             DEFB 8
-	097C 07             DEFB 7
-hq_song2_voice0
+	097C 07             DEFB 7		;; envp num
+hq_pickupsong_voice0
 	097D 00             DEFB 0
 	097E 				DEFB &6A, &8A, &6A, &AA, &92, &AA, &D3, &FF, &FF
 
 ;; -----------------------------------------------------------------------------------------------------------
-	0987 1E				DEFB 30
+	0987 1E				DEFB 30		;; ref note
 	0988 08          	DEFB 8
-	0989 07             DEFB 7
-hq_song2_voice1
+	0989 07             DEFB 7		;; envp num
+hq_pickupsong_voice1
 	098A 00             DEFB 0
 	098B 				DEFB &3A, &5A, &3A, &7A, &62, &7A, &AB, &FF, &FF
 
 ;; -----------------------------------------------------------------------------------------------------------
-	0994 14             DEFB 20
+	0994 14             DEFB 20		;; ref note
 	0995 08             DEFB 8
-	0996 07             DEFB 7
-hq_song2_voice2
+	0996 07             DEFB 7		;; envp num
+hq_pickupsong_voice2
 	0997 00             DEFB 0
 	0998 				DEFB &42, &62, &42, &82, &6A, &82, &AB, &FF, &FF
 
 ;; -----------------------------------------------------------------------------------------------------------
-	09A1 19             DEFB 25
+	09A1 19             DEFB 25		;; ref note
 	09A2 08             DEFB 8
-	09A3 07             DEFB 7
-hq_song3_voice0
+	09A3 07             DEFB 7		;; envp num
+hq_deadlysong_voice0
 	09A4 00             DEFB 0
 	09A5 				DEFB &92, &8A, &6A, &83, &00, &2A, &32, &FF, &FF
 
 ;; -----------------------------------------------------------------------------------------------------------
-	09AE 14             DEFB 20
+	09AE 14             DEFB 20		;; ref note
 	09AF 08             DEFB 8
-	09B0 07             DEFB 7
-hq_song3_voice1
+	09B0 07             DEFB 7		;; envp num
+hq_deadlysong_voice1
 	09B1 00             DEFB 0
 	09B2 				DEFB &7A, &72, &52, &6B, &00, &12, &1A, &FF, &FF
 
 ;; -----------------------------------------------------------------------------------------------------------
-	09BB 14             DEFB 20
+	09BB 14             DEFB 20		;; ref note
 	09BC 08             DEFB 8
-	09BD 07             DEFB 7
-hq_song3_voice2
+	09BD 07             DEFB 7		;; envp num
+hq_deadlysong_voice2
 	09BE 00             DEFB 0
 	09BF 				DEFB &92, &8A, &6A, &83, &00, &2A, &32, &FF, &FF
 
 ;; -----------------------------------------------------------------------------------------------------------
-	09C8 1C             DEFB 28
+	09C8 1C             DEFB 28		;; ref note
 	09C9 08             DEFB 8
-	09CA 07             DEFB 7
-hq_song1_voice0
+	09CA 07             DEFB 7		;; envp num
+hq_bmsong_voice0
 	09CB 00             DEFB 0
 	09CC 				DEFB &32, &32, &2A, &2A, &12, &12, &2A, &2A, &32, &32, &2A, &2A, &12, &12, &2A, &2A
 	09DC 				DEFB &5A, &5A, &52, &52, &4A, &4A, &52, &52, &5A, &5A, &52, &52, &4A, &4A, &52, &52
 	09EC 				DEFB &32, &32, &2A, &2A, &12, &12, &2A, &2A, &93, &05, &94, &97, &07, &FF, &FF
 
 ;; -----------------------------------------------------------------------------------------------------------
-	09FB 14             DEFB 20
+	09FB 14             DEFB 20		;; ref note
 	09FC 08             DEFB 8
-	09FD 07             DEFB 7
-hq_song1_voice1
+	09FD 07             DEFB 7		;; envp num
+hq_bmsong_voice1
 	09FE 00             DEFB 0
 	09FF 				DEFB &24, &24, &24, &24, &24, &24, &24, &24, &4C, &4C, &4C, &4C, &4C, &4C, &4C, &4C
 	0A0F 				DEFB &5C, &5C, &84, &5C, &73, &05, &74, &77, &07, &FF, &FF
 
 ;; -----------------------------------------------------------------------------------------------------------
-	0A1A 1E				DEFB 30
+	0A1A 1E				DEFB 30		;; ref note
 	0A1B 08         	DEFB 8
-	0A1C 07             DEFB 7
-hq_song1_voice2
+	0A1C 07             DEFB 7		;; envp num
+hq_bmsong_voice2
 	0A1D 00             DEFB 0
 	0A1E 				DEFB &8A, &8A, &82, &82, &7A, &7A, &82, &82, &8A, &8A, &82, &82, &7A, &7A, &82, &82
 	0A2E 				DEFB &B2, &B2, &AA, &AA, &A2, &A2, &AA, &AA, &B2, &B2, &AA, &AA, &A2, &A2, &AA, &AA
@@ -1899,69 +1914,76 @@ hq_song1_voice2
 
 ;; -----------------------------------------------------------------------------------------------------------
 Play_Batman_Theme
-	0A4D CD AD 0C       CALL 0CAD	;; if Sound_amount = 0 ("late at night") silence it, else
-	0A50 AF             XOR A		;; V0
-	0A51 21 CB 09       LD HL,hq_song1_voice0
-	0A54 CD 88 0B       CALL Snd_Play	;; play
-	0A57 3E 01          LD A,1		;; V1
-	0A59 21 FE 09       LD HL,hq_song1_voice1
-	0A5C CD 88 0B       CALL Snd_Play	;; play
-	0A5F 3E 02          LD A,2		;; V2
-	0A61 21 1D 0A       LD HL,hq_song1_voice2
-	0A64 C3 97 0A       JP 0A97		;; play
+	0A4D CD AD 0C       CALL Check_volume_amount	;; if Sound_amount = 0 ("late at night") silence it, else
+	0A50 AF             XOR A						;; V0
+	0A51 21 CB 09       LD HL,hq_bmsong_voice0
+	0A54 CD 88 0B       CALL Snd_Play				;; play
+	0A57 3E 01          LD A,1						;; V1
+	0A59 21 FE 09       LD HL,hq_bmsong_voice1
+	0A5C CD 88 0B       CALL Snd_Play				;; play
+	0A5F 3E 02          LD A,2						;; V2
+	0A61 21 1D 0A       LD HL,hq_bmsong_voice2
+	0A64 C3 97 0A       JP PlayVoice				;; play
 
-	0A67 CD AD 0C       CALL 0CAD   ;; if Sound_amount = 0 ("late at night") silence it, else
-	0A6A AF             XOR A       ;; V0
-	0A6B 21 7D 09       LD HL,hq_song2_voice0
-	0A6E CD 88 0B       CALL Snd_Play   ;; play
-	0A71 3E 01          LD A,1      ;; V1
-	0A73 21 8A 09       LD HL,hq_song2_voice1
-	0A76 CD 88 0B       CALL Snd_Play   ;; play
-	0A79 3E 02          LD A,2      ;; V2
-	0A7B 21 97 09       LD HL,hq_song2_voice2
-	0A7E 18 17          JR 0A97     ;; play
+GetSpecialSong
+	0A67 CD AD 0C       CALL Check_volume_amount	;; if Sound_amount = 0 ("late at night") silence it, else
+	0A6A AF             XOR A       				;; V0
+	0A6B 21 7D 09       LD HL,hq_pickupsong_voice0
+	0A6E CD 88 0B       CALL Snd_Play   			;; play
+	0A71 3E 01          LD A,1    	  				;; V1
+	0A73 21 8A 09       LD HL,hq_pickupsong_voice1
+	0A76 CD 88 0B       CALL Snd_Play   			;; play
+	0A79 3E 02          LD A,2    					;; V2
+	0A7B 21 97 09       LD HL,hq_pickupsong_voice2
+	0A7E 18 17          JR PlayVoice		  		;; play
 
-	0A80 CD AD 0C       CALL 0CAD    ;; if Sound_amount = 0 ("late at night") silence it, else
-	0A83 AF             XOR A        ;; V0
-	0A84 21 A4 09       LD HL,hq_song3_voice0
-	0A87 CD 88 0B       CALL Snd_Play    ;; play
-	0A8A 3E 01          LD A,1       ;; V1
-	0A8C 21 B1 09       LD HL,hq_song3_voice1
-	0A8F CD 88 0B       CALL Snd_Play    ;; play
-	0A92 3E 02          LD A,2       ;; V2
-	0A94 21 BE 09       LD HL,hq_song3_voice2
-
+DeadlyContactSong
+	0A80 CD AD 0C       CALL Check_volume_amount    ;; if Sound_amount = 0 ("late at night") silence it, else
+	0A83 AF             XOR A        				;; V0
+	0A84 21 A4 09       LD HL,hq_deadlysong_voice0
+	0A87 CD 88 0B       CALL Snd_Play   			;; play
+	0A8A 3E 01          LD A,1       				;; V1
+	0A8C 21 B1 09       LD HL,hq_deadlysong_voice1
+	0A8F CD 88 0B       CALL Snd_Play    			;; play
+	0A92 3E 02          LD A,2       				;; V2
+	0A94 21 BE 09       LD HL,hq_deadlysong_voice2
+	;; flows in PlayVoice
+PlayVoice
 	0A97 18 38          JR Snd_Play_curr_voice
 
-	0A99 21 53 09       LD HL,0953
-	0A9C DD 21 5A 09    LD IX,095A
-	0AA0 CD AD 0C       CALL 0CAD   ;; if Sound_amount = 0 ("late at night") silence it, else
+;; -----------------------------------------------------------------------------------------------------------
+	0A99 21 53 09       LD HL,&0953
+	0A9C DD 21 5A 09    LD IX,&095A
+	0AA0 CD AD 0C       CALL Check_volume_amount   ;; if Sound_amount = 0 ("late at night") silence it, else
 	0AA3 E5             PUSH HL
-	0AA4 CD B5 0C       CALL 0CB5
+	0AA4 CD B5 0C       CALL TestHasSomthingToBePlayed
 	0AA7 E1             POP HL
 	0AA8 C0             RET NZ
 	0AA9 3E 01          LD A,1
 	0AAB 18 24          JR Snd_Play_curr_voice
 
+;; -----------------------------------------------------------------------------------------------------------
 ;; *****
 	0AAD 21 23 09       LD HL,silence_sound
-	0AB0 CD D0 0A       CALL 0AD0	;; Snd_Play_voice0
+	0AB0 CD D0 0A       CALL &0AD0		;; Snd_Play_voice0
 	0AB3 21 23 09       LD HL,silence_sound
-	0AB6 18 2E          JR 0AE6		;; Snd_Play_voice2
+	0AB6 18 2E          JR &0AE6		;; Snd_Play_voice2
+
+;; -----------------------------------------------------------------------------------------------------------
 ;; *****
 	0AB8 21 29 09       LD HL,0929
 	0ABB 3A D0 1B       LD A,(CNT_SPEED)
 	0ABE A7             AND A
-	0ABF 28 0B          JR Z,0ACC
+	0ABF 28 0B          JR Z,&0ACC
 	0AC1 21 33 			LD HL, &0933
 ;; *****
 	0AC5 09      		ADD HL,BC		;; this instruction is cancelled if comming from 0AB8
-	0AC4 DD 21 49 09    LD IX,0949
-	0AC8 DD 			LD IX,093D
+	0AC4 DD 21 49 09    LD IX,&0949
+	0AC8 DD 			LD IX,&093D
 ;; ******
-	0AC9 21 3D 09    	LD HL,093D		;; this instruction is cancelled if comming from 0AC5
+	0AC9 21 3D 09    	LD HL,&093D		;; this instruction is cancelled if comming from 0AC5
 ;; ******
-	0ACC CD AD 0C       CALL 0CAD
+	0ACC CD AD 0C       CALL Check_volume_amount
 	0ACF C8             RET Z
 ;; ******
 Snd_Play_voice0
@@ -1969,19 +1991,21 @@ Snd_Play_voice0
 Snd_Play_curr_voice:
 	0AD1 C3 88 0B       JP Snd_Play
 
+;; -----------------------------------------------------------------------------------------------------------
 ;; *****
-	0AD4 21 6F 09       LD HL,096F
-	0AD7 DD 			LD IX,0976
+	0AD4 21 6F 09       LD HL,&096F
+	0AD7 DD 			LD IX,&0976
 ;; *****
-	0AD8 21 76 09    	LD HL,0976		;; this instruction is cancelled if comming from 0AD4
-	0ADB DD 21 			LD IX,0961
+	0AD8 21 76 09    	LD HL,&0976		;; this instruction is cancelled if comming from 0AD4
+	0ADB DD 21 			LD IX,&0961
 ;; *****
+Sound_ID_Menu_Blip
 	0ADC 61 			LD H,C			;; this instruction is cancelled if comming from 0AD8
 	0ADD 09   			ADD HL,BC		;; this instruction is cancelled if comming from 0AD8
-	0ADF DD 21 68		LD IX,0968
+	0ADF DD 21 68		LD IX,&0968
 ;; *****
 	0AE0 09    			ADD HL,BC		;; this instruction is cancelled if comming from 0ADC
-	0AE3 CD AD 0C       CALL 0CAD
+	0AE3 CD AD 0C       CALL Check_volume_amount
 ;; ******
 Snd_Play_voice2
 	0AE6 3E 02          LD A,2
@@ -2001,14 +2025,16 @@ AY_A_VOL				EQU 	&08			;; Channel A volume        4-bit (0-15)
 AY_B_VOL				EQU 	&09			;; Channel B volume        4-bit (0-15)
 AY_C_VOL				EQU 	&0A			;; Channel C volume        4-bit (0-15)
 
+SONG_PTR				EQU		5
+
 ;; -----------------------------------------------------------------------------------------------------------
 Voice_0_data
 	0AEA 00        		DEFB 0			;; +0
-	0AEB 00             DEFB 0			;; +1
-	0AEC 00             DEFB 0			;; +2
-	0AED 00             DEFB 0			;; +3
-	0AEE 00             DEFB 0			;; +4
-	0AEF 23 09          DEFW silence_sound      ;; +5&6
+	0AEB 00             DEFB 0			;; +1	; duration offset
+	0AEC 00             DEFB 0			;; +2	;
+	0AED 00             DEFB 0			;; +3 	; envp ???
+	0AEE 00             DEFB 0			;; +4 	; note offset
+	0AEF 23 09          DEFW silence_sound      ;; +5&6 SONG_PTR
 
 Voice_1_data
 	0AF1 01             DEFB 0			;; +0
@@ -2016,7 +2042,7 @@ Voice_1_data
 	0AF3 00       		DEFB 0			;; +2
 	0AF4 00             DEFB 0			;; +3
 	0AF5 00             DEFB 0			;; +4
-	0AF6 23 09          DEFW silence_sound     ;; +5&6
+	0AF6 23 09          DEFW silence_sound     ;; +5&6 SONG_PTR
 
 Voice_2_data
 	0AF8 02				DEFB 0			;; +0
@@ -2024,228 +2050,236 @@ Voice_2_data
 	0AFA 00            	DEFB 0			;; +2
 	0AFB 00            	DEFB 0			;; +3
 	0AFC 00            	DEFB 0			;; +4
-	0AFD 23 09         	DEFW silence_sound      ;; +5&6
+	0AFD 23 09         	DEFW silence_sound      ;; +5&6 SONG_PTR
 
 ;; -----------------------------------------------------------------------------------------------------------
 Mixer_control
 	0AFF 3F             DEFB &3F
 
-	0B00 	            DEFB 3, 7, 7, 6, 4, 2, 1, 0
-
-	0B08 	      		DEFB 3, 5, 7, &0B, &0F, &17, &1F, &2F
+Envelope_array:
+	0B00 	            DEFB 3, 7, 7, 6, 4, 2, 1, 0		;; enveloppe
+Duration_array:
+	0B08 	      		DEFB 3, 5, 7, 11, 15, 23, 31, 47 ;; duration fast to slow
 
 ;; -----------------------------------------------------------------------------------------------------------
 Notes_array
-	0B10 77 07          DEFW &0777 ;; id0 1911 : do oct -2 ; 65.4Hz
-	0B12 0C 07          DEFW &070C ;; 1804 : do# oct -2 : 69.3Hz
-	0B14 A7 06          DEFW &06A7 ;; re
-	0B16 47 06          DEFW &0647 ;; re#
-	0B18 ED 05          DEFW &05ED ;; mi
-	0B1A 98 05          DEFW &0598 ;; fa
-	0B1C 47 05          DEFW &0547 ;; fa#
-	0B1E FC 04          DEFW &04FC ;; sol
-	0B20 D4 04          DEFW &04D4 ;; sol#
-	0B22 70 04          DEFW &0470 ;; la
-	0B24 31 04          DEFW &0431 ;; la#
-	0B26 F4 03          DEFW &03F4 ;; si
-	0B28 BC 03          DEFW &03BC ;; do oct -1
-	0B2A 86 03          DEFW &0386 ;; do#
-	0B2C 53 03          DEFW &0353 ;; re
-	0B2E 24 03          DEFW &0324 ;; re#
-	0B30 F6 02          DEFW &02F6 ;; mi
-	0B32 CC 02          DEFW &02CC ;; fa
-	0B34 A4 02          DEFW &02A4 ;; fa#
-	0B36 7E 02          DEFW &027E ;; sol
-	0B38 5A 02          DEFW &025A ;; sol#
-	0B3A 38 02          DEFW &0238 ;; la
-	0B3C 18 02          DEFW &0218 ;; la#
-	0B3E FA 01          DEFW &01FA ;; si
-	0B40 DE 01          DEFW &01DE ;; do oct 0
-	0B42 C3 01          DEFW &01C3 ;; do#
-	0B44 AA 01          DEFW &01AA ;; re
-	0B46 92 01          DEFW &0192 ;; re#
-	0B48 7B 01          DEFW &017B ;; mi
-	0B4A 66 01          DEFW &0166 ;; fa
-	0B4C 52 01          DEFW &0152 ;; fa#
-	0B4E 3F 01          DEFW &013F ;; sol
-	0B50 2D 01          DEFW &012D ;; sol#
-	0B52 1C 01          DEFW &011C ;; la
-	0B54 0C 01          DEFW &010C ;; la#
-	0B56 FD 00          DEFW &00FD ;; si
-	0B58 EF 00          DEFW &00EF ;; do oct 1
-	0B5A E1 00          DEFW &00E1 ;; do#
-	0B5C D5 00          DEFW &00D5 ;; re
-	0B5E C9 00          DEFW &00C9 ;; re#
-	0B60 BE 00          DEFW &00BE ;; mi
-	0B62 B3 00          DEFW &00B3 ;; fa
-	0B64 A9 00          DEFW &00A9 ;; fa#
-	0B66 9F 00          DEFW &009F ;; sol
-	0B68 96 00          DEFW &0096 ;; sol#
-	0B6A 8E 00          DEFW &008E ;; la
-	0B6C 86 00          DEFW &0086 ;; la#
-	0B6E 7F 00          DEFW &007F ;; si
-	0B70 77 00          DEFW &0077 ;; do oct 2
-	0B72 71 00          DEFW &0071 ;; do#
-	0B74 6A 00          DEFW &006A ;; re
-	0B76 64 00          DEFW &0064 ;; re#
-	0B78 5F 00          DEFW &005F ;; mi
-	0B7A 59 00          DEFW &0059 ;; fa
-	0B7C 54 00          DEFW &0054 ;; fa#
-	0B7E 50 00          DEFW &0050 ;; sol
-	0B80 4B 00          DEFW &004B ;; sol#
-	0B82 47 00          DEFW &0047 ;; la
-	0B84 43 00          DEFW &0043 ;; la#
-	0B86 3F 00          DEFW &003F ;; id59 ; si oct2 1975.5Hz
+	0B10 77 07          DEFW &0777 ;; id &00 : do oct -2 ; 65.4Hz 1911
+	0B12 0C 07          DEFW &070C ;; id &01 : do# oct -2 ; 69.3Hz 1804
+	0B14 A7 06          DEFW &06A7 ;; id &02 : re
+	0B16 47 06          DEFW &0647 ;; id &03 : re#
+	0B18 ED 05          DEFW &05ED ;; id &04 : mi
+	0B1A 98 05          DEFW &0598 ;; id &05 : fa
+	0B1C 47 05          DEFW &0547 ;; id &06 : fa#
+	0B1E FC 04          DEFW &04FC ;; id &07 : sol
+	0B20 D4 04          DEFW &04D4 ;; id &08 : sol#
+	0B22 70 04          DEFW &0470 ;; id &09 : la
+	0B24 31 04          DEFW &0431 ;; id &0A : la#
+	0B26 F4 03          DEFW &03F4 ;; id &0B : si
+	0B28 BC 03          DEFW &03BC ;; id &0C : do oct -1
+	0B2A 86 03          DEFW &0386 ;; id &0D : do#
+	0B2C 53 03          DEFW &0353 ;; id &0E : re
+	0B2E 24 03          DEFW &0324 ;; id &0F : re#
+	0B30 F6 02          DEFW &02F6 ;; id &10 : mi
+	0B32 CC 02          DEFW &02CC ;; id &11 : fa
+	0B34 A4 02          DEFW &02A4 ;; id &12 : fa#
+	0B36 7E 02          DEFW &027E ;; id &13 : sol
+	0B38 5A 02          DEFW &025A ;; id &14 : sol#
+	0B3A 38 02          DEFW &0238 ;; id &15 : la
+	0B3C 18 02          DEFW &0218 ;; id &16 : la#
+	0B3E FA 01          DEFW &01FA ;; id &17 : si
+	0B40 DE 01          DEFW &01DE ;; id &18 : do oct 0
+	0B42 C3 01          DEFW &01C3 ;; id &19 : do#
+	0B44 AA 01          DEFW &01AA ;; id &1A : re
+	0B46 92 01          DEFW &0192 ;; id &1B : re#
+	0B48 7B 01          DEFW &017B ;; id &1C : mi
+	0B4A 66 01          DEFW &0166 ;; id &1D : fa
+	0B4C 52 01          DEFW &0152 ;; id &1E : fa#
+	0B4E 3F 01          DEFW &013F ;; id &1F : sol
+	0B50 2D 01          DEFW &012D ;; id &20 : sol#
+	0B52 1C 01          DEFW &011C ;; id &21 : la
+	0B54 0C 01          DEFW &010C ;; id &22 : la#
+	0B56 FD 00          DEFW &00FD ;; id &23 : si
+	0B58 EF 00          DEFW &00EF ;; id &24 : do oct 1
+	0B5A E1 00          DEFW &00E1 ;; id &25 : do#
+	0B5C D5 00          DEFW &00D5 ;; id &26 : re
+	0B5E C9 00          DEFW &00C9 ;; id &27 : re#
+	0B60 BE 00          DEFW &00BE ;; id &28 : mi
+	0B62 B3 00          DEFW &00B3 ;; id &29 : fa
+	0B64 A9 00          DEFW &00A9 ;; id &2A : fa#
+	0B66 9F 00          DEFW &009F ;; id &2B : sol
+	0B68 96 00          DEFW &0096 ;; id &2C : sol#
+	0B6A 8E 00          DEFW &008E ;; id &2D : la
+	0B6C 86 00          DEFW &0086 ;; id &2E : la#
+	0B6E 7F 00          DEFW &007F ;; id &2F : si
+	0B70 77 00          DEFW &0077 ;; id &30 : do oct 2
+	0B72 71 00          DEFW &0071 ;; id &31 : do#
+	0B74 6A 00          DEFW &006A ;; id &32 : re
+	0B76 64 00          DEFW &0064 ;; id &33 : re#
+	0B78 5F 00          DEFW &005F ;; id &34 : mi
+	0B7A 59 00          DEFW &0059 ;; id &35 : fa
+	0B7C 54 00          DEFW &0054 ;; id &36 : fa#
+	0B7E 50 00          DEFW &0050 ;; id &37 : sol
+	0B80 4B 00          DEFW &004B ;; id &38 : sol#
+	0B82 47 00          DEFW &0047 ;; id &39 : la
+	0B84 43 00          DEFW &0043 ;; id &3A : la#
+	0B86 3F 00          DEFW &003F ;; id &3B (59) ; si oct2 1975.5Hz
 
 ;; -----------------------------------------------------------------------------------------------------------
 Snd_Play
 	0B88 DD 21 EA 0A    LD IX,Voice_0_data
-	0B8C EB             EX DE,HL
-	0B8D A7             AND A			;; test voice 0
-	0B8E 28 0B          JR Z,0B9B		;; if so, play
-	0B90 3D             DEC A			;; test voice 1
+	0B8C EB             EX DE,HL				;;
+	0B8D A7             AND A					;; test voice 0
+	0B8E 28 0B          JR Z,Snd_Program		;; if so, play
+	0B90 3D             DEC A					;; test voice 1
 	0B91 DD 21 F1 0A    LD IX,Voice_1_data
-	0B95 28 04          JR Z,0B9B		;; if so play
-	0B97 DD 21 F8 0A    LD IX,Voice_2_data ;; else voice2
+	0B95 28 04          JR Z,Snd_Program		;; if so play
+	0B97 DD 21 F8 0A    LD IX,Voice_2_data 		;; else voice2
 Snd_Program
-	0B9B DD 6E 05       LD L,(IX+05)
-	0B9E DD 66 06       LD H,(IX+06)	;; HL = pointer on
-	0BA1 AF             XOR A			;; clear Carry
-	0BA2 ED 52          SBC HL,DE		;; diff HL and DE
-	0BA4 C8             RET Z			;; if they were equal, leave
-	0BA5 12             LD (DE),A		;; else 1st byte is voice num
+	0B9B DD 6E 05       LD L,(IX+SONG_PTR)
+	0B9E DD 66 06       LD H,(IX+SONG_PTR+1)	;; HL = pointer on current song data
+	0BA1 AF             XOR A					;; clear Carry and reset byte pointer to 0
+	0BA2 ED 52          SBC HL,DE				;; diff HL and DE
+	0BA4 C8             RET Z					;; if they were equal, leave
+	0BA5 12             LD (DE),A				;; else 1st byte is voice num ## &09CB
 	0BA6 F3             DI
-	0BA7 DD 73 05       LD (IX+05),E
-	0BAA DD 72 06       LD (IX+06),D
-	0BAD DD 77 01       LD (IX+01),A
+	0BA7 DD 73 05       LD (IX+SONG_PTR),E		;; ## IX=&0AEA (v0), &0AF1 (v1), &0A1D (v2)
+	0BAA DD 72 06       LD (IX+SONG_PTR+1),D
+	0BAD DD 77 01       LD (IX+1),A				;; byte pointer reset
 	0BB0 FB             EI
 	0BB1 C9             RET
 
+;; -----------------------------------------------------------------------------------------------------------
+Silence_all_Voices:
 	0BB2 21 23 09       LD HL,silence_sound
-	0BB5 22 EF 0A       LD (0AEF),HL
-	0BB8 22 F6 0A       LD (0AF6),HL
-	0BBB 22 FD 0A       LD (0AFD),HL
+	0BB5 22 EF 0A       LD (Voice_0_data+SONG_PTR),HL
+	0BB8 22 F6 0A       LD (Voice_1_data+SONG_PTR),HL
+	0BBB 22 FD 0A       LD (Voice_2_data+SONG_PTR),HL
 	0BBE C9             RET
 
+;; -----------------------------------------------------------------------------------------------------------
 sub_IntH_play_update
 	0BBF FD 21 EA 0A    LD IY,Voice_0_data
-	0BC3 06 03          LD B,3			;; 3 voices ??
+	0BC3 06 03          LD B,3					;; 3 voices ??
 pu_loopv
-	0BC5 FD 6E 05       LD L,(IY+05)
-	0BC8 FD 66 06       LD H,(IY+06)
+	0BC5 FD 6E 05       LD L,(IY+SONG_PTR)
+	0BC8 FD 66 06       LD H,(IY+SONG_PTR+1)
 	0BCB E5             PUSH HL
-	0BCC DD E1          POP IX
-	0BCE C5             PUSH BC
-	0BCF CD DB 0B       CALL 0BDB
-	0BD2 C1             POP BC
-	0BD3 11 07 00       LD DE,&0007		;; length of data array ??
-	0BD6 FD 19          ADD IY,DE		;; next Voice_x_data
-	0BD8 10 EB          DJNZ pu_loopv		;; loop all voices
+	0BCC DD E1          POP IX					;; ## 09CB
+	0BCE C5             PUSH BC					;; ## 032F
+	0BCF CD DB 0B       CALL &0BDB
+	0BD2 C1             POP BC					;; ## 032F
+	0BD3 11 07 00       LD DE,7					;; length of data array ??
+	0BD6 FD 19          ADD IY,DE				;; next Voice_x_data
+	0BD8 10 EB          DJNZ pu_loopv			;; loop all voices
 	0BDA C9             RET
 
-	0BDB FD 7E 01       LD A,(IY+1)
+;; -----------------------------------------------------------------------------------------------------------
+	0BDB FD 7E 01       LD A,(IY+1)				;; ## 0AEA get byte pointer
 	0BDE A7             AND A
-	0BDF C2 84 0C       JP NZ,0C84
-	0BE2 DD E5          PUSH IX
-	0BE4 E1             POP HL
-	0BE5 34             INC (HL) 	;; point on next data
-	0BE6 7E             LD A,(HL)	;; read data
+	0BDF C2 84 0C       JP NZ,&0C84				;; not 0 (already started), jump 0c84
+
+	0BE2 DD E5          PUSH IX					;; else, starting
+	0BE4 E1             POP HL					;; ## &09CB
+	0BE5 34             INC (HL) 				;; point on next data
+	0BE6 7E             LD A,(HL)				;; read data
 	0BE7 85             ADD A,L
 	0BE8 6F             LD L,A
 	0BE9 8C             ADC A,H
 	0BEA 95             SUB L
-	0BEB 67             LD H,A		;; HL = HL + A
-	0BEC 7E             LD A,(HL)
+	0BEB 67             LD H,A					;; HL = HL + A (byte nb)
+	0BEC 7E             LD A,(HL)				;; read song note
 	0BED FE FF          CP &FF
-	0BEF 20 29          JR NZ,0C1A	;; not &FF, jump
-	0BF1 23             INC HL		;; else read next byte
-	0BF2 BE             CP (HL)		;; CP avec un 2eme &FF
-	0BF3 28 06          JR Z,0BFB	;; if &FF jump (end) 0BFB
+	0BEF 20 29          JR NZ,&0C1A				;; not &FF, jump
+	0BF1 23             INC HL					;; else read next byte
+	0BF2 BE             CP (HL)					;; CP avec un 2eme &FF
+	0BF3 28 06          JR Z,&0BFB				;; if &FF jump (end) 0BFB
 	0BF5 DD 36 00 00    LD (IX+0),0
-	0BF9 18 E7          JR 0BE2
+	0BF9 18 E7          JR &0BE2
 
 	0BFB 21 23 09       LD HL,silence_sound
 	0BFE 36 00          LD (HL),0
-	0C00 FD 75 05       LD (IY+05),L
-	0C03 FD 74 06       LD (IY+06),H
+	0C00 FD 75 05       LD (IY+SONG_PTR),L
+	0C03 FD 74 06       LD (IY+SONG_PTR+1),H
 
-	0C06 FD 7E 03       LD A,(IY+03)
+	0C06 FD 7E 03       LD A,(IY+3)
 	0C09 A7             AND A
 	0C0A C8             RET Z
-	0C0B FD 35 03       DEC (IY+03)
-	0C0E FD 5E 03       LD E,(IY+03)	;; AY3 value
-	0C11 FD 7E 00       LD A,(IY+00)	;; voice num
+	0C0B FD 35 03       DEC (IY+3)
+
+	0C0E FD 5E 03       LD E,(IY+3)	;; AY3 value
+	0C11 FD 7E 00       LD A,(IY+0)	;; voice num
 	0C14 C6 08          ADD A,&08
 	0C16 57             LD D,A	     ;; AY3 reg (8: AY_A_VOL, 9: AY_B_VOL, 10: AY_C_VOL)
 	0C17 C3 93 0C       JP SubF_Write_AY3Reg
 
-	0C1A 4F             LD C,A		;; volume reg number
-	0C1B E6 07          AND &07		;; voice num
+	0C1A 4F             LD C,A		;; data ##&32 = 6 (offset from refnote) << 3 + 2 (duration index)
+	0C1B E6 07          AND &07		;; 1st song byte [7:3] ; [2:0]=idx Duration_array array array(2) = 7
 	0C1D 5F             LD E,A
 	0C1E 16 00          LD D,0
-	0C20 21 08 0B       LD HL,0B08
+	0C20 21 08 0B       LD HL,Duration_array
 	0C23 19             ADD HL,DE
 	0C24 7E             LD A,(HL)
-	0C25 FD 77 01       LD (IY+1),A
-	0C28 79             LD A,C		;; volume reg number
+	0C25 FD 77 01       LD (IY+1),A			;; &0AEA+1
+	0C28 79             LD A,C				;; first byte data
 	0C29 E6 F8          AND &F8
 	0C2B 0F             RRCA
 	0C2C 0F             RRCA
-	0C2D 0F             RRCA
-	0C2E FD 77 04       LD (IY+4),A ;; offset note
-	0C31 28 D3          JR Z,0C06
-	0C33 DD 86 FD       ADD A,(IX-3) ;; refnote
-	0C36 6F             LD L,A
+	0C2D 0F             RRCA				;; [7:3] >> 3 put [7:3] as [4:0]
+	0C2E FD 77 04       LD (IY+4),A 		;; offset note = &30 >> 3 = 6
+	0C31 28 D3          JR Z,&0C06
+	0C33 DD 86 FD       ADD A,(IX-3) 		;; refnote	## &09CB-3 = &1C+6 = &22
+	0C36 6F             LD L,A				;; ## HL = &22
 	0C37 26 00          LD H,0
-	0C39 29             ADD HL,HL   ;; HL = 2*A
+	0C39 29             ADD HL,HL   		;; HL = 2*A ## &44
 	0C3A 11 10 0B       LD DE,Notes_array
-	0C3D 19             ADD HL,DE
-	0C3E 5E             LD E,(HL)  ;; AY3 value
+	0C3D 19             ADD HL,DE			;; HL = Notes_array + 2*index # &0B54
+	0C3E 5E             LD E,(HL)  			;; AY3 value ## &0C
 	0C3F 23             INC HL
-	0C40 66             LD H,(HL) ;; AY3 next value
-	0C41 FD 7E 00       LD A,(IY+0)	;; voice num
-	0C44 87             ADD A,A		;; voice num x2
-	0C45 57             LD D,A     ;; AY3 reg (0 : AY_A_FINE, 2 : AY_B_FINE or 4 : AY_C_FINE)
+	0C40 66             LD H,(HL) 			;; AY3 next value  ## &0155
+	0C41 FD 7E 00       LD A,(IY+0)			;; voice num
+	0C44 87             ADD A,A				;; voice num x2
+	0C45 57             LD D,A     			;; AY3 reg (0 : AY_A_FINE, 2 : AY_B_FINE or 4 : AY_C_FINE)
 	0C46 CD 93 0C       CALL SubF_Write_AY3Reg
-	0C49 14             INC D		;; next AY3 reg (0 : AY_A_COARSE, 2 : AY_B_COARSE or 4 : AY_C_COARSE)
-	0C4A 5C             LD E,H		;; AY3 value
+	0C49 14             INC D				;; next AY3 reg (0 : AY_A_COARSE, 2 : AY_B_COARSE or 4 : AY_C_COARSE)
+	0C4A 5C             LD E,H				;; AY3 value
 	0C4B CD 93 0C       CALL SubF_Write_AY3Reg
-	0C4E FD 36 02 00    LD (IY+2),0
-	0C52 FD 46 00       LD B,(IY+0)
+	0C4E FD 36 02 00    LD (IY+2),0			;; &0AEA+2
+	0C52 FD 46 00       LD B,(IY+0)			;;
 	0C55 04             INC B
-	0C56 DD 7E FE       LD A,(IX-2)
-	0C59 0F             RRCA
+	0C56 DD 7E FE       LD A,(IX-2)			;; &09CB-2 ##8
+	0C59 0F             RRCA				;; >> 1
 	0C5A 0E 84          LD C,&84
 
-	0C5C 07             RLCA
-	0C5D CB 01          RLC C
+	0C5C 07             RLCA				;; << 1
+	0C5D CB 01          RLC C				;; &09
 	0C5F 10 FB          DJNZ 0C5C
-	0C61 21 FF 0A       LD HL,0AFF
-	0C64 AE             XOR (HL)
-	0C65 A1             AND C
-	0C66 AE             XOR (HL)
+	0C61 21 FF 0A       LD HL,&0AFF
+	0C64 AE             XOR (HL)    		;; &37
+	0C65 A1             AND C				;; &01
+	0C66 AE             XOR (HL)			;; &3E
 	0C67 77             LD (HL),A
-	0C68 5F             LD E,A		;; AY3 value
-	0C69 16 07          LD D,7		;; AY3 reg : AY_MIXER
+	0C68 5F             LD E,A				;; AY3 value
+	0C69 16 07          LD D,7				;; AY3 reg : AY_MIXER ; D/E=&07/&3E en voice0
 	0C6B CD 93 0C       CALL SubF_Write_AY3Reg
-	0C6E FD 7E 02       LD A,(IY+2)
+
+	0C6E FD 7E 02       LD A,(IY+2)			;; &0AEA ## 0
 	0C71 FE 08          CP &08
 	0C73 D0             RET NC
 	0C74 6F             LD L,A
-	0C75 26 00          LD H,0
-	0C77 11 00 0B       LD DE,0B00
-	0C7A 19             ADD HL,DE
-	0C7B 7E             LD A,(HL)
-	0C7C DD 86 FF       ADD A,(IX-1)
-	0C7F FD 77 03       LD (IY+3),A
-	0C82 18 8A          JR 0C0E
+	0C75 26 00          LD H,0				;; idx b00 = 0
+	0C77 11 00 0B       LD DE,Envelope_array
+	0C7A 19             ADD HL,DE			;; HL = &0B00 + A
+	0C7B 7E             LD A,(HL)			;; value 3
+	0C7C DD 86 FF       ADD A,(IX-1)		;; &09CB-1
+	0C7F FD 77 03       LD (IY+3),A			;; &0aea+3
+	0C82 18 8A          JR &0C0E
 
 	0C84 FD 35 01       DEC (IY+1)
 	0C87 FD 7E 04       LD A,(IY+4)
 	0C8A A7             AND A
-	0C8B CA 06 0C       JP Z,0C06
+	0C8B CA 06 0C       JP Z,&0C06
 	0C8E FD 34 02       INC (IY+2)
-	0C91 18 DB          JR 0C6E
+	0C91 18 DB          JR &0C6E
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Sub function for Write_AY3_Registers (write one AY-3 reg)
@@ -2266,6 +2300,7 @@ pu_loopv
 	0CAC C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
+Check_volume_amount
 	0CAD 3A 10 01       LD A,(Sound_amount)
 	0CB0 FE 01          CP &01			;; amount 1 or 2, ret NC
 	0CB2 D0             RET NC
@@ -2273,7 +2308,9 @@ pu_loopv
 	0CB4 C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
-	0CB5 2A F6 0A       LD HL,(0AF6)
+;; Returns Zero if nothing to play, NZ if something to play
+TestHasSomthingToBePlayed
+	0CB5 2A F6 0A       LD HL,(&0AF6)
 	0CB8 11 23 09       LD DE,silence_sound
 	0CBB A7             AND A
 	0CBC ED 52          SBC HL,DE
@@ -2990,7 +3027,7 @@ dbg_2
 	0FA8 3C             INC A
 	0FA9 C0             RET NZ
 	0FAA FD 21 E4 11    LD IY,ClearOne
-	0FAE DD 21 9A 12    LD IX,129A ;; OneColBlitL
+	0FAE DD 21 9A 12    LD IX,OneColBlitL
 	0FB2 21 6C 12       LD HL,BlitFloorL
 	0FB5 22 77 10       LD (smc_blitfloor_fnptr+1),HL
 	0FB8 D9             EXX
@@ -3497,7 +3534,7 @@ clr2_1
 	1218 F5             PUSH AF
 	1219 D9             EXX
 	121A 7E             LD A,(HL)
-	121B F6 FA          OR &FA
+	121B F6 FA          OR &FA			;; ~&05
 	121D 3C             INC A
 	121E D9             EXX
 	121F 28 0C          JR Z,Blank_Tile
@@ -3592,7 +3629,7 @@ bf_2
 	1270 D9             EXX
 	1271 0E 00          LD C,&00
 	1273 28 02          JR Z,bfl_1
-	1275 0E 10          LD C,10
+	1275 0E 10          LD C,&10
 bfl_1
 	1277 CD 18 12       CALL GetFloorAddr
 	127A E6 0F          AND &0F
@@ -3627,6 +3664,7 @@ bfl_2
 	1296 23             INC HL
 	1297 23             INC HL
 	1298 18 01          JR ocbt_1
+OneColBlitL:
 	129A D9             EXX
 ocbt_1
 	129B 47             LD B,A
@@ -3736,7 +3774,7 @@ IsPillarBufFlipped:
 	12FA 26 00          LD H,0
 	12FC 29             ADD HL,HL
 	12FD 29             ADD HL,HL
-	12FE ED 4B 0B 30    LD BC,(300B) ;; Walls_PanelBase
+	12FE ED 4B 0B 30    LD BC,(Walls_PanelBase)
 	1302 09             ADD HL,BC
 	1303 C9             RET
 
@@ -4115,9 +4153,9 @@ brot44_2
 ;; X extent is in screen units (2 pixels per unit).
 ;; Units increase down and to the right.
 ViewXExtent
-	14C6 66 60          DEFW &6066
+	14C6 66 60          DEFW &60 * WORD_HIGH_BYTE + &66
 ViewYExtent
-	14C8 70 50          DEFW &5070
+	14C8 70 50          DEFW &50 * WORD_HIGH_BYTE + &70
 
 SpriteXStart
 	14CA 00             DEFB 0
@@ -4125,9 +4163,9 @@ SpriteRowCount
 	14CB 00             DEFB 0
 
 ObjXExtent
-	14CC 00 00          DEFW 0
+	14CC 00 00          DEFW &00 * WORD_HIGH_BYTE + &00
 ObjYExtent
-	14CE 00 00          DEFW 0
+	14CE 00 00          DEFW &00 * WORD_HIGH_BYTE + &00
 SpriteFlags
 	14D0 00             DEFB 0
 
@@ -4547,7 +4585,7 @@ DecodeOrgStack
 	16B8 00 00 00    	DEFB 	&00, &00, &00
 
 BaseFlags
-	16BB 00             DEFW 	&0000
+	16BB 00             DEFB	&00, &00
 
 ;; -----------------------------------------------------------------------------------------------------------
 O_NEAR2FAR_LST			EQU		&00
@@ -4579,8 +4617,7 @@ O_SPECIAL				EQU 	&11
 	16C7 00             DEFB 	&00				;;	A : O_FUNC
 	16C8 FF             DEFB 	&FF				;;	B : O_IMPACT
 	16C9 FF             DEFB 	&FF				;;	C :
-	16CA 00             DEFB 	&00				;;	D : O_OBJUNDER
-	16CB 00             DEFB 	&00				;;	E : O_OBJUNDER+1
+	16CA 00 00          DEFW 	&0000			;;	D&E : O_OBJUNDER
 	16CC 00             DEFB 	&00				;;	F : O_ANIM
 	16CD 00             DEFB 	&00				;;	10 : O_DIRECTION (dir code (0 to 7 or FF))
 	16CE 00             DEFB 	&00				;;	11 : O_SPECIAL
@@ -4596,7 +4633,7 @@ CurrData
 ExpandDone
 	16D3 00             DEFB 0
 DoorSprites
-	16D4 00 00          DEFW &0000
+	16D4 00 00          DEFB &00, &00
 
 current_Room_ID
 	16D6 00             DEFW &0000
@@ -4684,12 +4721,12 @@ HighestDoor
 ;; -----------------------------------------------------------------------------------------------------------
 BuildRoom
 	171D FD 21 E8 16    LD IY,Max_min_UV_Table
-	1721 21 D0 30       LD HL,&30D0
+	1721 21 D0 30       LD HL,&30 * WORD_HIGH_BYTE + &D0
 	1724 22 C6 14       LD (ViewXExtent),HL
-	1727 21 FF 00       LD HL,&00FF
+	1727 21 FF 00       LD HL,&00 * WORD_HIGH_BYTE + &FF
 	172A 22 C8 14       LD (ViewYExtent),HL
 	172D ED 43 D6 16    LD (16D6),BC
-	1731 21 C0 C0       LD HL,GROUND_LEVEL * 256 + GROUND_LEVEL
+	1731 21 C0 C0       LD HL,GROUND_LEVEL * WORD_HIGH_BYTE + GROUND_LEVEL
 	1734 22 18 17       LD (DoorHeightsTmp),HL
 	1737 22 1A 17       LD (DoorHeightsTmp+2),HL
 	173A 21 00 00       LD HL,0
@@ -4727,6 +4764,7 @@ br_sk1
 	1780 7D             LD A,L
 	1781 E6 08          AND &08
 	1783 28 1F          JR Z,test_if_wall_far_U
+	;; Draw the room in V direction (Nw side)
 	1785 3E 01          LD A,&01
 	1787 CD 8A 2D       CALL SetObjList
 	178A ED 4B D6 16    LD BC,(current_Room_ID)
@@ -4749,6 +4787,7 @@ test_if_wall_far_U
 	17AA 7D             LD A,L
 	17AB E6 04          AND &04
 	17AD 28 20          JR Z,bldroom_2
+	;; Draw the room in U direction (Ne side)
 	17AF 3E 02          LD A,&02
 	17B1 CD 8A 2D       CALL SetObjList
 	17B4 ED 4B D6 16    LD BC,(current_Room_ID)
@@ -4841,7 +4880,7 @@ rdroom_loop
 	1847 CD 9D 18       CALL ProcEntry
 	184A 30 FB          JR NC,rdroom_loop
 	184C C1             POP BC
-	184D C3 D3 32       JP 32D3   ;; AddSavedCrowns_and_SpecialItems
+	184D C3 D3 32       JP AddSpecialItems
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; value going in are 3-bit signed value (-4 to +3)
@@ -4871,7 +4910,7 @@ add3b_1
 	186A 4F             LD C,A
 	186B 23             INC HL
 	186C F1             POP AF
-	186D D6 07          SUB &07
+	186D D6 07          SUB 7
 	186F 86             ADD A,(HL)
 	1870 23             INC HL
 	1871 22 AD 16       LD (DecodeOrgPtr),HL
@@ -4918,6 +4957,11 @@ ROOM_DATA_MACRO			EQU		&C0
 	18B3 FD E1          POP IY
 	18B5 06 02          LD B,2
 	18B7 CD C1 1A       CALL FetchData
+	;; The 2 bits fetched are:
+	;; Bit0, if 0 : only one object with current object code;
+	;;       if 1 : several objects to create with current object code.
+	;; Bit1, if 0 : we will need to fetch one bit before every coord-set to get the per-object orientation bit.
+	;;       if 1 : the next fetched bit will serve as orientation bit for all onjects in that group.
 	18BA CB 4F          BIT 1,A
 	18BC 20 04          JR NZ,global_orientation_bit
 	18BE 3E 01          LD A,&01
@@ -5152,6 +5196,13 @@ fm_loop
 	19F8 4F             LD C,A
 	19F9 CD 10 1A       CALL FindRoom
 	19FC D8             RET c
+check_floorid_above:
+    ;; Room Data Format (excluding size byte) is:
+	;; 12b roomID UVZ, 3b roomDimensions, 3b colorScheme,
+	;; 3b WorldId, 15b door data, 3b floorId, 8b Object, etc.
+	;; 		uuuuvvvv_zzzzdddc_ccwwwDDD_pppDDDpp_pDDDfffo_ooooooo..
+	;; DE currently pointing on the second byte, so +3 points on the
+	;; byte with the floorId. ORing &F1 checks if floorId is 7 (no floor).
 	19FD 13             INC DE
 	19FE 13             INC DE
 	19FF 13             INC DE
@@ -5285,6 +5336,7 @@ stof_end
 ;; set TmpObj_variables's location
 .SetTmpObjUVZEx:
 	1A7A CD AC 1A       CALL FetchData333
+SetTmpObjUVZ
 	1A7D 08             EX AF,AF'
 	1A7E 2A AD 16       LD HL,(DecodeOrgPtr)
 	1A81 11 C2 16       LD DE,TmpObj_variables+O_U
@@ -5410,7 +5462,7 @@ Init_setup:
 	1AF8 CD 96 1B       CALL Reinitialise
 	1AFB C9 1B          DEFW StatusReinit
 	1AFD CD 96 1B       CALL Reinitialise
-	1B00 EF 34          DEFW &34EF
+	1B00 EF 34          DEFW reset_count_val ;; reset nbtimes_died and nbcollected_bonus
 	1B02 C3 56 33       JP ResetSpecials
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -5419,12 +5471,13 @@ Init_setup:
 	1B08 C9 1B          DEFW StatusReinit
 	1B0A C3 03 34       JP DoContinue
 
-;; TODO
+;; -----------------------------------------------------------------------------------------------------------
+EnterRoom
 	1B0D D9             EXX
 	1B0E CD 96 1B       CALL Reinitialise
 	1B11 51 2D          DEFW ObjVars
 	1B13 CD 96 1B       CALL Reinitialise
-	1B16 D6 1B          DEFW &1BD6
+	1B16 D6 1B          DEFW reset_stat			;; reset some sta like jump height, isStill, etc.
 	1B18 21 00 50       LD HL,BackgrdBuff
 	1B1B 01 40 00       LD BC,&0040
 	1B1E CD A8 1B       CALL Erase_forward_Block_RAM
@@ -5576,16 +5629,17 @@ Erase_block_val_in_E:
 	1BB4 30				DEFB &30
 
 ;; -----------------------------------------------------------------------------------------------------------
-	1BB5 AD 0A          DEFW 0AAD		;; 0 0AAD
-	1BB7 B8 0A          DEFW 0AB8		;; 1 0AB8
-	1BB9 E0 0A          DEFW 0AE0		;; 2 0AE0
-	1BBB C5 0A          DEFW 0AC5		;; 3 0AC5
-	1BBD C9 0A          DEFW 0AC9		;; 4 0AC9
-	1BBF DC 0A          DEFW 0ADC		;; 5 0ADC
-	1BC1 DC 0A          DEFW 0ADC		;; 6 0ADC
-	1BC3 D4 0A      	DEFW 0AD4		;; 7 0AD4
-	1BC5 D8 0A          DEFW 0AD8		;; 8 0AD8
-	1BC7 D8 0A          DEFW 0AD8		;; 9 0AD8
+sounds_pointer_array
+	1BB5 AD 0A          DEFW &0AAD		;; 0 0AAD
+	1BB7 B8 0A          DEFW &0AB8		;; 1 0AB8
+	1BB9 E0 0A          DEFW &0AE0		;; 2 0AE0
+	1BBB C5 0A          DEFW &0AC5		;; 3 0AC5
+	1BBD C9 0A          DEFW &0AC9		;; 4 0AC9
+	1BBF DC 0A          DEFW Sound_ID_Menu_Blip		;; 5 0ADC
+	1BC1 DC 0A          DEFW Sound_ID_Menu_Blip		;; 6 0ADC
+	1BC3 D4 0A      	DEFW &0AD4		;; 7 0AD4
+	1BC5 D8 0A          DEFW &0AD8		;; 8 0AD8
+	1BC7 D8 0A          DEFW &0AD8		;; 9 0AD8
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; These are the init/default values for the Inventory (see 247B) and
@@ -5593,13 +5647,18 @@ Erase_block_val_in_E:
 ;; Then the reset values to initialize the variables.
 ;; The Reinitialise call with 2471 as argument will copy the 9 bytes of
 ;; StatusReinit_reset_data into the Inventory (247B) & after
+CNT_SPEED				EQU		1
+CNT_SPRING				EQU		2
+CNT_SHIELD				EQU		3
+CNT_LIVES				EQU		4
+
 StatusReinit:
 	1BC9 05             DEFB	5 ;; length
 StatusReinit_reset_data:
 	1BCA 00             DEFB 	0 ;; Inventory
-	1BCB 00             DEFB 	0 ;; CNT_SPEED ???
-	1BCC 00             DEFB 	0 ;; CNT_SPRING ???
-	1BCD 00             DEFB 	0 ;; CNT_SHIELD ???
+	1BCB 00             DEFB 	0 ;; CNT_SPEED
+	1BCC 00             DEFB 	0 ;; CNT_SPRING
+	1BCD 00             DEFB 	0 ;; CNT_SHIELD
 	1BCE 08             DEFB 	8 ;; CNT_LIVES
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -5614,22 +5673,33 @@ Inventory:
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; These are the main counters (Lives, Invuln, Speed, Spring, Donuts)
+NB_COUNTERS				EQU		4
+
 .Counters:
-	1BD0 00             DEFB 	0  ;; CNT_SPEED ???
-	1BD1 00             DEFB 	0  ;; CNT_SPRING ???
-	1BD2 00             DEFB 	0  ;; CNT_SHIELD ???
-	1BD3 04             DEFB 	4  ;; CNT_LIVES
+Counter_speed
+	1BD0 00             DEFB 	0	;; CNT_SPEED
+Counter_spring
+	1BD1 00             DEFB 	0	;; CNT_SPRING
+Counter_shield
+	1BD2 00             DEFB 	0	;; CNT_SHIELD
+Counter_lives
+	1BD3 04             DEFB 	4	;; CNT_LIVES
+InvulnModulo
+	1BD4 03             DEFB	3	;; InvulnModulo
+SpeedModulo
+	1BD5 02             DEFB	2	;; SpeedModulo
 
-	1BD4 03             ;; InvulnModulo ???
-	1BD5 02             ;; SpeedModulo ???
-
+;; -----------------------------------------------------------------------------------------------------------
+;; the 5 bytes of reset_stat_data will be copied into Jump_Height and following
+reset_stat
 	1BD6 05             DEFB 5 ;; length
+reset_stat_data
 	1BD7 00             DEFB 0
 	1BD8 FF             DEFB &FF
-	1BD9 00             DEFB 0
-	1BDA 00             DEFB 0
+	1BD9 00             DEFW &0000
 	1BDB 00             DEFB 0
 
+;; -----------------------------------------------------------------------------------------------------------
 Jump_Height
 	1BDC 00             DEFB 0
 IsStill
@@ -5637,19 +5707,24 @@ IsStill
 
 Carried_Object
 	1BDE 00 00          DEFW &0000
+Corrying_bool
 	1BE0 00             DEFB 0
-	1BE1 00             DEFB 0
 
-	1BE2 0F             RRCA
-	1BE3 00             NOP
+;; -----------------------------------------------------------------------------------------------------------
+	1BE1 00             DEFB 0
+character_direction
+	1BE2 0F             DEFB &0F
+Other_sound_ID
+	1BE3 00             DEFB 0
 Saved_Objects_List_index
-	1BE4 00             NOP
+	1BE4 00             DEFB 0
 Movement
 	1BE5 FF             DEFB &FF
-	1BE6 00             NOP
-	1BE7 00             NOP
-	1BE8 00             NOP
-	1BE9 00             NOP
+saved_access_code
+	1BE6 00             DEFB 0
+
+EntryPosition_uvz
+	1BE7 00             DEFB 0, 0, 0
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Character instance
@@ -5710,20 +5785,20 @@ Vape_loop
 ;; checks if need to play anims, check Death anim
 ;; Decrease invuln counter if needed,
 .Characters_Update:
-	1C28 21 18 38       LD HL,3818
+	1C28 21 18 38       LD HL,Dying
 	1C2B 7E             LD A,(HL)
 	1C2C A7             AND A
 	1C2D 20 4D          JR NZ,HandleDeath
-	1C2F 21 D4 1B       LD HL,1BD4
+	1C2F 21 D4 1B       LD HL,InvulnModulo
 	1C32 35             DEC (HL)
 	1C33 20 07          JR NZ,ct_mvt
 	1C35 36 03          LD (HL),3
 decr_invuln
-	1C37 3E 03          LD A,3 ;; CNT_INVULN ???
-	1C39 CD 8E 34       CALL 348E
+	1C37 3E 03          LD A,CNT_SHIELD
+	1C39 CD 8E 34       CALL Decrement_counter_and_display
 ct_mvt
 	1C3C 3E FF          LD A,&FF
-	1C3E 32 E5 1B       LD (1BE5),A ;; Movement
+	1C3E 32 E5 1B       LD (&1BE5),A ;; Movement
 	1C41 3A 17 38       LD A,(access_new_room_code)
 	1C44 A7             AND A
 	1C45 28 13          JR Z,br_25B6
@@ -5731,7 +5806,7 @@ change_room
 	1C47 3A E4 1B       LD A,(Saved_Objects_List_index)
 	1C4A A7             AND A
 	1C4B 28 0A          JR Z,br_25B3
-	1C4D 3A E2 1B       LD A,(1BE2) ;; character_direction
+	1C4D 3A E2 1B       LD A,(character_direction)
 	1C50 37             SCF
 	1C51 17             RLA
 	1C52 32 12 01       LD (Current_User_Inputs),A
@@ -5739,29 +5814,29 @@ change_room
 br_25B3
 	1C57 32 17 38       LD (access_new_room_code),A
 br_25B6
-	1C5A CD F3 1C       CALL 1CF3	;; CharThing4
+	1C5A CD F3 1C       CALL CharThing4
 	1C5D 3A F1 1B       LD A,(Batman_variables+O_Z)
 	1C60 FE 84          CP GROUND_LEVEL - 60
-	1C62 30 0F          JR NC,1C73	;; CheckFired or CheckDying
+	1C62 30 0F          JR NC,&1C73	;; CheckFired or CheckDying
 	1C64 AF             XOR A
 	1C65 32 DC 1B       LD (Jump_Height),A
 	1C68 3A E3 16       LD A,(FloorAboveFlag)
 	1C6B A7             AND A
-	1C6C 20 05          JR NZ,1C73 ;; CheckFired or CheckDying
+	1C6C 20 05          JR NZ,&1C73 ;; CheckFired or CheckDying
 	1C6E 3E 07          LD A,7
 	1C70 32 17 38       LD (access_new_room_code),A
 CheckDying
 	1C73 3A 17 38       LD A,(access_new_room_code)
 	1C76 E6 7F          AND &7F
 	1C78 C8             RET Z
-	1C79 C3 86 01       JP 0186
+	1C79 C3 86 01       JP &0186
 
 ;; -----------------------------------------------------------------------------------------------------------
 .HandleDeath:
 	1C7C 35             DEC (HL)
 	1C7D 20 2B          JR NZ,CharThing20
 	1C7F 34             INC (HL)
-	1C80 CD B5 0C       CALL 0CB5
+	1C80 CD B5 0C       CALL TestHasSomthingToBePlayed
 	1C83 3E 08          LD A,8
 	1C85 C2 5D 03       JP NZ,Set_colors
 	1C88 CD D4 35       CALL Incr_died_number
@@ -5771,14 +5846,15 @@ lose_a_life
 	1C8F D6 01          SUB 1
 	1C91 27             DAA
 	1C92 77             LD (HL),A
-	1C93 DC E5 1C       CALL c,1CE5
-	1C96 21 E7 1B       LD HL,1BE7
+	1C93 DC E5 1C       CALL c,&1CE5
+	1C96 21 E7 1B       LD HL,EntryPosition_uvz
 	1C99 11 EF 1B       LD DE,Batman_variables+O_U
 	1C9C 01 03 00       LD BC,&0003
 	1C9F ED B0          LDIR
-	1CA1 3A E6 1B       LD A,(1BE6)
+	1CA1 3A E6 1B       LD A,(saved_access_code)
 	1CA4 32 17 38       LD (access_new_room_code),A
-	1CA7 C3 B0 01       JP 01B0
+	1CA7 C3 B0 01       JP &01B0
+
 CharThing20
 	1CAA AF             XOR A
 	1CAB 32 EE 1B       LD (Batman_variables+O_FLAGS),A
@@ -5799,20 +5875,24 @@ CharThing20
 	1CD4 CD D1 14       CALL StoreObjExtents
 	1CD7 21 EA 1B       LD HL,Batman_variables
 	1CDA CD 19 15       CALL UnionAndDraw
-	1CDD 3A 18 38       LD A,(3818)
+	1CDD 3A 18 38       LD A,(Dying)
 	1CE0 E6 07          AND &07
-	1CE2 C3 4F 03       JP Set_pen3_only
+	1CE2 C3 4F 03       JP Set_pen3_only		;; This will blink the colors when dying
 
-	1CE5 36 00          LD (HL),00
+;; -----------------------------------------------------------------------------------------------------------
+	1CE5 36 00          LD (HL),0
 	1CE7 CD 9B 36       CALL Random_gen
 	1CEA 7D             LD A,L
-	1CEB E6 03          AND 03
+	1CEB E6 03          AND &03
 	1CED C2 17 01       JP NZ,Game_over
-	1CF0 C3 22 25       JP 2522
+	1CF0 C3 22 25       JP &2522
 
+;; -----------------------------------------------------------------------------------------------------------
+;; Looks like more movement stuff
+CharThing4:
 	1CF3 FD 21 EA 1B    LD IY,Batman_variables
 	1CF7 AF             XOR A
-	1CF8 32 E3 1B       LD (1BE3),A
+	1CF8 32 E3 1B       LD (Other_sound_ID),A
 	1CFB 3A E4 1B       LD A,(Saved_Objects_List_index)
 	1CFE CD 8A 2D       CALL SetObjList
 	1D01 21 EA 1B       LD HL,Batman_variables
@@ -5820,79 +5900,88 @@ CharThing20
 	1D07 21 DC 1B       LD HL,Jump_Height
 	1D0A 7E             LD A,(HL)
 	1D0B A7             AND A
-	1D0C 28 52          JR Z,1D60
+	1D0C 28 52          JR Z,br_27F8
 	1D0E 3A E4 1B       LD A,(Saved_Objects_List_index)
 	1D11 A7             AND A
-	1D12 28 04          JR Z,1D18
-	1D14 36 00          LD (HL),00
-	1D16 18 48          JR 1D60
+	1D12 28 04          JR Z,br_27AF
+	1D14 36 00          LD (HL),0
+	1D16 18 48          JR br_27F8
 
+br_27AF
 	1D18 35             DEC (HL)
 	1D19 21 EA 1B       LD HL,Batman_variables
 	1D1C CD 81 22       CALL ChkSatOn
-	1D1F 38 0A          JR c,1D2B
-	1D21 FD 35 07       DEC (IY+07)
-	1D24 3E 03          LD A,03
-	1D26 CD FE 1F       CALL 1FFE
-	1D29 18 11          JR 1D3C
+	1D1F 38 0A          JR c,br_27C2
+	1D21 FD 35 07       DEC (IY+O_Z)
+	1D24 3E 03          LD A,&03
+	1D26 CD FE 1F       CALL SetOtherSound
+	1D29 18 11          JR br_27D3
 
+br_27C2
 	1D2B 08             EX AF,AF'
-	1D2C 3E 06          LD A,06
-	1D2E FD CB 0B 66    BIT 4,(IY+0B)
-	1D32 FD CB 0B E6    SET 4,(IY+0B)
-	1D36 CC FE 1F       CALL Z,1FFE
+	1D2C 3E 06          LD A,&06
+	1D2E FD CB 0B 66    BIT 4,(IY+O_IMPACT)
+	1D32 FD CB 0B E6    SET 4,(IY+O_IMPACT)
+	1D36 CC FE 1F       CALL Z,SetOtherSound
 	1D39 08             EX AF,AF'
-	1D3A 28 0B          JR Z,1D47
-	1D3C FD CB 0B A6    RES 4,(IY+0B)
-	1D40 FD CB 0B EE    SET 5,(IY+0B)
-	1D44 FD 35 07       DEC (IY+07)
+	1D3A 28 0B          JR Z,br_27DE
+br_27D3
+	1D3C FD CB 0B A6    RES 4,(IY+O_IMPACT)
+	1D40 FD CB 0B EE    SET 5,(IY+O_IMPACT)
+	1D44 FD 35 07       DEC (IY+O_Z)
+br_27DE
 	1D47 3A CF 1B       LD A,(Inventory)
-	1D4A 1F             RRA		;; bit0 in carry
-	1D4B 38 06          JR c,1D53	;; if we have ??? 1D53
-	1D4D 3A E2 1B       LD A,(1BE2) ;; else
+	1D4A 1F             RRA				;; bit0 in carry
+	1D4B 38 06          JR c,br_27EB	;; if we have ??? 1D53
+br_27E5
+	1D4D 3A E2 1B       LD A,(character_direction) ;; else
 	1D50 C3 D4 1D       JP HandleMove
 
+br_27EB
 	1D53 3A 12 01       LD A,(Current_User_Inputs)
 	1D56 1F             RRA
 	1D57 CD 16 36       CALL DirCode_from_LRDU
 	1D5A 3C             INC A
-	1D5B C2 D0 1D       JP NZ,1DD0
-	1D5E 18 ED          JR 1D4D
+	1D5B C2 D0 1D       JP NZ,br_2855
+	1D5E 18 ED          JR br_27E5
 
-	1D60 FD CB 0B E6    SET 4,(IY+0B)
-	1D64 FD CB 0C EE    SET 5,(IY+0C)
+br_27F8
+	1D60 FD CB 0B E6    SET 4,(IY+O_IMPACT)
+	1D64 FD CB 0C EE    SET 5,(IY+&0C)
 	1D68 21 EA 1B       LD HL,Batman_variables
 	1D6B CD E4 20       CALL DoorContact
 	1D6E D2 6A 1E       JP NC,CharThing23
-	1D71 28 1A          JR Z,1D8D
+	1D71 28 1A          JR Z,br_2812
 	1D73 3A CF 1B       LD A,(Inventory)
-	1D76 E6 02          AND 02
-	1D78 C2 49 1E       JP NZ,1E49
+	1D76 E6 02          AND &02
+	1D78 C2 49 1E       JP NZ,&1E49
 	1D7B FD 34 07       INC (IY+O_Z)
 	1D7E 3A F2 1B       LD A,(Batman_variables+O_SPRITE)
-	1D81 D6 15          SUB 15
-	1D83 E6 FE          AND FE
-	1D85 3E 07          LD A,07
-	1D87 CC FE 1F       CALL Z,1FFE
+	1D81 D6 15          SUB SPR_BATMAN_FLY
+	1D83 E6 FE          AND &FE				;; test if SPR_BATMAN_FLY or SPR_BATMAN_FLYB
+	1D85 3E 07          LD A,&07
+	1D87 CC FE 1F       CALL Z,SetOtherSound
 	1D8A C3 C6 1D       JP br_284B
 
+br_2812
 	1D8D 3A 17 38       LD A,(access_new_room_code)
 	1D90 17             RLA
-	1D91 30 04          JR NC,1D97
-	1D93 FD 36 0C FF    LD (IY+0C),FF
-	1D97 3E 07          LD A,07
-	1D99 FD CB 0B 6E    BIT 5,(IY+0B)
-	1D9D FD CB 0B EE    SET 5,(IY+0B)
-	1DA1 CC FE 1F       CALL Z,1FFE
-	1DA4 FD CB 0C 66    BIT 4,(IY+0C)
-	1DA8 FD CB 0C E6    SET 4,(IY+0C)
+	1D91 30 04          JR NC,br_281C
+	1D93 FD 36 0C FF    LD (IY+&0C),&FF
+br_281C
+	1D97 3E 07          LD A,&07
+	1D99 FD CB 0B 6E    BIT 5,(IY+O_IMPACT)
+	1D9D FD CB 0B EE    SET 5,(IY+O_IMPACT)
+	1DA1 CC FE 1F       CALL Z,SetOtherSound
+	1DA4 FD CB 0C 66    BIT 4,(IY+&0C)
+	1DA8 FD CB 0C E6    SET 4,(IY+&0C)
 	1DAC 20 18          JR NZ,br_284B
 	1DAE 21 EA 1B       LD HL,Batman_variables
 	1DB1 CD 81 22       CALL ChkSatOn
 	1DB4 30 09          JR NC,EPIC_40
 	1DB6 20 07          JR NZ,EPIC_40
-	1DB8 3E 06          LD A,06
-	1DBA CD FE 1F       CALL 1FFE
+	1DB8 3E 06          LD A,&06
+	1DBA CD FE 1F       CALL SetOtherSound
 	1DBD 18 07          JR br_284B
 
 EPIC_40
@@ -5900,9 +5989,10 @@ EPIC_40
 	1DC2 FD CB 0B A6    RES 4,(IY+O_IMPACT)
 br_284B
 	1DC6 AF             XOR A
-	1DC7 32 E1 1B       LD (1BE1),A
+	1DC7 32 E1 1B       LD (&1BE1),A
 	1DCA CD 73 1F       CALL TryCarry
 	1DCD CD 2E 1F       CALL DoJump
+br_2855
 	1DD0 3A 12 01       LD A,(Current_User_Inputs)
 	1DD3 1F             RRA
 ;; Do the movement with LRDU direction in A.
@@ -5917,12 +6007,12 @@ br_284B
 	1DE2 32 0E 1C       LD (Front_Batman_Walk_Loop),A
 	1DE5 32 14 1C       LD (Back_Batman_Walk_Loop),A
 	1DE8 08             EX AF,AF'
-	1DE9 3E 13          LD A,13
+	1DE9 3E 13          LD A,&13
 	1DEB 38 13          JR c,br_28BC
-	1DED 3E 10          LD A,10
+	1DED 3E 10          LD A,&10
 	1DEF 18 32          JR DoFootTap
 br_288C
-	1DF1 CD 9E 1E       CALL 1E9E
+	1DF1 CD 9E 1E       CALL &1E9E
 	1DF4 08             EX AF,AF'
 	1DF5 21 0E 1C       LD HL,Front_Batman_Walk_Loop
 	1DF8 30 03          JR NC,br_289B
@@ -5935,62 +6025,64 @@ br_28BC
 ;; call UpdateChar.
 .UpdateCharFrame:
 	1E04 32 F2 1B       LD (Batman_variables+O_SPRITE),A
-	1E07 3A E5 1B       LD A,(1BE5)
+	1E07 3A E5 1B       LD A,(&1BE5)
 	1E0A 32 F6 1B       LD (Batman_variables+&0C),A
 	1E0D 21 EA 1B       LD HL,Batman_variables
 	1E10 CD AF 2E       CALL Relink
-	1E13 CD BE 20       CALL 20BE
+	1E13 CD BE 20       CALL SaveObjListIdx
 	1E16 AF             XOR A
 	1E17 CD 8A 2D       CALL SetObjList
 	1E1A 21 EA 1B       LD HL,Batman_variables
 	1E1D CD 19 15       CALL UnionAndDraw
-	1E20 C3 05 20       JP 2005
+	1E20 C3 05 20       JP Play_Other_Sound
 
+;; -----------------------------------------------------------------------------------------------------------
 DoFootTap ;; br_1e23
-	1E23 21 B2 1B       LD HL,1BB2 ;; BlinkEyesCounter ???
+	1E23 21 B2 1B       LD HL,&1BB2 ;; BlinkEyesCounter ???
 	1E26 35             DEC (HL)
 	1E27 20 D7          JR NZ,br_28BC
 	1E29 36 01          LD (HL),&01
-	1E2B 21 B3 1B       LD HL,1BB3
+	1E2B 21 B3 1B       LD HL,&1BB3
 	1E2E 35             DEC (HL)
 	1E2F 20 05          JR NZ,do_blink
 	1E31 36 02          LD (HL),&02
 	1E33 CD B1 03       CALL TapFoot
 do_blink
-	1E36 21 B4 1B       LD HL,1BB4
+	1E36 21 B4 1B       LD HL,&1BB4
 	1E39 35             DEC (HL)
 	1E3A 3E 17          LD A,&17
 	1E3C 20 C2          JR NZ,br_28BC
 	1E3E 3E 30          LD A,&30
 	1E40 36 60          LD (HL),&60
-	1E42 32 B2 1B       LD (1BB2),A
+	1E42 32 B2 1B       LD (&1BB2),A
 	1E45 3E 17          LD A,&17
 	1E47 18 B7          JR br_28BC
 
 	1E49 2A E2 20       LD HL,(ObjContact)
 	1E4C 24             INC H
 	1E4D 25             DEC H
-	1E4E 28 09          JR Z,1E59
+	1E4E 28 09          JR Z,&1E59
 	1E50 E5             PUSH HL
 	1E51 DD E1          POP IX
-	1E53 DD CB 04 6E    BIT 5,(IX+04)
+	1E53 DD CB 04 6E    BIT 5,(IX+O_FLAGS)
 	1E57 20 11          JR NZ,CharThing23
 
-	1E59 21 E1 1B       LD HL,1BE1
+	1E59 21 E1 1B       LD HL,&1BE1
 	1E5C 7E             LD A,(HL)
 	1E5D A7             AND A
-	1E5E 36 FF          LD (HL),FF
-	1E60 28 0C          JR Z,1E6E
+	1E5E 36 FF          LD (HL),&FF
+	1E60 28 0C          JR Z,&1E6E
 	1E62 CD 73 1F       CALL TryCarry
 	1E65 CD 2E 1F       CALL DoJump
-	1E68 18 04          JR 1E6E
+	1E68 18 04          JR &1E6E
 
+;; -----------------------------------------------------------------------------------------------------------
 CharThing23
 	1E6A AF             XOR A
-	1E6B 32 E1 1B       LD (1BE1),A ;; TODO_248e
-	1E6E CD 9E 1E       CALL 1E9E
+	1E6B 32 E1 1B       LD (&1BE1),A ;; TODO_248e
+	1E6E CD 9E 1E       CALL &1E9E
 	1E71 3E 04          LD A,&04
-	1E73 CD FE 1F       CALL 1FFE
+	1E73 CD FE 1F       CALL SetOtherSound
 	1E76 FD CB 0B AE    RES 5,(IY+O_IMPACT)
 	1E7A 3A CF 1B       LD A,(Inventory)
 	1E7D E6 02          AND &02
@@ -6006,12 +6098,12 @@ br_292E
 	1E91 CD B8 1E       CALL MoveChar
 br_2949
 	1E94 CD A4 1E       CALL Orient
-	1E97 3E 15          LD A,&15
+	1E97 3E 15          LD A,&15		;; SPR_BATMAN_FLY ???
 	1E99 CE 00          ADC A,0
 	1E9B C3 04 1E       JP UpdateCharFrame
 
 	1E9E 3E 30          LD A,&30
-	1EA0 32 B2 1B       LD (1BB2),A
+	1EA0 32 B2 1B       LD (&1BB2),A
 	1EA3 C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -6020,7 +6112,7 @@ br_2949
 ;; set bit4 of O_FLAGS if bit1 is reset (V) (sprite needs flip)
 ;; Returns with carry set if facing away or Carry reset if rearward.
 Orient
-	1EA4 3A E2 1B       LD A,(1BE2) ;; character_direction
+	1EA4 3A E2 1B       LD A,(character_direction)
 	1EA7 CD 16 36       CALL DirCode_from_LRDU
 	1EAA 1F             RRA
 	1EAB FD CB 04 A6    RES 4,(IY+O_FLAGS)
@@ -6034,43 +6126,42 @@ br_2976
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Move the character.
 .MoveChar:
-	1EB8 F6 F0          OR F0
-	1EBA FE FF          CP FF
+	1EB8 F6 F0          OR &F0
+	1EBA FE FF          CP &FF
 	1EBC 32 DD 1B       LD (IsStill),A
 	1EBF 28 14          JR Z,br_2993
 	1EC1 08             EX AF,AF'
 	1EC2 AF             XOR A
 	1EC3 32 DD 1B       LD (IsStill),A
-	1EC6 3E 01          LD A,01
-	1EC8 CD FE 1F       CALL 1FFE
+	1EC6 3E 01          LD A,&01
+	1EC8 CD FE 1F       CALL SetOtherSound
 	1ECB 08             EX AF,AF'
-	1ECC 21 E2 1B       LD HL,1BE2 ;; character_direction
+	1ECC 21 E2 1B       LD HL,character_direction
 	1ECF BE             CP (HL)
 	1ED0 77             LD (HL),A
 	1ED1 28 02          JR Z,br_2998
-	1ED3 3E FF          LD A,FF
+	1ED3 3E FF          LD A,&FF
 br_2998
 br_2993
 	1ED5 F5             PUSH AF
-	1ED6 FD A6 0C       AND (IY+0C)
+	1ED6 FD A6 0C       AND (IY+&0C)
 	1ED9 CD 16 36       CALL DirCode_from_LRDU
-	1EDC FE FF          CP FF
+	1EDC FE FF          CP &FF
 	1EDE 28 13          JR Z,br_29B6
 	1EE0 21 EA 1B       LD HL,Batman_variables
 	1EE3 CD 1A 38       CALL MoveCurrent
-	1EE6 30 15          JR NC,1EFD ;; Sub_Move_Char
+	1EE6 30 15          JR NC,Sub_Move_Char
 	1EE8 3A F5 1B       LD A,(Batman_variables+O_IMPACT)
 	1EEB F6 F0          OR &F0
 	1EED 3C             INC A
-	1EEE 3E 05          LD A,05
-	1EF0 C4 FE 1F       CALL NZ,1FFE ;; sound
+	1EEE 3E 05          LD A,&05
+	1EF0 C4 FE 1F       CALL NZ,SetOtherSound ;; sound
 br_29B6
 	1EF3 F1             POP AF
 	1EF4 3A F5 1B       LD A,(Batman_variables+O_IMPACT)
-	1EF7 F6 0F          OR 0F
+	1EF7 F6 0F          OR &0F
 	1EF9 32 F5 1B       LD (Batman_variables+O_IMPACT),A
 	1EFC C9             RET
-
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Direction bitmask is on stack. "Move" has been called.
@@ -6083,29 +6174,30 @@ br_29B6
 	1F04 3A D0 1B       LD A,(CNT_SPEED)
 	1F07 A7             AND A
 	1F08 C8             RET Z
-	1F09 21 D5 1B       LD HL,1BD5 ;; Speed
+	1F09 21 D5 1B       LD HL,SpeedModulo
 	1F0C 35             DEC (HL)
 	1F0D C5             PUSH BC
-	1F0E 20 07          JR NZ,1F17
-	1F10 36 02          LD (HL),02
-	1F12 3E 00          LD A,00
-	1F14 CD 8E 34       CALL 348E
+	1F0E 20 07          JR NZ,speedskip
+	1F10 36 02          LD (HL),&02
+	1F12 3E 00          LD A,0
+	1F14 CD 8E 34       CALL Decrement_counter_and_display
+speedskip
 	1F17 F1             POP AF
 	1F18 CD 16 36       CALL DirCode_from_LRDU
-	1F1B FE FF          CP FF
+	1F1B FE FF          CP &FF
 	1F1D C8             RET Z
 	1F1E 21 EA 1B       LD HL,Batman_variables
 	1F21 E5             PUSH HL
 	1F22 CD 1A 38       CALL MoveCurrent
 	1F25 E1             POP HL
 	1F26 D2 59 36       JP NC,UpdatePos
-	1F29 3E 05          LD A,05
-	1F2B C3 FE 1F       JP 1FFE
+	1F29 3E 05          LD A,&05
+	1F2B C3 FE 1F       JP SetOtherSound
 
 ;; -----------------------------------------------------------------------------------------------------------
 .DoJump:
 	1F2E 3A CF 1B       LD A,(Inventory)
-	1F31 E6 04          AND 04
+	1F31 E6 04          AND &04
 	1F33 C8             RET Z
 	1F34 3A E4 1B       LD A,(Saved_Objects_List_index)
 	1F37 A7             AND A
@@ -6114,7 +6206,7 @@ br_29B6
 	1F3C 1F             RRA
 	1F3D D8             RET c
 djmp_jumpkey
-	1F3E 0E 00          LD C,00
+	1F3E 0E 00          LD C,0
 	1F40 2A F7 1B       LD HL,(Batman_variables+O_OBJUNDER)
 	1F43 7C             LD A,H
 	1F44 B5             OR L
@@ -6123,15 +6215,15 @@ djmp_jumpkey
 	1F48 DD E1          POP IX
 br_teststandingon
 	1F4A DD 7E 08       LD A,(IX+O_SPRITE)
-	1F4D FE 51          CP 51 ;; SPR_SPRING???
+	1F4D FE 51          CP SPR_SMILEY
 	1F4F 28 04          JR Z,onSpringStool
-	1F51 FE 36          CP 36 ;; SPR_SPRUNG???
+	1F51 FE 36          CP SPR_S_CUSHION
 	1F53 20 01          JR NZ,br_jpbonus
 onSpringStool
 	1F55 0C             INC C
 br_jpbonus
 	1F56 C5             PUSH BC
-	1F57 3E 02          LD A,02 ;; CNT_SPRING
+	1F57 3E 02          LD A,CNT_SPRING
 	1F59 CD 8E 34       CALL Decrement_counter_and_display
 	1F5C C1             POP BC
 	1F5D 28 01          JR Z,calculate_jump
@@ -6153,7 +6245,7 @@ TryCarry
 	1F73 3A CF 1B       LD A,(Inventory) ;; check if batbag owned
 	1F76 E6 08          AND &08			;; test bit3 (bag)
 	1F78 C8             RET Z			;; no leave
-	1F79 21 E0 1B       LD HL,1BE0		;; else try to pick up
+	1F79 21 E0 1B       LD HL,Corrying_bool		;; else try to pick up
 	1F7C 3A 14 01       LD A,(action_key_pressed)
 	1F7F A7             AND A
 	1F80 20 03          JR NZ,DoCarry
@@ -6163,14 +6255,14 @@ TryCarry
 ;; -----------------------------------------------------------------------------------------------------------
 ;; This will handle the pick-up (by Heels with the Purse) of an object
 ;; in the room, and drawing it on the HUD if carried.
-CARRIED_OBJ_HUD_POS		EQU		&D0 * 256 + &40
+CARRIED_OBJ_HUD_POS		EQU		&D0 * WORD_HIGH_BYTE + &40
 
 .DoCarry:
 	1F85 7E             LD A,(HL)
 	1F86 A7             AND A
 	1F87 C0             RET NZ
-	1F88 36 01          LD (HL),01
-	1F8A 3E 09          LD A,09
+	1F88 36 01          LD (HL),&01
+	1F8A 3E 09          LD A,9
 	1F8C CD FE 1F       CALL SetOtherSound
 	1F8F 3A DF 1B       LD A,(Carried_Object+1)
 	1F92 A7             AND A
@@ -6217,7 +6309,7 @@ carryLoop
 	1FDC ED A8          LDD
 	1FDE E1             POP HL
 	1FDF CD 02 37       CALL InsertObject
-	1FE2 21 00 00       LD HL,0000
+	1FE2 21 00 00       LD HL,&0000
 	1FE5 22 DE 1B       LD (Carried_Object),HL
 	1FE8 01 40 D0       LD BC,CARRIED_OBJ_HUD_POS
 	1FEB CD D0 37       CALL Clear_3x24
@@ -6231,7 +6323,7 @@ NoDrop
 
 ;; -----------------------------------------------------------------------------------------------------------
 SetOtherSound
-	1FFE 21 E3 1B       LD HL,1BE3 ;; Other_sound_ID
+	1FFE 21 E3 1B       LD HL,Other_sound_ID
 BumpUp
 	2001 BE             CP (HL)
 	2002 D8             RET c
@@ -6239,13 +6331,14 @@ BumpUp
 	2004 C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
-	2005 CD B5 0C       CALL 0CB5
+Play_Other_Sound
+	2005 CD B5 0C       CALL TestHasSomthingToBePlayed
 	2008 C0             RET NZ
-	2009 3A E3 1B       LD A,(1BE3)
+	2009 3A E3 1B       LD A,(Other_sound_ID)
 	200C 87             ADD A,A
-	200D C6 B5          ADD A,B5
+	200D C6 B5          ADD A,sounds_pointer_array and WORD_LOW_BYTE
 	200F 6F             LD L,A
-	2010 CE 1B          ADC A,1B	;; 1BB5  sound???
+	2010 CE 1B          ADC A,sounds_pointer_array / WORD_HIGH_BYTE	;; 1BB5  sounds_pointer_array???
 	2012 95             SUB L
 	2013 67             LD H,A
 	2014 7E             LD A,(HL)
@@ -6259,66 +6352,72 @@ CharThing15:
 	2019 AF             XOR A
 	201A 32 F4 1B       LD (Batman_variables+O_FUNC),A
 	201D 32 1A 1C       LD (Vape_loop),A
-	2020 3E 08          LD A,08
+	2020 3E 08          LD A,&08
 	2022 32 EE 1B       LD (Batman_variables+O_FLAGS),A
 	2025 3A 17 38       LD A,(access_new_room_code)
-	2028 32 E6 1B       LD (1BE6),A
+	2028 32 E6 1B       LD (saved_access_code),A
 	202B F5             PUSH AF
 	202C F5             PUSH AF
 	202D 3D             DEC A
-	202E FE 04          CP 04
-	2030 30 18          JR NC,204A
-	2032 EE 01          XOR 01
+	202E FE 04          CP 4
+	2030 30 18          JR NC,EPIC_86
+	2032 EE 01          XOR &01
 	2034 5F             LD E,A
-	2035 16 00          LD D,00
+	2035 16 00          LD D,0
 	2037 21 14 17       LD HL,DoorHeights
 	203A 19             ADD HL,DE
 	203B 4E             LD C,(HL)
-	203C 21 DE 20       LD HL,Facing_in_new_Room_tab
+	203C 21 DE 20       LD HL,WallSideBitmap
 	203F 19             ADD HL,DE
 	2040 3A E6 16       LD A,(Has_no_wall)
 	2043 A6             AND (HL)
-	2044 20 04          JR NZ,204A
+	2044 20 04          JR NZ,EPIC_86
 	2046 79             LD A,C
 	2047 32 F1 1B       LD (Batman_variables+O_Z),A
 
+EPIC_86
 	204A F1             POP AF
-	204B D6 01          SUB 01
+	204B D6 01          SUB 1
 	204D 11 EF 1B       LD DE,Batman_variables+O_U
-	2050 38 29          JR c,207B
-	2052 FE 04          CP 04
-	2054 28 20          JR Z,2076
-	2056 FE 05          CP 05
-	2058 30 0F          JR NC,2069
+	2050 38 29          JR c,EPIC_93
+	2052 FE 04          CP &04
+	2054 28 20          JR Z,EPIC_92
+	2056 FE 05          CP &05
+	2058 30 0F          JR NC,EPIC_90
 	205A 21 E8 16       LD HL,Max_min_UV_Table
 	205D 1F             RRA
-	205E 30 02          JR NC,2062
+	205E 30 02          JR NC,EPIC_87
 	2060 13             INC DE
 	2061 23             INC HL
+EPIC_87
 	2062 1F             RRA
-	2063 38 1D          JR c,2082
+	2063 38 1D          JR c,EPIC_95
 	2065 23             INC HL
 	2066 23             INC HL
-	2067 18 19          JR 2082
+	2067 18 19          JR EPIC_95
 
+EPIC_90
 	2069 13             INC DE
 	206A 13             INC DE
 	206B 1F             RRA
-	206C 3E 84          LD A,84
+	206C 3E 84          LD A,&84  ;; GROUND_LEVEL - 60
 	206E 38 02          JR c,EPIC_91
-	2070 3E BA          LD A,BA
+	2070 3E BA          LD A,&BA ;; GROUND_LEVEL - 6
 EPIC_91
 	2072 12             LD (DE),A
 	2073 F1             POP AF
 	2074 18 1A          JR EPIC_96_bis
 
+EPIC_92
 	2076 21 EC 34       LD HL,UVZ_coord_Set_UVZ
 	2079 18 03          JR EPIC_94
 
-	207B 21 D6 20       LD HL,20D6 ;; TODO_2c54_uvz_reset_values
+EPIC_93
+	207B 21 D6 20       LD HL,TODO_2c54_uvz_reset_values
 EPIC_94
 	207E ED A0          LDI
 	2080 ED A0          LDI
+EPIC_95
 	2082 ED A0          LDI
 EPIC_96
 	2084 F1             POP AF
@@ -6326,17 +6425,18 @@ EPIC_96
 	2087 6F             LD L,A
 	2088 CE 20          ADC A,Facing_in_new_Room_tab / WORD_HIGH_BYTE ;; 20D9
 	208A 95             SUB L
-	208B 67             LD H,A
+	208B 67             LD H,A				;; HL = Facing_in_new_Room_tab + A
 	208C 7E             LD A,(HL)
-	208D 32 E2 1B       LD (1BE2),A ;; character_direction
+	208D 32 E2 1B       LD (character_direction),A
 EPIC_96_bis
-	2090 3E 80          LD A,80
+EPIC_97
+	2090 3E 80          LD A,&80
 	2092 32 17 38       LD (access_new_room_code),A
 	2095 21 EF 1B       LD HL,Batman_variables+O_U
-	2098 11 E7 1B       LD DE,1BE7
-	209B 01 03 00       LD BC,0003
+	2098 11 E7 1B       LD DE,EntryPosition_uvz
+	209B 01 03 00       LD BC,&0003
 	209E ED B0          LDIR
-	20A0 21 00 00       LD HL,0000
+	20A0 21 00 00       LD HL,&0000
 	20A3 22 F7 1B       LD (Batman_variables+O_OBJUNDER),HL
 	20A6 2B             DEC HL
 	20A7 22 F5 1B       LD (Batman_variables+O_IMPACT),HL
@@ -6345,7 +6445,7 @@ EPIC_96_bis
 	20B1 CD 01 2E       CALL Enlist
 	20B4 CD BE 20       CALL SaveObjListIdx
 	20B7 AF             XOR A
-	20B8 32 18 38       LD (3818),A ;; Dying
+	20B8 32 18 38       LD (Dying),A
 	20BB C3 8A 2D       JP SetObjList
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -6373,21 +6473,15 @@ TODO_2c54_uvz_reset_values:											;; UVZ for ???
 	20D6 2C				DEFB &2C, &45, &84
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; From access_new_room_code (but with teleport put at index 0),
+;; From access_new_room_code
 ;; get the facing direction when entering a new room from:
-;;		 0 : Teleport then facing Down (south-West side of the screen)
-;;  1 to 4 : Down, Right, Up, Left then resp. facing Down, Right, Up, Left
-;; 5 and 6 : Below,Above then resp. facing Down, Down
 Facing_in_new_Room_tab:
-	20D9 F7 FD FB FE F7	DEFB &F7, &FD, &FB, &FE, &F7
+	20D9 F7 FD FB FE F7	DEFB FACING_LEFT, FACING_DOWN, FACING_RIGHT, FACING_UP, FACING_LEFT ;; ???continue???, Down Right Up Left
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; From access_new_room_code (but with teleport put at index 0),
+;; From access_new_room_code
 ;; get the facing direction when entering a new room from:
-;;		 0 : Teleport then facing Down (south-West side of the screen)
-;;  1 to 4 : Down, Right, Up, Left then resp. facing Down, Right, Up, Left
-;; 5 and 6 : Below,Above then resp. facing Down, Down
-Facing_in_new_Room_tab:
+WallSideBitmap:											;; index 0 = 8 = bit3, index 1 = 4 = bit2 etc.
 	20DE 08 04 02 01    DEFB	&08, &04, &02, &01
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -6449,7 +6543,7 @@ Facing_in_new_Room_tab:
 	213A 28 0A          JR Z,DeadlyFloorCase
 	213C FE 07          CP &07
 	213E 20 09          JR NZ,RetZero_Cset
-	2140 3E 06          LD A,&06
+	2140 3E 06          LD A,6
 	2142 32 17 38       LD (access_new_room_code),A
 	2145 C9             RET
 
@@ -6503,8 +6597,8 @@ RetZero_Cset
 	218F DD 7E F9       LD A,(IX-OBJECT_LENGTH+O_IMPACT)
 	2192 18 07          JR DOC_2
 DOC_1
-	2194 DD CB 0C AE    RES 5,(IX+0C)
-	2198 DD 7E 0B       LD A,(IX+&0B)
+	2194 DD CB 0C AE    RES 5,(IX+&0C)
+	2198 DD 7E 0B       LD A,(IX+O_IMPACT)
 DOC_2
 	219B F6 E0          OR &E0
 	219D 4F             LD C,A
@@ -6587,9 +6681,9 @@ CSIT_6
 	2214 DD 21 EA 1B    LD IX,Batman_variables
 	2218 CD 10 23       CALL CheckWeOverlap
 	221B 30 0A          JR NC,CSIT_7
-	221D FD 36 0D 00    LD (IY+0D),00
-	2221 FD 36 0E 00    LD (IY+0E),00
-	2225 18 27          JR 224E
+	221D FD 36 0D 00    LD (IY+0D),0
+	2221 FD 36 0E 00    LD (IY+0E),0
+	2225 18 27          JR CSIT_11
 CSIT_7
 	2227 2A E2 20       LD HL,(ObjContact)
 	222A FD 36 0D 00    LD (IY+O_OBJUNDER),0
@@ -6607,7 +6701,7 @@ CSIT_9
 	2244 DD CB 0B 66    BIT 4,(IX+O_IMPACT)
 CSIT_10
 	2248 20 04          JR NZ,CSIT_11
-	224A FD CB 0C A6    RES 4,(IY+0C)
+	224A FD CB 0C A6    RES 4,(IY+&0C)
 CSIT_11
 	224E AF             XOR A
 	224F D6 01          SUB 1
@@ -6689,9 +6783,9 @@ CSAT_2
 	22B0 F6 E0          OR &E0
 	22B2 E6 EF          AND &EF
 	22B4 4F             LD C,A
-	22B5 DD 7E 0C       LD A,(IX+0C)
+	22B5 DD 7E 0C       LD A,(IX+&0C)
 	22B8 A1             AND C
-	22B9 DD 77 0C       LD (IX+0C),A
+	22B9 DD 77 0C       LD (IX+&0C),A
 	22BC AF             XOR A
 	22BD 37             SCF
 	22BE C3 B2 38       JP ProcContact
@@ -6833,7 +6927,7 @@ MenuCursor
 Main_Screen:
 	2365 3E 0A          LD A,10
 	2367 CD 5D 03       CALL Set_colors
-
+MainScreen
 	236A 3E CE          LD A,Print_Title_Instr
 	236C CD 15 3C       CALL Print_String
 	236F DD 21 C8 23    LD IX,Main_menu_data
@@ -6841,9 +6935,9 @@ Main_Screen:
 	2377 CD 92 25       CALL Draw_Menu
 fms_1
 	237A CD 9B 36       CALL Random_gen
-	237D 01 7B 60       LD BC,&60 * 256 + &7B
+	237D 01 7B 60       LD BC,&60 * WORD_HIGH_BYTE + &7B
 	2380 3E 17          LD A,SPR_BM_STANDING
-	2382 CD 9C 23       CALL 239C
+	2382 CD 9C 23       CALL Main_screen_anim
 	2385 CD 77 25       CALL Step_Menu
 	2388 38 F0          JR c,fms_1
 	238A DD 7E 00       LD A,(IX+MENU_CURR_SEL)
@@ -6853,11 +6947,15 @@ fms_1
 	2394 CD EC 23       CALL Control_menu
 	2397 18 CC          JR Main_Screen
 
+;; -----------------------------------------------------------------------------------------------------------
+Batman_anim_vars:
 	2399 00             DEFB 0
 	239A 02             DEFB 2
 	239B 00             DEFB 0
 
-	239C 21 99 23       LD HL,2399
+;; -----------------------------------------------------------------------------------------------------------
+Main_screen_anim
+	239C 21 99 23       LD HL,Batman_anim_vars
 	239F 35             DEC (HL)
 	23A0 C0             RET NZ
 	23A1 23             INC HL
@@ -6877,12 +6975,13 @@ fms_1
 	23B7 C3 B1 03       JP TapFoot
 fms_2
 	23BA FE 03          CP &03
-	23BC 28 05          JR Z,23C3
+	23BC 28 05          JR Z,MenuSensi
 	23BE CD CD 23       CALL Sound_Menu
-	23C1 18 A7          JR 236A
+	23C1 18 A7          JR MainScreen
 
+MenuSensi
 	23C3 CD 3B 24       CALL Sensitivity_Menu
-	23C6 18 A2          JR 236A
+	23C6 18 A2          JR MainScreen
 
 ;; -----------------------------------------------------------------------------------------------------------
 MENU_CURR_SEL 			EQU		&00							;; Which_selected in menu ; 0 = first
@@ -6915,8 +7014,8 @@ smstp_1
 	23D9 CD 77 25       CALL Step_Menu
 	23DC 38 FB          JR c,smstp_1
 	23DE 3E 02          LD A,&02
-	23E0 DD 96 00       SUB (IX+0)			;; "volume" = 2 - menu index so that "Nasty" has the value 2, "useful" has 1, and "late at night" has 0
-	23E3 32 10 01       LD (0110),A			;; store that value
+	23E0 DD 96 00       SUB (IX+0)				;; "volume" = 2 - menu index so that "Nasty" has the value 2, "useful" has 1, and "late at night" has 0
+	23E3 32 10 01       LD (Sound_amount),A		;; store that value
 	23E6 C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -6997,7 +7096,7 @@ Sensitivity_menu_data
 	2455 09             DEFB	&09 or MENU_PRINTDOUBLE_SIZE		;; MENU_INIT_ROW : Initial row, double size the selcted row
 	2456 C5             DEFB	Print_High							;; MENU_SEL_STRINGID : Selected item String ID
 
-; -----------------------------------------------------------------------------------------------------------
+;; -----------------------------------------------------------------------------------------------------------
 ;; Menu "Old game/New game/Main menu"; only available if we consumed
 ;; a living fish in a previous game. (RET if Save_point_value = 0)
 ;; Output: Zero reset: No saved game (go to new Game)
@@ -7030,15 +7129,6 @@ Play_Game_menu_data
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Game over Screen
-;; Note on the score: After GetScore it is saved in HL as a BCD value without the
-;; rightmost 0 (ie. score/10):
-;;   value:    0 to  999 = Dummy, index 0 (displayed score 0 to 9990)
-;;   value: 1000 to 2999 = Novice, index 1 (displayed score 10000 to 29990)
-;;   value: 3000 to 4999 = Spy, index 2 (displayed score 30000 to 49990)
-;;   value: 5000 to 6999 = Master Spy, index 3 (displayed score 50000 to 69990)
-;;   value: 7000 to 8999 = Hero, index 4 (displayed score 70000 to 89990)
-;;   value: 9000 and above = Emperor, index 5 (displayed score 90000 and above, 99980 max)
-;; Independently of the score, we are Emperor if all 5 crowns have been picked up.
 Game_over_screen
 	247C CD C8 06       CALL clr_screen
 	247F CD 4D 0A       CALL Play_Batman_Theme
@@ -7081,13 +7171,13 @@ bwa_loop1
 	24C9 20 F6          JR NZ,bwa_loop1
 bwa_loop2
 	24CB CD D4 24       CALL Play_Batman_Walking
-	24CE CD B5 0C       CALL 0CB5
+	24CE CD B5 0C       CALL TestHasSomthingToBePlayed
 	24D1 20 F8          JR NZ,bwa_loop2
 	24D3 C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
 Play_Batman_Walking
-	24D4 2A 99 23       LD HL,(2399)
+	24D4 2A 99 23       LD HL,(Batman_anim_vars)
 	24D7 3E 01          LD A,1
 	24D9 BD             CP L
 	24DA 20 07          JR NZ,Place_Batman_Walking
@@ -7096,8 +7186,8 @@ Play_Batman_Walking
 	24E0 CC 73 36       CALL Z,Read_Loop_byte
 
 Place_Batman_Walking
-	24E3 01 78 D0       LD BC,&D0 * 256 + &78 ;; y,x pos
-	24E6 CD 9C 23       CALL 239C
+	24E3 01 78 D0       LD BC,&D0 * WORD_HIGH_BYTE + &78 ;; y,x pos
+	24E6 CD 9C 23       CALL Main_screen_anim
 	24E9 C3 0B 08       JP Test_Enter_Shift_keys
 
 Anim_Batman_walking:
@@ -7112,16 +7202,16 @@ Batcraft_complete_screen:
 	24F4 CD 5D 03       CALL Set_colors
 	24F7 3E DC          LD A,Print_Completed
 	24F9 CD 15 3C       CALL Print_String
-	24FC 01 9C E8       LD BC,&E8 * 256 + &9C
+	24FC 01 9C E8       LD BC,&E8 * WORD_HIGH_BYTE + &9C
 	24FF 3E 1F          LD A,SPR_DEMONB
 	2501 CD EA 37       CALL Draw_sprite_3x32
-	2504 01 54 B8       LD BC,&B8 * 256 + &54
+	2504 01 54 B8       LD BC,&B8 * WORD_HIGH_BYTE + &54
 	2507 3E 2B          LD A,SPR_RIDDLER
 	2509 CD EA 37       CALL Draw_sprite_3x32
-	250C 01 9C B8       LD BC,&B8 * 256 + &9C
+	250C 01 9C B8       LD BC,&B8 * WORD_HIGH_BYTE + &9C
 	250F 3E 9A          LD A,SPR_WOLF_2 or SPR_FLIP
 	2511 CD EA 37       CALL Draw_sprite_3x32
-	2514 01 54 E8       LD BC,&E8 * 256 + &54
+	2514 01 54 E8       LD BC,&E8 * WORD_HIGH_BYTE + &54
 	2517 3E AA          LD A,SPR_JOKER_B1 or SPR_FLIP
 	2519 CD EA 37       CALL Draw_sprite_3x32
 	251C CD 4D 0A       CALL Play_Batman_Theme
@@ -7133,7 +7223,7 @@ Batcraft_complete_screen:
 	2527 CD 5D 03       CALL Set_colors
 	252A 3E D8          LD A,Print_Dogs
 	252C CD 15 3C       CALL Print_String
-	252F 01 78 88       LD BC,&88 * 256 + &78
+	252F 01 78 88       LD BC,&88 * WORD_HIGH_BYTE + &78
 	2532 3E 24          LD A,SPR_DOG_0
 	2534 CD EA 37       CALL Draw_sprite_3x32
 	2537 C3 BE 24       JP Batman_Walking_animation
@@ -7146,8 +7236,9 @@ Joystick_Menu
 	2541 CD 15 3C       CALL Print_String
 	2544 DD 21 51 25    LD IX,Joystick_menu_data
 	2548 CD 92 25       CALL Draw_Menu
+jymenu_loop
 	254B CD 77 25       CALL Step_Menu
-	254E 38 FB          JR c,254B
+	254E 38 FB          JR c,jymenu_loop
 	2550 C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -7202,7 +7293,7 @@ MenuStepCore
 mstepc_1
 	2588 DD 77 00       LD (IX+MENU_CURR_SEL),A
 	258B DD E5          PUSH IX
-	258D CD DC 0A       CALL 0ADC	;; Sound_ID_Menu_Blip????
+	258D CD DC 0A       CALL Sound_ID_Menu_Blip
 	2590 DD E1          POP IX
 Draw_Menu
 	2592 DD 46 03       LD B,(IX+MENU_INIT_ROW)
@@ -7328,6 +7419,8 @@ Print_GO_parts					EQU		&D0
 Print_YOU						EQU		&D1
 Print_ClrDbl_Pos				EQU		&D2
 Print_1Chance					EQU		&D3
+Print_Right_2					EQU		&D6
+Print_Left_2					EQU		&D7
 Print_Dogs						EQU		&D8
 Print_GO_rooms					EQU		&D9
 Print_GO_score					EQU		&DA
@@ -7372,7 +7465,7 @@ String_Table_Main
 	26BE				DEFB 	Delimiter, "LATE AT NIGHT"						;; ID &93
 	26CC				DEFB 	Delimiter, Print_ClrDbl_Pos, 13, 0				;; ID &94
 	26D0				DEFB		Print_Color_Attr_1, Print_BAT,
-	26D2				DEFB		Print_KEY, "S", &95
+	26D2				DEFB		Print_KEY, "S", Print_ShiftToFinish
 	26D5				DEFB 	Delimiter, Print_Instructions					;; ID &95
 	26D7				DEFB		Print_SetPos, 5, 3, Print_PRESS
 	26DB				DEFB		Print_Color_Attr_1, Print_SHIFT
@@ -7473,7 +7566,7 @@ String_Table_Main
 	2879				DEFB		Print_Color_Attr_1, Print_SetPos, 12, 8
 	287D				DEFB		Print_YOU, "HAVE", Print_SetPos, 3, 10
 	2885				DEFB		Print_Color_Attr_2, "ASSEMBLED"
-	288F				DEFB 	Delimiter, " ", &D8, "PARTS" 					;; ID &D0
+	288F				DEFB 	Delimiter, " ", Print_Dogs, "PARTS" 			;; ID &D0
 	2897				DEFB		Print_SetPos, 7, 12, "EXPLORED"
 	28A2				DEFB 	Delimiter, "YOU "								;; ID &D1
 	28A7				DEFB 	Delimiter, Print_WipeScreen, Print_DoubleSize	;; ID &D2 (needs to be followed by pos x,y)
@@ -7484,8 +7577,9 @@ String_Table_Main
 	28C4				DEFB		Print_SetPos, 10, 5, "GET IT ", Print_RIGHT
 	28CF				DEFB	Delimiter, Print_ClrDbl_Pos, 10, 0				;; ID &D4
 	28D3				DEFB		Print_Color_Attr_3, "SCREEN ", Print_SHIFT
-	28DC				DEFB		&D3, Print_SetPos, 0, 0, Print_Color_Attr_1
-	28E1				DEFB		&D7, Print_SetPos, &1B, 0, &D6
+	28DC				DEFB		Print_1Chance, Print_SetPos, 0, 0
+	28E0				DEFB		Print_Color_Attr_1, Print_Left_2
+	28E2				DEFB		Print_SetPos, &1B, 0, Print_Right_2
 	28E6				DEFB	Delimiter, Print_FINISH							;; ID &D5
 	28E8				DEFB	Delimiter, Print_RIGHT							;; ID &D6
 	28EA				DEFB	Delimiter, Print_LEFT				 			;; ID &D7
@@ -7516,9 +7610,9 @@ String_Table_Main
 	293A 7D             LD A,L
 	293B 26 00          LD H,0
 	293D 32 89 29       LD (Sprite_Code),A
-	2940 CD 4D 2A       CALL 2A4D		;; Sprite3x56
+	2940 CD 4D 2A       CALL Sprite3x56
 	2943 EB             EX DE,HL
-	2944 11 90 B8       LD DE,B890 ;; DoorwayBuf + MOVE_OFFSET
+	2944 11 90 B8       LD DE,DoorwayBuf + MOVE_OFFSET
 	2947 D5             PUSH DE
 	2948 01 50 01       LD BC,56 * 3 * 2
 	294B ED B0          LDIR
@@ -7528,7 +7622,7 @@ String_Table_Main
 	2950 C6 08          ADD A,8
 	2952 FE 39          CP &39
 	2954 38 02          JR c,occdw_1
-	2956 3E 38          LD A,38
+	2956 3E 38          LD A,&38
 occdw_1
 	2958 47             LD B,A
 	2959 87             ADD A,A
@@ -7576,8 +7670,9 @@ occdw_2
 Sprite_Code
 	2989 00             DEFB	&00
 
-	298A 00             NOP
-	298B 01
+;; -----------------------------------------------------------------------------------------------------------
+	298A 00             DEFB	0
+	298B 01				DEFB	1
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; This will init another table in 4F00-4FFF used as a look-up table
@@ -7614,12 +7709,12 @@ GetSprExtents:
 	299D 32 89 29       LD (Sprite_Code),A
 	29A0 E6 7F          AND &7F
 	29A2 FE 10          CP SPR_1st_3x32_sprite
-	29A4 38 34          JR c,29DA ;; Case3x56
-	29A6 11 06 06       LD DE,&0606
+	29A4 38 34          JR c,Case3x56
+	29A6 11 06 06       LD DE,&06 * WORD_HIGH_BYTE + &06
 	29A9 26 12          LD H,&12
 	29AB FE 50          CP SPR_1st_4x28_sprite
 	29AD 38 05          JR c,gsext_1
-	29AF 11 08 08       LD DE,&0808
+	29AF 11 08 08       LD DE,&08 * WORD_HIGH_BYTE + &08
 	29B2 26 14          LD H,&14
 gsext_1
 	29B4 FE 30          CP SPR_1st_3x24_sprite
@@ -7658,7 +7753,7 @@ SSW_2
 ;; either something clever's going on, or the extents can be
 ;; slightly wrong in the AddObject case for doors.
 .Case3x56:
-	29DA 2A 9F 15       LD HL,(159F) ;; smc_CurrObject2+1
+	29DA 2A 9F 15       LD HL,(smc_CurrObject2+1)
 	29DD 23             INC HL
 	29DE 23             INC HL
 	29DF CB 6E          BIT 5,(HL)
@@ -7696,20 +7791,20 @@ br_35A8
 	2A06 3A 89 29       LD A,(Sprite_Code)
 	2A09 E6 7F          AND &7F
 	2A0B FE 50          CP SPR_1st_4x28_sprite
-	2A0D D2 CF 2A       JP NC,2ACF ;; Sprite4x28
+	2A0D D2 CF 2A       JP NC,Sprite4x28
 	2A10 FE 30          CP SPR_1st_3x24_sprite
-	2A12 30 7E          JR NC,2A92 ;; Sprite3x24
+	2A12 30 7E          JR NC,Sprite3x24
 	2A14 FE 10          CP SPR_1st_3x32_sprite
 	2A16 26 00          LD H,0
-	2A18 30 4B          JR NC,2A65 ;; Sprite3x32
+	2A18 30 4B          JR NC,Sprite3x32
 	2A1A 6F             LD L,A
-	2A1B ED 5B 9F 15    LD DE,(159F) ;; smc_CurrObject2+1
+	2A1B ED 5B 9F 15    LD DE,(smc_CurrObject2+1)
 	2A1F 13             INC DE
 	2A20 13             INC DE
 	2A21 1A             LD A,(DE)
 	2A22 F6 FC          OR &FC
 	2A24 3C             INC A
-	2A25 20 26          JR NZ,2A4D ;; Sprite3x56
+	2A25 20 26          JR NZ,Sprite3x56
 	2A27 3A 89 29       LD A,(Sprite_Code)
 	2A2A 4F             LD C,A
 	2A2B 17             RLA
@@ -7720,17 +7815,17 @@ br_35A8
 br_35E2
 	2A35 FE 03          CP &03
 br_35E4
-	2A37 28 14          JR Z,2A4D ;; Sprite3x56
+	2A37 28 14          JR Z,Sprite3x56
 	2A39 3A 40 2B       LD A,(DoorwayFlipped)
 	2A3C A9             XOR C
 	2A3D 17             RLA
-	2A3E 11 90 B8       LD DE,B890 ;; DoorwayImgBuf + MOVE_OFFSET
-	2A41 21 38 B9       LD HL,B938 ;; DoorwayMaskBuf + MOVE_OFFSET
+	2A3E 11 90 B8       LD DE,DoorwayImgBuf + MOVE_OFFSET
+	2A41 21 38 B9       LD HL,DoorwayMaskBuf + MOVE_OFFSET
 	2A44 D0             RET NC
 	2A45 79             LD A,C
 	2A46 32 40 2B       LD (DoorwayFlipped),A
 	2A49 06 70          LD B,56*2
-	2A4B 18 66          JR 2AB3 ;; FlipSprite3
+	2A4B 18 66          JR FlipSprite3
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Deal with a 3 byte x sprite 56 pixels high.
@@ -7753,7 +7848,7 @@ Sprite3x56
 	2A5D 19             ADD HL,DE
 	2A5E 11 A8 00       LD DE,56*3
 	2A61 06 70          LD B,56*2
-	2A63 18 46          JR 2AAB ;; Sprite3Wide
+	2A63 18 46          JR Sprite3Wide
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Deal with a 3 byte x 32 pixel high sprite.
@@ -7782,7 +7877,7 @@ Sprite3x56
 	2A7C D9             EXX
 	2A7D CD 11 2B       CALL NeedsFlip
 	2A80 D9             EXX
-	2A81 D4 B3 2A       CALL NC,2AB3 ;; FlipSprite3
+	2A81 D4 B3 2A       CALL NC,FlipSprite3
 	2A84 3A D0 14       LD A,(SpriteFlags)
 	2A87 E6 02          AND &02
 	2A89 C0             RET NZ
@@ -7840,7 +7935,7 @@ fspr3_loop
 	2AC1 5E             LD E,(HL)
 	2AC2 1A             LD A,(DE)
 smc_flipsprite3
-	2AC3 32 00 00       LD (0000),A
+	2AC3 32 00 00       LD (&0000),A
 	2AC6 59             LD E,C
 	2AC7 1A             LD A,(DE)
 	2AC8 77             LD (HL),A
@@ -7899,7 +7994,7 @@ fspr4_loop
 	2B03 5E             LD E,(HL)
 	2B04 1A             LD A,(DE)
 smc_fs_addr
-	2B05 32 00 00       LD (0000),A
+	2B05 32 00 00       LD (&0000),A
 	2B08 59             LD E,C
 	2B09 1A             LD A,(DE)
 	2B0A 77             LD (HL),A
@@ -7985,9 +8080,9 @@ SetObjSprite
 	2B54 FD 77 08       LD (IY+O_SPRITE),A
 	2B57 FE 80          CP &80
 	2B59 38 0B          JR c,sos_skip		;; if < &80 skip, else it has anim loop
-	2B5B 87             ADD A,A
+	2B5B 87             ADD A,A				;; else if >= &80:
 	2B5C 87             ADD A,A
-	2B5D 87             ADD A,A
+	2B5D 87             ADD A,A				;; A[4:0]<<3
 	2B5E FD 77 0F       LD (IY+O_ANIM),A
 	2B61 E5             PUSH HL
 	2B62 CD A5 2B       CALL AnimateObj
@@ -8001,7 +8096,7 @@ sos_skip
 	2B6D FE 80          CP &80
 	2B6F CB BF          RES 7,A
 	2B71 FD 77 FF       LD (IY-1),A	;; BaseFlags+1 (IY = TmpObj_variables)
-	2B74 FD 36 FE 02    LD (IY-2),02 ;; BaseFlags (IY = TmpObj_variables)
+	2B74 FD 36 FE 02    LD (IY-2),&02 ;; BaseFlags (IY = TmpObj_variables)
 	2B78 FD CB 09 96    RES 2,(IY+O_SPRFLAGS)
 	2B7C D8             RET c
 	2B7D FD CB 09 D6    SET 2,(IY+O_SPRFLAGS)
@@ -8043,7 +8138,7 @@ AnimateObj
 	2BA5 FD 4E 0F       LD C,(IY+O_ANIM)
 	2BA8 79             LD A,C
 	2BA9 E6 F8          AND &F8
-	2BAB FE 08          CP &08 ;; FIRST_ANIM_code
+	2BAB FE 08          CP FIRST_ANIM_code
 	2BAD 3F             CCF
 	2BAE D0             RET NC
 	2BAF 0F             RRCA
@@ -8087,169 +8182,189 @@ Anim1
 ;; Pointers on the anim sprites list from the anim codes [7:3] and [2:0] frame
 ;; Note : The 'B' version is the moving-away-from-viewers version (Back/rear view).
 ;; The code &00 = no anim.
+ANIM_VAPE				EQU		&81
+ANIM_WOLF				EQU		&82
+ANIM_SHARK 				EQU		&84
+ANIM_DOG 				EQU		&86
+ANIM_JOKER 				EQU		&88
+ANIM_DEMON 				EQU		&8A
+ANIM_SALT 				EQU		&8C
+ANIM_RIDDLER 			EQU		&8E
+ANIM_WORM 				EQU		&90
+ANIM_BIGVAPE 			EQU		&92
+ANIM_BEACON 			EQU		&94
+;; -----------------------------------------------------------------------------------------------------------
+;; value set in O_ANIM; [7:3] = AnimID (bit3=Front/Back for most values); [2:0] = frame index
+NO_ANIM_code			EQU		&00					;; [7:3] AnimID = 0 (no anim), [2:0] frame = 0
+ANIM_VAPE_code			EQU		&08					;; [7:3] AnimID = 1 (&81), [2:0] frame = 0
+FIRST_ANIM_code			EQU		ANIM_VAPE_code
+;; -----------------------------------------------------------------------------------------------------------
+
 .AnimTable:
-	2BDD 07 2C			DEFW anim_vape			;; &80
-	2BDF 0C 2C          DEFW anim_f_wolf		;; &81
-	2BE1 11 2C          DEFW anim_b_wolf        ;; &82
-	2BE3 16 2C          DEFW anim_f_shark       ;; &83
-	2BE5 1B 2C          DEFW anim_b_shark       ;; &84
-	2BE7 20 2C          DEFW anim_f_dog         ;; &85
-	2BE9 25 2C          DEFW anim_b_dog         ;; &86
-	2BEB 2A 2C          DEFW anim_f_joker       ;; &87
-	2BED 2C 2C          DEFW anim_b_joker       ;; &88
-	2BEF 33 2C          DEFW anim_f_demon       ;; &89
-	2BF1 35 2C          DEFW anim_b_demon       ;; &8A
-	2BF3 37 2C          DEFW anim_salt          ;; &8B
-	2BF5 37 2C          DEFW anim_salt          ;; &8C
-	2BF7 3A 2C          DEFW anim_f_riddler     ;; &8D
-	2BF9 3C 2C          DEFW anim_b_riddler     ;; &8E
-	2BFB 3E 2C          DEFW anim_worm          ;; &8F
-	2BFD 3E 2C          DEFW anim_worm          ;; &90
-	2BFF 43 2C          DEFW anim_big_vape      ;; &91
-	2C01 43 2C          DEFW anim_big_vape      ;; &92
-	2C03 4C 2C          DEFW anim_beacon        ;; &93
-	2C05 4C 2C          DEFW anim_beacon        ;; &94
+	2BDD 07 2C			DEFW anim_vape			;; &81 ; bit7 set, code1 will become &08 + phase in O_ANIM
+	2BDF 0C 2C          DEFW anim_f_wolf		;; &82
+	2BE1 11 2C          DEFW anim_b_wolf        ;; &83
+	2BE3 16 2C          DEFW anim_f_shark       ;; &84
+	2BE5 1B 2C          DEFW anim_b_shark       ;; &85
+	2BE7 20 2C          DEFW anim_f_dog         ;; &86
+	2BE9 25 2C          DEFW anim_b_dog         ;; &87
+	2BEB 2A 2C          DEFW anim_f_joker       ;; &88
+	2BED 2C 2C          DEFW anim_b_joker       ;; &89
+	2BEF 33 2C          DEFW anim_f_demon       ;; &8A
+	2BF1 35 2C          DEFW anim_b_demon       ;; &8B
+	2BF3 37 2C          DEFW anim_salt          ;; &8C
+	2BF5 37 2C          DEFW anim_salt          ;; &8D
+	2BF7 3A 2C          DEFW anim_f_riddler     ;; &8E
+	2BF9 3C 2C          DEFW anim_b_riddler     ;; &8F
+	2BFB 3E 2C          DEFW anim_worm          ;; &90
+	2BFD 3E 2C          DEFW anim_worm          ;; &91
+	2BFF 43 2C          DEFW anim_big_vape      ;; &92
+	2C01 43 2C          DEFW anim_big_vape      ;; &93
+	2C03 4C 2C          DEFW anim_beacon        ;; &94
+	2C05 4C 2C          DEFW anim_beacon        ;; &95 ; bit7 set, code1 will become &A0 + phase in O_ANIM
 
 ;; -----------------------------------------------------------------------------------------------------------
 .AnimTable_data:
 anim_vape:
-	2C07 SPR_VAPE_2 or SPR_FLIP, SPR_VAPE_2, SPR_VAPE_1, SPR_VAPE_0, 0
+	2C07 				DEFB SPR_VAPE_2 or SPR_FLIP, SPR_VAPE_2, SPR_VAPE_1, SPR_VAPE_0, 0
 anim_f_wolf:
-	2C0C SPR_WOLF_0, SPR_WOLF_1, SPR_WOLF_0, SPR_WOLF_2, 0
+	2C0C 				DEFB SPR_WOLF_0, SPR_WOLF_1, SPR_WOLF_0, SPR_WOLF_2, 0
 anim_b_wolf:
-	2C11 SPR_WOLF_B0, SPR_WOLF_B1, 1B SPR_WOLF_B2, 0
+	2C11 				DEFB SPR_WOLF_B0, SPR_WOLF_B1, 1B SPR_WOLF_B2, 0
 anim_f_shark:
-	2C16 SPR_SHARK_0, SPR_SHARK_0, SPR_SHARK_1, SPR_SHARK_1, 0
+	2C16 				DEFB SPR_SHARK_0, SPR_SHARK_0, SPR_SHARK_1, SPR_SHARK_1, 0
 anim_b_shark:
-	2C1B SPR_SHARK_B0, SPR_SHARK_B0, SPR_SHARK_B1, SPR_SHARK_B1, 0
+	2C1B 				DEFB SPR_SHARK_B0, SPR_SHARK_B0, SPR_SHARK_B1, SPR_SHARK_B1, 0
 anim_f_dog:
-	2C20 SPR_DOG_0, SPR_DOG_0, SPR_DOG_1, SPR_DOG_1, 0
+	2C20 				DEFB SPR_DOG_0, SPR_DOG_0, SPR_DOG_1, SPR_DOG_1, 0
 anim_b_dog:
-	2C25 SPR_DOG_B0, SPR_DOG_B0, SPR_DOG_B1, SPR_DOG_B1, 0
+	2C25 				DEFB SPR_DOG_B0, SPR_DOG_B0, SPR_DOG_B1, SPR_DOG_B1, 0
 anim_f_joker
-	2C2A SPR_JOKER, 0
+	2C2A 				DEFB SPR_JOKER, 0
 anim_b_joker:
-	2C2C SPR_JOKERB, SPR_JOKERB, SPR_JOKERB, SPR_JOKERB, SPR_JOKER_B1, SPR_JOKER_B1, 0
+	2C2C 				DEFB SPR_JOKERB, SPR_JOKERB, SPR_JOKERB, SPR_JOKERB, SPR_JOKER_B1, SPR_JOKER_B1, 0
 anim_f_demon:
-	2C33 SPR_DEMON, 0
+	2C33 				DEFB SPR_DEMON, 0
 anim_b_demon:
-	2C35 SPR_DEMONB, 0
+	2C35 				DEFB SPR_DEMONB, 0
 anim_salt:
-	2C37 SPR_SALT, SPR_SALT or SPR_FLIP, 0
+	2C37 				DEFB SPR_SALT, SPR_SALT or SPR_FLIP, 0
 anim_f_riddler:
-	2C3A SPR_RIDDLER, 0
+	2C3A 				DEFB SPR_RIDDLER, 0
 anim_b_riddler:
-	2C3C SPR_RIDDLERB, 0
+	2C3C 				DEFB SPR_RIDDLERB, 0
 anim_worm:
-	2C3E SPR_WORM_0, SPR_WORM_0, SPR_WORM_1, SPR_WORM_1, 0
+	2C3E 				DEFB SPR_WORM_0, SPR_WORM_0, SPR_WORM_1, SPR_WORM_1, 0
 anim_big_vape:
-	2C43 SPR_VAPE_0, SPR_VAPE_0 or SPR_FLIP, SPR_VAPE_1 or SPR_FLIP, SPR_VAPE_1, SPR_VAPE_2, SPR_VAPE_2 or SPR_FLIP, SPR_VAPE_1 or SPR_FLIP, SPR_VAPE_1, 0
+	2C43 				DEFB SPR_VAPE_0, SPR_VAPE_0 or SPR_FLIP, SPR_VAPE_1 or SPR_FLIP, SPR_VAPE_1, SPR_VAPE_2, SPR_VAPE_2 or SPR_FLIP, SPR_VAPE_1 or SPR_FLIP, SPR_VAPE_1, 0
 anim_beacon:
-	2C4C SPR_BEACON, SPR_BEACON or SPR_FLIP, 0
+	2C4C 				DEFB SPR_BEACON, SPR_BEACON or SPR_FLIP, 0
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Function names will be kept consitent with the ones in Head Over Heels
+OBJFN_FADE				EQU	&12
+
 .ObjFnTbl:
-	2C4F D0 3D		DEFW ObjFnPushable		;; &01 	3DD0
-	2C51 85 3D		DEFW ObjFnRollers1		;; &02  3D85
-	2C53 89 3D		DEFW ObjFnRollers2		;; &03  3D89
-	2C55 8D 3D		DEFW ObjFnRollers3		;; &04  3D8D
-	2C57 91 3D		DEFW ObjFnRollers4		;; &05  3D91
-	2C59 E7 3D		DEFW ObjFnVisor1		;; &06  3DE7
-	2C5B EC 3D		DEFW ObjFnMonocat		;; &07  3DEC
-	2C5D F1 3D		DEFW ObjFnAnticlock		;; &08  3DF1
-	2C5F 05 3E		DEFW ObjFnRandB			;; &09  3E05
-	2C61 04 3D		DEFW ObjFnBall			;; &0A  3D04
-	2C63 F6 3D		DEFW ObjFnBee			;; &0B  3DF6
-	2C65 FB 3D		DEFW ObjFnRandK			;; &0C  3DFB
-	2C67 00 3E		DEFW ObjFnRandR			;; &0D  3E00
-	2C69 0F 3E		DEFW ObjFnTowards		;; &0E  3E0F
-	2C6B 52 3D		DEFW					;; &0F  3D52
-	2C6D 0A 3E		DEFW ObjFnHomeIn		;; &10  3E0A
-	2C6F 6B 3E		DEFW ObjFnHeliplat3		;; &11  3E6B
-	2C71 B6 3D		DEFW ObjFnFade			;; &12  3DB6
-	2C73 6A 3D		DEFW ObjFnHeliplat60	;; &13  3D6A
-	2C75 70 3D		DEFW ObjFnHeliplat10	;; &14  3D70
-	2C77 7A 3D		DEFW ObjFnColapse		;; &15  3D7A
-	2C79 9E 3D		DEFW ObjFnDissolve2		;; &16  3D9E
-	2C7B E1 3D		DEFW ObjFnSquarePatrol	;; &17  3DE1
-	2C7D DB 3D		DEFW ObjFnLinePatrol	;; &18  3DDB
-	2C7F 67 3D		DEFW ObjFnHeliplat90	;; &19  3D67
-	2C81 6D 3D		DEFW ObjFnHeliplat30	;; &1A  3D6D
-	2C83 9B 3D		DEFW ObjFnDissolve		;; &1B  3D9B
+	2C4F D0 3D			DEFW ObjFnPushable		;; &01 	3DD0
+	2C51 85 3D			DEFW ObjFnRollers1		;; &02  3D85
+	2C53 89 3D			DEFW ObjFnRollers2		;; &03  3D89
+	2C55 8D 3D			DEFW ObjFnRollers3		;; &04  3D8D
+	2C57 91 3D			DEFW ObjFnRollers4		;; &05  3D91
+	2C59 E7 3D			DEFW ObjFnVisor1		;; &06  3DE7
+	2C5B EC 3D			DEFW ObjFnMonocat		;; &07  3DEC
+	2C5D F1 3D			DEFW ObjFnAnticlock		;; &08  3DF1
+	2C5F 05 3E			DEFW ObjFnRandB			;; &09  3E05
+	2C61 04 3D			DEFW ObjFnBall			;; &0A  3D04
+	2C63 F6 3D			DEFW ObjFnBee			;; &0B  3DF6
+	2C65 FB 3D			DEFW ObjFnRandK			;; &0C  3DFB
+	2C67 00 3E			DEFW ObjFnRandR			;; &0D  3E00
+	2C69 0F 3E			DEFW ObjFnTowards		;; &0E  3E0F
+	2C6B 52 3D			DEFW ObjFnSwitch		;; &0F  3D52
+	2C6D 0A 3E			DEFW ObjFnHomeIn		;; &10  3E0A
+	2C6F 6B 3E			DEFW ObjFnHeliplat3		;; &11  3E6B
+	2C71 B6 3D			DEFW ObjFnFade			;; &12  3DB6
+	2C73 6A 3D			DEFW ObjFnHeliplat60	;; &13  3D6A
+	2C75 70 3D			DEFW ObjFnHeliplat10	;; &14  3D70
+	2C77 7A 3D			DEFW ObjFnColapse		;; &15  3D7A
+	2C79 9E 3D			DEFW ObjFnDissolve2		;; &16  3D9E
+	2C7B E1 3D			DEFW ObjFnSquarePatrol	;; &17  3DE1
+	2C7D DB 3D			DEFW ObjFnLinePatrol	;; &18  3DDB
+	2C7F 67 3D			DEFW ObjFnHeliplat90	;; &19  3D67
+	2C81 6D 3D			DEFW ObjFnHeliplat30	;; &1A  3D6D
+	2C83 9B 3D			DEFW ObjFnDissolve		;; &1B  3D9B
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Define the objects that can appear in a room definition
 ;; "sprite codes" >= &81 are animations
 ObjDefns: 		;;		<sprite code> 	<function> 						<flag>
-	2C85 36 01 40	DEFB SPR_S_CUSHION, &01, &40 ;; SPR_S_CUSHION
-	2C88 3C 01 40	DEFB SPR_PRESENT, &01, &40 ;; SPR_PRESENT
-	2C8B 3D 01 40	DEFB SPR_WELL, &01, &40 ;; SPR_WELL
-	2C8E 3E 01 40	DEFB SPR_PAWDRUM, &01, &40 ;; SPR_PAWDRUM
-	2C91 3F 01 40	DEFB SPR_STOOL, &01, &40 ;; SPR_STOOL
-	2C94 47 00 00	DEFB SPR_PILLAR, 0, &00 ;; SPR_PILLAR
-	2C97 42 01 40	DEFB SPR_KETTLE, &01, &40 ;; SPR_KETTLE
-	2C9A 43 01 40	DEFB SPR_SUGARBOX, &01, &40 ;; SPR_SUGARBOX
-	2C9D 48 01 40	DEFB SPR_BUNDLE, &01, &40 ;; SPR_BUNDLE
-	2CA0 45 0A 20	DEFB SPR_QBALL, &0A, &20 ;; SPR_QBALL
-	2CA3 4A 0A 00	DEFB SPR_BUBBLE, &0A, &00 ;; SPR_BUBBLE
-	2CA6 5C 01 01	DEFB SPR_CRATE, &01, &01 ;; SPR_CRATE
-	2CA9 3D 00 00	DEFB SPR_WELL, 0, &00 ;; SPR_WELL
-	2CAC 41 0F 00	DEFB SPR_SWITCH, &0F, &00 ;; SPR_SWITCH
-	2CAF 8C 09 20	DEFB &8C, &09, &20
-	2CB2 40 00 20	DEFB SPR_SHROOM, 0, &20 ;; SPR_SHROOM
-	2CB5 5A 19 01	DEFB SPR_TURTLE, &19, &01 ;; SPR_TURTLE
-	2CB8 45 16 00	DEFB SPR_QBALL, &16, &00 ;; SPR_QBALL
-	2CBB 51 01 01	DEFB SPR_SMILEY, &01, &01 ;; SPR_SMILEY
-	2CBE 52 02 11	DEFB SPR_ROLLER, &02, &11 ;; SPR_ROLLER
-	2CC1 52 03 11	DEFB SPR_ROLLER, &03, &11 ;; SPR_ROLLER
-	2CC4 52 04 01	DEFB SPR_ROLLER, &04, &01 ;; SPR_ROLLER
-	2CC7 52 05 01	DEFB SPR_ROLLER, &05, &01 ;; SPR_ROLLER
-	2CCA 54 02 01	DEFB SPR_STEPBOX, &02, &01 ;; SPR_STEPBOX
-	2CCD 54 03 01	DEFB SPR_STEPBOX, &03, &01 ;; SPR_STEPBOX
-	2CD0 54 04 01	DEFB SPR_STEPBOX, &04, &01 ;; SPR_STEPBOX
-	2CD3 54 05 01	DEFB SPR_STEPBOX, &05, &01 ;; SPR_STEPBOX
-	2CD6 53 00 01	DEFB SPR_CLEARBOX, 0, &01 ;; SPR_CLEARBOX
-	2CD9 54 00 01	DEFB SPR_STEPBOX, 0, &01 ;; SPR_STEPBOX
-	2CDC 56 00 01	DEFB SPR_COLUMN, 0, &01 ;; SPR_COLUMN
-	2CDF 59 00 21	DEFB SPR_Z_CUSHION, 0, &21 ;; SPR_Z_CUSHION
-	2CE0 5A 00 01	DEFB SPR_TURTLE, 0, &01 ;; SPR_TURTLE
-	2CE5 5B 00 01	DEFB SPR_TABLE, 0, &01 ;; SPR_HELIPLAT
-	2CE8 5C 00 01	DEFB SPR_CRATE, 0, &01 ;; SPR_CRATE
-	2CEB 5E 00 01	DEFB SPR_DSPIKES, 0, &01 ;; SPR_DSPIKES
-	2CEE 5F 00 02	DEFB SPR_BRICKW, 0, &02 ;; SPR_BRICKW
-	2CF1 55 00 21	DEFB SPR_LAVAPIT, 0, &21 ;; SPR_LAVAPIT
-	2CF4 57 00 21	DEFB SPR_ECRIN, 0, &21 ;; SPR_ECRIN
-	2CF7 58 00 21	DEFB SPR_BOX, 0, &21 ;; SPR_BOX
-	2CFA 5D 00 21	DEFB SPR_TARBOX, 0, &21 ;; SPR_TARBOX
-	2CFD 60 00 A2	DEFB &60, 0, &A2
-	2D00 5E 1A A2	DEFB SPR_DSPIKES, &1A, &A2 ;; SPR_DSPIKES
-	2D03 54 16 01	DEFB SPR_STEPBOX, &16, &01 ;; SPR_STEPBOX
-	2D06 53 16 01	DEFB SPR_CLEARBOX, &16, &01 ;; SPR_CLEARBOX
-	2D09 56 16 01	DEFB SPR_COLUMN, &16, &01 ;; SPR_COLUMN
-	2D0C 5C 16 01	DEFB SPR_CRATE, &16, &01 ;; SPR_CRATE
-	2D0F 94 0B 20	DEFB &94, &0B, &20
-	2D12 90 0B 20	DEFB &90, &0B, &20
-	2D15 92 0C 20	DEFB &92, &0C, &20
-	2D18 82 06 28	DEFB &82, &06, &28
-	2D1B 8A 06 28	DEFB &8A, &06, &28
-	2D1E 84 0D 28	DEFB &84, &0D, &28
-	2D21 2B 00 28	DEFB SPR_RIDDLER, 0, &28 ;; SPR_ONEEYE
-	2D24 88 08 28	DEFB &88, &08, &28
-	2D27 1E 00 28	DEFB SPR_DEMON, 0, &28 ;; SPR_DEMON
-	2D2A 1F 00 28	DEFB SPR_DEMONB, 0, &28 ;; SPR_DEMONB
-	2D2D 86 07 28	DEFB &86, &07, &28
-	2D30 54 19 01	DEFB SPR_STEPBOX, &19, &01 ;; SPR_STEPBOX
-	2D33 54 15 01	DEFB SPR_STEPBOX, &15, &01 ;; SPR_STEPBOX
-	2D36 56 18 01	DEFB SPR_COLUMN, &18, &01 ;; SPR_COLUMN
-	2D39 56 17 01	DEFB SPR_COLUMN, &17, &01 ;; SPR_COLUMN
-	2D3C 56 15 01	DEFB SPR_COLUMN, &15, &01 ;; SPR_COLUMN
-	2D3F 5D 19 21	DEFB SPR_TARBOX, &19, &21 ;; SPR_TARBOX
-	2D42 47 14 A0	DEFB SPR_PILLAR, &14, &A0 ;; SPR_PILLAR
-	2D45 5D 13 21	DEFB SPR_TARBOX, &13, &21 ;; SPR_TARBOX
-	2D48 8E 10 28	DEFB &8E, &10, &28
-	2D4B 8C 0E 00	DEFB &8C, &0E, &00
-	2D4E 3C 1B 20	DEFB SPR_PRESENT, &1B, &20 ;; SPR_PRESENT
+	2C85 36 01 40		DEFB SPR_S_CUSHION, &01, &40 ;; SPR_S_CUSHION
+	2C88 3C 01 40		DEFB SPR_PRESENT, &01, &40 ;; SPR_PRESENT
+	2C8B 3D 01 40		DEFB SPR_WELL, &01, &40 ;; SPR_WELL
+	2C8E 3E 01 40		DEFB SPR_PAWDRUM, &01, &40 ;; SPR_PAWDRUM
+	2C91 3F 01 40		DEFB SPR_STOOL, &01, &40 ;; SPR_STOOL
+	2C94 47 00 00		DEFB SPR_PILLAR, 0, &00 ;; SPR_PILLAR
+	2C97 42 01 40		DEFB SPR_KETTLE, &01, &40 ;; SPR_KETTLE
+	2C9A 43 01 40		DEFB SPR_SUGARBOX, &01, &40 ;; SPR_SUGARBOX
+	2C9D 48 01 40		DEFB SPR_BUNDLE, &01, &40 ;; SPR_BUNDLE
+	2CA0 45 0A 20		DEFB SPR_QBALL, &0A, &20 ;; SPR_QBALL
+	2CA3 4A 0A 00		DEFB SPR_BUBBLE, &0A, &00 ;; SPR_BUBBLE
+	2CA6 5C 01 01		DEFB SPR_CRATE, &01, &01 ;; SPR_CRATE
+	2CA9 3D 00 00		DEFB SPR_WELL, 0, &00 ;; SPR_WELL
+	2CAC 41 0F 00		DEFB SPR_SWITCH, &0F, &00 ;; SPR_SWITCH
+	2CAF 8C 09 20		DEFB ANIM_SALT, &09, &20
+	2CB2 40 00 20		DEFB SPR_SHROOM, 0, &20 ;; SPR_SHROOM
+	2CB5 5A 19 01		DEFB SPR_TURTLE, &19, &01 ;; SPR_TURTLE
+	2CB8 45 16 00		DEFB SPR_QBALL, &16, &00 ;; SPR_QBALL
+	2CBB 51 01 01		DEFB SPR_SMILEY, &01, &01 ;; SPR_SMILEY
+	2CBE 52 02 11		DEFB SPR_ROLLER, &02, &11 ;; SPR_ROLLER
+	2CC1 52 03 11		DEFB SPR_ROLLER, &03, &11 ;; SPR_ROLLER
+	2CC4 52 04 01		DEFB SPR_ROLLER, &04, &01 ;; SPR_ROLLER
+	2CC7 52 05 01		DEFB SPR_ROLLER, &05, &01 ;; SPR_ROLLER
+	2CCA 54 02 01		DEFB SPR_STEPBOX, &02, &01 ;; SPR_STEPBOX
+	2CCD 54 03 01		DEFB SPR_STEPBOX, &03, &01 ;; SPR_STEPBOX
+	2CD0 54 04 01		DEFB SPR_STEPBOX, &04, &01 ;; SPR_STEPBOX
+	2CD3 54 05 01		DEFB SPR_STEPBOX, &05, &01 ;; SPR_STEPBOX
+	2CD6 53 00 01		DEFB SPR_CLEARBOX, 0, &01 ;; SPR_CLEARBOX
+	2CD9 54 00 01		DEFB SPR_STEPBOX, 0, &01 ;; SPR_STEPBOX
+	2CDC 56 00 01		DEFB SPR_COLUMN, 0, &01 ;; SPR_COLUMN
+	2CDF 59 00 21		DEFB SPR_Z_CUSHION, 0, &21 ;; SPR_Z_CUSHION
+	2CE0 5A 00 01		DEFB SPR_TURTLE, 0, &01 ;; SPR_TURTLE
+	2CE5 5B 00 01		DEFB SPR_TABLE, 0, &01 ;; SPR_HELIPLAT
+	2CE8 5C 00 01		DEFB SPR_CRATE, 0, &01 ;; SPR_CRATE
+	2CEB 5E 00 01		DEFB SPR_DSPIKES, 0, &01 ;; SPR_DSPIKES
+	2CEE 5F 00 02		DEFB SPR_BRICKW, 0, &02 ;; SPR_BRICKW
+	2CF1 55 00 21		DEFB SPR_LAVAPIT, 0, &21 ;; SPR_LAVAPIT
+	2CF4 57 00 21		DEFB SPR_ECRIN, 0, &21 ;; SPR_ECRIN
+	2CF7 58 00 21		DEFB SPR_BOX, 0, &21 ;; SPR_BOX
+	2CFA 5D 00 21		DEFB SPR_TARBOX, 0, &21 ;; SPR_TARBOX
+	2CFD 60 00 A2		DEFB &60, 0, &A2
+	2D00 5E 1A A2		DEFB SPR_DSPIKES, &1A, &A2 ;; SPR_DSPIKES
+	2D03 54 16 01		DEFB SPR_STEPBOX, &16, &01 ;; SPR_STEPBOX
+	2D06 53 16 01		DEFB SPR_CLEARBOX, &16, &01 ;; SPR_CLEARBOX
+	2D09 56 16 01		DEFB SPR_COLUMN, &16, &01 ;; SPR_COLUMN
+	2D0C 5C 16 01		DEFB SPR_CRATE, &16, &01 ;; SPR_CRATE
+	2D0F 94 0B 20		DEFB ANIM_BEACON, &0B, &20
+	2D12 90 0B 20		DEFB ANIM_WORM, &0B, &20
+	2D15 92 0C 20		DEFB ANIM_BIGVAPE, &0C, &20
+	2D18 82 06 28		DEFB ANIM_WOLF, &06, &28
+	2D1B 8A 06 28		DEFB ANIM_DEMON, &06, &28
+	2D1E 84 0D 28		DEFB ANIM_SHARK, &0D, &28
+	2D21 2B 00 28		DEFB SPR_RIDDLER, 0, &28 ;; SPR_ONEEYE
+	2D24 88 08 28		DEFB ANIM_JOKER, &08, &28
+	2D27 1E 00 28		DEFB SPR_DEMON, 0, &28 ;; SPR_DEMON
+	2D2A 1F 00 28		DEFB SPR_DEMONB, 0, &28 ;; SPR_DEMONB
+	2D2D 86 07 28		DEFB ANIM_DOG, &07, &28
+	2D30 54 19 01		DEFB SPR_STEPBOX, &19, &01 ;; SPR_STEPBOX
+	2D33 54 15 01		DEFB SPR_STEPBOX, &15, &01 ;; SPR_STEPBOX
+	2D36 56 18 01		DEFB SPR_COLUMN, &18, &01 ;; SPR_COLUMN
+	2D39 56 17 01		DEFB SPR_COLUMN, &17, &01 ;; SPR_COLUMN
+	2D3C 56 15 01		DEFB SPR_COLUMN, &15, &01 ;; SPR_COLUMN
+	2D3F 5D 19 21		DEFB SPR_TARBOX, &19, &21 ;; SPR_TARBOX
+	2D42 47 14 A0		DEFB SPR_PILLAR, &14, &A0 ;; SPR_PILLAR
+	2D45 5D 13 21		DEFB SPR_TARBOX, &13, &21 ;; SPR_TARBOX
+	2D48 8E 10 28		DEFB ANIM_RIDDLER, &10, &28
+	2D4B 8C 0E 00		DEFB ANIM_SALT, &0E, &00
+	2D4E 3C 1B 20		DEFB SPR_PRESENT, &1B, &20 ;; SPR_PRESENT
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Reinitialisation size of the array
@@ -8465,7 +8580,7 @@ EnlistObjAux
 	2E4E 08             EX AF,AF'
 	2E4F 3A EA 16       LD A,(MaxU)
 	2E52 BA             CP D
-	2E53 38 19          JR c,2E6E
+	2E53 38 19          JR c,elonjax_1
 	2E55 3A EB 16       LD A,(MaxV)
 	2E58 BC             CP H
 	2E59 38 13          JR c,elonjax_1
@@ -9170,7 +9285,7 @@ br_3D71
 ;; to pick for each part of the wall. It is essentially an index to add
 ;; to PanelsBaseAddr
 .Panel_WorldData:
-	3173         		DEFW	&EB, &EB, &F5, &FD, &07, &D7, &EB, &F0
+	3173         		DEFW	&EB, &EB, &F5, &FD, &07, &D7, &EB, &F0		;; 3,2,1,3,....
 	317B         		DEFW	&E4, &E4, &E3, &4E, &34, &CC, &E4, &CC
 	3183         		DEFW	&06, &18, &10, &82, &04, &10, &00, &01
 	318B         		DEFW	&08, &20, &10, &42, &08, &00, &14, &00
@@ -9188,13 +9303,13 @@ parts_got_Mask:
 	31B3 00             DEFB 0
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; Byte 0 : ??? room ID lowbyte
-;; Byte 1 : ??? room ID highbyte
+;; Byte 0 : room ID lowbyte
+;; Byte 1 : room ID highbyte
 ;; Byte 2 : U
 ;; Byte 3 : V
 ;; Byte 4 : Z
 ;; Byte 5 : Sprite (bit7 = flipped)
-;; Byte 6 : ??? function index
+;; Byte 6 : function index
 Special_obj_List ;; total of 41 (&29)
 NB_TOOLS				EQU		4
 NB_PARTS				EQU		7
@@ -9203,67 +9318,72 @@ NB_SPECIAL_OBJ			EQU		NB_TOOLS + NB_PARTS + NB_BONUSES ;; 41
 LEN_ENTRY_SPECIAL_OBJ	EQU		7
 
 InventoryList: ;; 4
-	31B4 DEFB &40, &49, &02, &07, &05, SPR_BATTHRUSTER, &00    	;; SPR_BATTHRUSTER
-	31BB DEFB &30, &54, &00, &03, &02, SPR_BATBELT, &01		;; SPR_BATBELT
-	31C2 DEFB &40, &A7, &07, &02, &06, SPR_BATBOOTS, &02		;; SPR_BATBOOTS
-	31C9 DEFB &40, &A9, &06, &04, &07, SPR_BATBAG, &03		;; SPR_BATBAG
+	;;						roomID l h,  U    V    Z    SPR          func
+	31B4				DEFB &40, &49, &02, &07, &05, SPR_BATTHRUSTER, &00    		;; SPR_BATTHRUSTER
+	31BB				DEFB &30, &54, &00, &03, &02, SPR_BATBELT, &01				;; SPR_BATBELT
+	31C2				DEFB &40, &A7, &07, &02, &06, SPR_BATBOOTS, &02			;; SPR_BATBOOTS
+	31C9				DEFB &40, &A9, &06, &04, &07, SPR_BATBAG, &03				;; SPR_BATBAG
 PartsList: ;; 7
-	31D0 DEFB &50, &6D, &00, &06, &04, SPR_BATCRAFT_RFNT, &0A		;; SPR_BATCRAFT_RFNT
-	31D7 DEFB &20, &A4, &04, &00, &07, SPR_BATCRAFT_LBCK, &0B		;; SPR_BATCRAFT_LBCK
-	31DE DEFB &30, &5D, &04, &03, &07, SPR_BATCRAFT_RBLF or SPR_FLIP, &0C		;; SPR_BATCRAFT_RBLF or SPR_FLIP
-	31E5 DEFB &30, &81, &07, &02, &07, SPR_BATCRAFT_RBLF, &0D		;; SPR_BATCRAFT_RBLF
-	31EC DEFB &80, &57, &01, &07, &02, SPR_BATCRAFT_FINS, &0E		;; SPR_BATCRAFT_FINS
-	31F3 DEFB &30, &89, &01, &07, &07, SPR_BATCRAFT_FINS, &0F		;; SPR_BATCRAFT_FINS
-	31FA DEFB &30, &12, &00, &07, &05, SPR_BATCRAFT_CKPIT, &10		;; SPR_BATCRAFT_CKPIT
+	31D0				DEFB &50, &6D, &00, &06, &04, SPR_BATCRAFT_RFNT, &0A		;; SPR_BATCRAFT_RFNT
+	31D7				DEFB &20, &A4, &04, &00, &07, SPR_BATCRAFT_LBCK, &0B		;; SPR_BATCRAFT_LBCK
+	31DE				DEFB &30, &5D, &04, &03, &07, SPR_BATCRAFT_RBLF or SPR_FLIP, &0C		;; SPR_BATCRAFT_RBLF or SPR_FLIP
+	31E5				DEFB &30, &81, &07, &02, &07, SPR_BATCRAFT_RBLF, &0D		;; SPR_BATCRAFT_RBLF
+	31EC				DEFB &80, &57, &01, &07, &02, SPR_BATCRAFT_FINS, &0E		;; SPR_BATCRAFT_FINS
+	31F3				DEFB &30, &89, &01, &07, &07, SPR_BATCRAFT_FINS, &0F		;; SPR_BATCRAFT_FINS
+	31FA				DEFB &30, &12, &00, &07, &05, SPR_BATCRAFT_CKPIT, &10		;; SPR_BATCRAFT_CKPIT
 SpecialList: ;; 30
-	3201 DEFB &40, &68, &03, &04, &00, SPR_BONUS, &05		;; SPR_BONUS : CNT_SPEED
-	3208 DEFB &30, &73, &02, &04, &06, SPR_BONUS, &05
-	320F DEFB &30, &41, &00, &03, &00, SPR_BONUS, &05
-	3216 DEFB &60, &5D, &04, &04, &07, SPR_BONUS, &05
-	321D DEFB &30, &4A, &00, &03, &00, SPR_BONUS, &05		;; ...
-	3224 DEFB &30, &1F, &03, &02, &06, SPR_BONUS, &05
-	322B DEFB &30, &4D, &06, &03, &06, SPR_BONUS, &05
-	3232 DEFB &30, &33, &03, &06, &07, SPR_BONUS, &05
-	3239 DEFB &40, &46, &03, &01, &00, SPR_BONUS, &05  	;; SPR_BONUS : CNT_SPEED
-	3240 DEFB &30, &74, &04, &03, &06, SPR_BONUS, &08 	;; SPR_BONUS : CNT_LIVES
-	3247 DEFB &30, &8B, &01, &00, &07, SPR_BONUS, &08
-	324E DEFB &80, &7A, &04, &03, &06, SPR_BONUS, &08		;; ...
-	3255 DEFB &40, &88, &03, &01, &00, SPR_BONUS, &08 	;; SPR_BONUS : CNT_LIVES
-	325C DEFB &30, &51, &05, &05, &03, SPR_BONUS, &06 	;; SPR_BONUS : CNT_SPRING
-	3263 DEFB &30, &8B, &04, &06, &05, SPR_BONUS, &06
-	326A DEFB &20, &A4, &06, &07, &07, SPR_BONUS, &06		;; ...
-	3271 DEFB &80, &6A, &00, &03, &07, SPR_BONUS, &06
-	3278 DEFB &30, &56, &04, &04, &00, SPR_BONUS, &06 	;; SPR_BONUS : CNT_SPRING
-	327F DEFB &40, &59, &01, &06, &06, SPR_BONUS, &07 	;; SPR_BONUS : CNT_SHIELD
-	3286 DEFB &30, &2F, &00, &01, &01, SPR_BONUS, &07
-	328D DEFB &30, &B3, &06, &01, &06, SPR_BONUS, &07		;; ...
-	3294 DEFB &50, &5C, &00, &03, &06, SPR_BONUS, &07 	;; SPR_BONUS : CNT_SHIELD
-	329B DEFB &30, &75, &03, &02, &07, SPR_BONUS, &09 	;; SPR_BONUS : Reset boost
-	32A2 DEFB &80, &8A, &07, &04, &07, SPR_BONUS, &09		;; ...
-	32A9 DEFB &30, &35, &02, &00, &07, SPR_BONUS, &09 	;; SPR_BONUS : Reset boost
-	32B0 DEFB &40, &48, &04, &04, &04, SPR_BATSIGNAL, &04		;; SPR_BATSIGNAL (same thing than FISH in HoH)
-	32B7 DEFB &30, &33, &03, &03, &04, SPR_BATSIGNAL, &04
-	32BE DEFB &40, &A8, &05, &04, &07, SPR_BATSIGNAL, &04		;; ...
-	32C5 DEFB &60, &7E, &02, &07, &05, SPR_BATSIGNAL, &04
-	32CC DEFB &30, &8A, &01, &01, &06, SPR_BATSIGNAL, &04      ;; SPR_BATSIGNAL
+	3201				DEFB &40, &68, &03, &04, &00, SPR_BONUS, &05				;; SPR_BONUS : CNT_SPEED
+	3208				DEFB &30, &73, &02, &04, &06, SPR_BONUS, &05
+	320F				DEFB &30, &41, &00, &03, &00, SPR_BONUS, &05
+	3216				DEFB &60, &5D, &04, &04, &07, SPR_BONUS, &05
+	321D				DEFB &30, &4A, &00, &03, &00, SPR_BONUS, &05				;; ...
+	3224				DEFB &30, &1F, &03, &02, &06, SPR_BONUS, &05
+	322B				DEFB &30, &4D, &06, &03, &06, SPR_BONUS, &05
+	3232				DEFB &30, &33, &03, &06, &07, SPR_BONUS, &05
+	3239				DEFB &40, &46, &03, &01, &00, SPR_BONUS, &05  				;; SPR_BONUS : CNT_SPEED
+	3240				DEFB &30, &74, &04, &03, &06, SPR_BONUS, &08 				;; SPR_BONUS : CNT_LIVES
+	3247				DEFB &30, &8B, &01, &00, &07, SPR_BONUS, &08
+	324E				DEFB &80, &7A, &04, &03, &06, SPR_BONUS, &08				;; ...
+	3255				DEFB &40, &88, &03, &01, &00, SPR_BONUS, &08 				;; SPR_BONUS : CNT_LIVES
+	325C				DEFB &30, &51, &05, &05, &03, SPR_BONUS, &06 				;; SPR_BONUS : CNT_SPRING
+	3263				DEFB &30, &8B, &04, &06, &05, SPR_BONUS, &06
+	326A				DEFB &20, &A4, &06, &07, &07, SPR_BONUS, &06				;; ...
+	3271				DEFB &80, &6A, &00, &03, &07, SPR_BONUS, &06				;; This one may be changed to a Malus
+	3278				DEFB &30, &56, &04, &04, &00, SPR_BONUS, &06 				;; SPR_BONUS : CNT_SPRING
+	327F				DEFB &40, &59, &01, &06, &06, SPR_BONUS, &07 				;; SPR_BONUS : CNT_SHIELD
+	3286				DEFB &30, &2F, &00, &01, &01, SPR_BONUS, &07
+	328D				DEFB &30, &B3, &06, &01, &06, SPR_BONUS, &07				;; ...
+	3294				DEFB &50, &5C, &00, &03, &06, SPR_BONUS, &07 				;; SPR_BONUS : CNT_SHIELD
+	329B				DEFB &30, &75, &03, &02, &07, SPR_BONUS, &09 				;; SPR_BONUS : Reset boost
+	32A2				DEFB &80, &8A, &07, &04, &07, SPR_BONUS, &09				;; ... This one may be changed to a Bonus
+	32A9				DEFB &30, &35, &02, &00, &07, SPR_BONUS, &09 				;; SPR_BONUS : Reset boost
+	32B0				DEFB &40, &48, &04, &04, &04, SPR_BATSIGNAL, &04			;; SPR_BATSIGNAL (same thing than FISH in HoH)
+	32B7				DEFB &30, &33, &03, &03, &04, SPR_BATSIGNAL, &04
+	32BE				DEFB &40, &A8, &05, &04, &07, SPR_BATSIGNAL, &04			;; ...
+	32C5				DEFB &60, &7E, &02, &07, &05, SPR_BATSIGNAL, &04
+	32CC				DEFB &30, &8A, &01, &01, &06, SPR_BATSIGNAL, &04      		;; SPR_BATSIGNAL
 
-;;AddSavedCrowns_and_SpecialItems
+;; -----------------------------------------------------------------------------------------------------------
+AddSpecialItems
 	32D3 21 B4 31       LD HL,Special_obj_List
 	32D6 11 06 00       LD DE,LEN_ENTRY_SPECIAL_OBJ - 1
 	32D9 3E 29          LD A,NB_SPECIAL_OBJ
+
+addspe_loop
 	32DB F5             PUSH AF
 	32DC 7E             LD A,(HL)
 	32DD 23             INC HL
 	32DE B9             CP C
-	32DF 20 04          JR NZ,32E5
+	32DF 20 04          JR NZ,AddCollectedPartsInVictoryRoom
 	32E1 7E             LD A,(HL)
 	32E2 B8             CP B
-	32E3 28 2D          JR Z,3312
+	32E3 28 2D          JR Z,br_3F25
 
+AddCollectedPartsInVictoryRoom
 	32E5 19             ADD HL,DE
 	32E6 F1             POP AF
 	32E7 3D             DEC A
-	32E8 20 F1          JR NZ,32DB
+	32E8 20 F1          JR NZ,addspe_loop
 	32EA 21 00 E5       LD HL,RoomID_Victory
 	32ED AF             XOR A
 	32EE ED 42          SBC HL,BC
@@ -9288,6 +9408,7 @@ pbcp_loop:
 	330F F1             POP AF
 	3310 18 ED          JR pbcp_loop
 
+br_3F25
 	3312 E5             PUSH HL
 	3313 D5             PUSH DE
 	3314 C5             PUSH BC
@@ -9303,7 +9424,7 @@ pbcp_loop:
 	3320 AF             XOR A
 	3321 32 CC 16       LD (TmpObj_variables+O_ANIM),A
 	3324 7B             LD A,E
-	3325 CD 7D 1A       CALL 1A7D
+	3325 CD 7D 1A       CALL SetTmpObjUVZ
 	3328 3E 01          LD A,&01
 	332A 32 C7 16       LD (TmpObj_variables+O_FUNC),A
 	332D 3E 60          LD A,&60
@@ -9312,17 +9433,18 @@ pbcp_loop:
 	3335 C1             POP BC
 	3336 D1             POP DE
 	3337 E1             POP HL
-	3338 18 AB          JR 32E5
+	3338 18 AB          JR AddCollectedPartsInVictoryRoom
 
+;; -----------------------------------------------------------------------------------------------------------
 ;; Batcraft parts in the last room
 BatCraftList
-	333A	DEFB &14, &22, &B4, SPR_BATCRAFT_CKPIT		;; U V Z Sprite
-	333E	DEFB &17, &2E, &B4, SPR_BATCRAFT_FINS
-	3342	DEFB &11, &2E, &B4, SPR_BATCRAFT_FINS
-	3346	DEFB &11, &2B, &BA, SPR_BATCRAFT_RBLF
-	334A	DEFB &17, &25, &BA, SPR_BATCRAFT_RBLF or SPR_FLIP
-	334E	DEFB &17, &2B, &BA, SPR_BATCRAFT_LBCK
-	3352	DEFB &11, &25, &BA, SPR_BATCRAFT_RFNT
+	333A				DEFB &14, &22, &B4, SPR_BATCRAFT_CKPIT		;; U V Z Sprite
+	333E				DEFB &17, &2E, &B4, SPR_BATCRAFT_FINS
+	3342				DEFB &11, &2E, &B4, SPR_BATCRAFT_FINS
+	3346				DEFB &11, &2B, &BA, SPR_BATCRAFT_RBLF
+	334A				DEFB &17, &25, &BA, SPR_BATCRAFT_RBLF or SPR_FLIP
+	334E				DEFB &17, &2B, &BA, SPR_BATCRAFT_LBCK
+	3352				DEFB &11, &25, &BA, SPR_BATCRAFT_RFNT
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Reset the "collected" flag (bit0 of room ID) on all the specials.
@@ -9338,32 +9460,46 @@ rstspe_loop
 	3360 19             ADD HL,DE ;; next
 	3361 10 FB          DJNZ rstspe_loop ;; loop
 
-	3363 CD 9B 36       CALL Random_gen
+Change_Special_Effect:
+	3363 CD 9B 36       CALL Random_gen		;; get a ramdom value in L
 	3366 3E 06          LD A,&06
 	3368 CB 1D          RR L
-	336A 38 02          JR c,336E
-	336C 3E 09          LD A,9
-	336E 32 77 32       LD (3277),A
-	3371 EE 0F          XOR &0F
-	3373 32 A8 32       LD (32A8),A
+	336A 38 02          JR c,Mutate_items	;; if L[0] = 1 use A=6 (bonus), else use A=9 (malus)
+	336C 3E 09          LD A,&09
+	;; flow in Mutate_items
+;; -----------------------------------------------------------------------------------------------------------
+;; This will swap (or not) 2 specific items depending on a random value
+Mutable_Item1_fn		EQU		SpecialList + (16*7) + 6	;; id 16 in SpecialList, 7 bytes per entry, byte #6 (ie. last one = function)
+Mutable_Item2_fn		EQU		SpecialList + (23*7) + 6	;; id 23 in SpecialList, 7 bytes per entry, byte #6 (ie. last one = function)
+
+Mutate_items:
+	336E 32 77 32       LD (Mutable_Item1_fn),A		;; Will keep 6 (Spring Bonus) or change to 9 (Malus) depending on random value
+	3371 EE 0F          XOR &0F						;; 6 <--> 9
+	3373 32 A8 32       LD (Mutable_Item2_fn),A		;; Will keep 9 (Malus) or change to 6 (Spring Bonus) depending on random value
 	3376 C9             RET
 
+;; -----------------------------------------------------------------------------------------------------------
+Find_Specials
 	3377 08             EX AF,AF'
 	3378 21 B4 31       LD HL,Special_obj_List
 	337B 11 06 00       LD DE,6
 	337E 3E 29          LD A,NB_SPECIAL_OBJ ;; number of objects
+
+findspec_loop
 	3380 F5             PUSH AF
 	3381 7E             LD A,(HL)
 	3382 23             INC HL
 	3383 B9             CP C
-	3384 20 04          JR NZ,338A
+	3384 20 04          JR NZ,FindSpecCont
 	3386 7E             LD A,(HL)
 	3387 B8             CP B
-	3388 28 06          JR Z,3390
+	3388 28 06          JR Z,&3390
+
+FindSpecCont
 	338A 19             ADD HL,DE
 	338B F1             POP AF
 	338C 3D             DEC A
-	338D 20 F1          JR NZ,3380
+	338D 20 F1          JR NZ,findspec_loop
 	338F C9             RET
 
 	3390 E5             PUSH HL
@@ -9373,15 +9509,15 @@ rstspe_loop
 	3394 23             INC HL
 	3395 23             INC HL
 	3396 BE             CP (HL)
-	3397 28 04          JR Z,339D
+	3397 28 04          JR Z,&339D
 	3399 E1             POP HL
 	339A 08             EX AF,AF'
-	339B 18 ED          JR 338A
+	339B 18 ED          JR FindSpecCont
 
 	339D 23             INC HL
 	339E 7E             LD A,(HL)
 	339F CB 41          BIT 0,C
-	33A1 C2 2B 34       JP NZ,342B
+	33A1 C2 2B 34       JP NZ,dconti_1
 	33A4 E1             POP HL
 	33A5 2B             DEC HL
 	33A6 CB C6          SET 0,(HL)		;; set bit0 to says "already picked up"
@@ -9464,9 +9600,10 @@ Picked_BatSignal:		;; save game (C, B, CNT_LIVES, parts_got_Mask)
 	3420 7E             LD A,(HL)
 	3421 32 B3 31       LD (parts_got_Mask),A
 	3424 CB C1          SET 0,C
-	3426 3E 35          LD A,&35
-	3428 C3 77 33       JP 3377
+	3426 3E 35          LD A,SPR_BATSIGNAL
+	3428 C3 77 33       JP Find_Specials
 
+dconti_1
 	342B 2B             DEC HL
 	342C 2B             DEC HL
 	342D 7E             LD A,(HL)
@@ -9478,19 +9615,19 @@ Picked_BatSignal:		;; save game (C, B, CNT_LIVES, parts_got_Mask)
 	3435 08             EX AF,AF'
 	3436 21 E9 34       LD HL,UVZ_origin
 	3439 CD 84 1A       CALL Set_UVZ
-	343C 3E 05          LD A,5
+	343C 3E 05          LD A,5									;; room access code
 	343E 32 17 38       LD (access_new_room_code),A
 	3441 E1             POP HL
 	3442 E1             POP HL
 	;; realign what inventory and parts we have got
 	3443 21 B4 31       LD HL,Special_obj_List
 	3446 CD 50 34       CALL Update_Inventory_from_save
-	3449 06 07          LD B,NB_PARTS					;; 7 Batcraft parts
-	344B 3A B3 31       LD A,(parts_got_Mask)			;; parts
+	3449 06 07          LD B,NB_PARTS							;; 7 Batcraft parts
+	344B 3A B3 31       LD A,(parts_got_Mask)					;; parts
 	344E 18 08          JR Update_from_save_state
 
 Update_Inventory_from_save
-	3450 06 04          LD B,NB_TOOLS		;; 4 Inventory items
+	3450 06 04          LD B,NB_TOOLS							;; 4 Inventory items
 	3452 3A CF 1B       LD A,(Inventory)
 	3455 11 07 00       LD DE,LEN_ENTRY_SPECIAL_OBJ				;; 7 bytes per entry in the InventoryTable table
 Update_from_save_state:
@@ -9520,7 +9657,7 @@ PickedUp_Part
 	346E D6 04          SUB 4
 	3470 21 B3 31       LD HL,parts_got_Mask
 	3473 CD 79 34       CALL Set_bit_nb_A_in_content_HL
-	3476 C3 21 37       JP 3721
+	3476 C3 21 37       JP Refresh_HUD
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; This function will set a bit (bit number in A) in a byte pointed by HL, leaving the
@@ -9538,11 +9675,21 @@ fsbn_loop
 	3481 C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
-	3482 99 D0 1B       ;; Bonus value , 1BD0 : Counters CNT_SPEED
-	3485 01 D3 1B       ;; 1BD3 CNT_LIVES
-	3488 10 D1 1B       ;; 1BD1 CNT_SPRING
-	348B 99 D2 1B     	;; 1BD2 CNT_SHIELD
+Counters_increments
+	3482 99       		DEFB &99 ;; (BCD) ; Bonus value , 1BD0 : Counters CNT_SPEED
+	3483 D0 1B			DEFW Counter_speed
+	3485 01				DEFB &01
+	3486 D3 1B      	DEFW Counter_lives ;; 1BD3 CNT_LIVES
+	3488 10				DEFB &10
+	3489 D1 1B      	DEFW Counter_spring ;; 1BD1 CNT_SPRING
+	348B 99				DEFB &99
+	348C D2 1B     		DEFW Counter_shield ;; 1BD2 CNT_SHIELD
 
+;; -----------------------------------------------------------------------------------------------------------
+;; Decrement one of the counters and print new value
+;; Input : A can be: 0: speed, 1: spring, 2:Heels Invul, 3: Head Invul, 4:Heels Lives, 5:Head Lives, 6:Donuts
+;; Output : Zero flag set if was 0; Zero flag reset is was able to decrement the counter.
+Decrement_counter_and_display
 	348E CD C3 34		CALL Get_Count_pointer
 	348F CD B9 34		CALL Sub_1_HLcontent_base10_clamp0
 	3494 C8             RET Z
@@ -9556,7 +9703,7 @@ fsbn_loop
 .PrintStatus:
 	349C 3E C1          LD A,Print_HUD_Left
 	349E CD 15 3C       CALL Print_String
-	34A1 3E 04          LD A,4 ;; NB_COUNTERS
+	34A1 3E 04          LD A,NB_COUNTERS
 prntstat_1
 	34A3 F5             PUSH AF
 	34A4 3D             DEC A
@@ -9605,9 +9752,9 @@ prntstat_1
 	34C3 4F             LD C,A		;; i
 	34C4 87             ADD A,A		;; i*2
 	34C5 81             ADD A,C		;; i*3
-	34C6 C6 82          ADD A,Save_Data and WORD_LOW_BYTE
+	34C6 C6 82          ADD A,Counters_increments and WORD_LOW_BYTE
 	34C8 6F             LD L,A
-	34C9 CE 34          ADC A,Save_Data / WORD_HIGH_BYTE	;; 3482
+	34C9 CE 34          ADC A,Counters_increments / WORD_HIGH_BYTE	;; 3482
 	34CB 95             SUB L
 	34CC 67             LD H,A		;; &3482 + 3*index
 	34CD 7E             LD A,(HL)	;; first item in A = value
@@ -9636,9 +9783,13 @@ UVZ_origin
 UVZ_coord_Set_UVZ
 	34EC 00 00 00       DEFS 3,0
 
+;; -----------------------------------------------------------------------------------------------------------
+reset_count_val
 	34EF 02             DEFB 2 ;; length
-	34F0 00             NOP
-	34F1 00             NOP
+nbtimes_died_resetval
+	34F0 00             DEFB 0
+nbcollected_bonus_resetval
+	34F1 00             DEFB 0
 
 nbtimes_died
 	34F2 00             DEFB 0
@@ -9972,6 +10123,7 @@ Rand_seed_2
 	3720 C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
+Refresh_HUD
 	3721 CD 2D 37       CALL WaitKey
 	3724 CD 29 03       CALL DrawBlacked
 	3727 CD C5 20       CALL Draw_carried_objects
@@ -10002,7 +10154,7 @@ waitkp_loop
 	374D B5             OR L
 	374E 20 F7          JR NZ,waitkp_loop
 wait_loop
-	3750 CD B5 0C       CALL 0CB5
+	3750 CD B5 0C       CALL TestHasSomthingToBePlayed
 	3753 C8             RET Z
 	3754 18 FA          JR wait_loop
 
@@ -10064,10 +10216,10 @@ dfl_3
 
 ;; -----------------------------------------------------------------------------------------------------------
 .Inventory_sprite_list:
-	3798 DEFB SPR_BATTHRUSTER, 	&B4, &D0 ;; spr y,x coords on HUD
-	379B DEFB SPR_BATBELT, 		&B4, &F0
-	379E DEFB SPR_BATBOOTS, 	&94, &F0
-	37A1 DEFB SPR_BATBAG, 		&A4, &E0
+	3798				DEFB SPR_BATTHRUSTER, 	&B4, &D0 ;; spr y,x coords on HUD
+	379B				DEFB SPR_BATBELT, 		&B4, &F0
+	379E				DEFB SPR_BATBOOTS, 		&94, &F0
+	37A1				DEFB SPR_BATBAG, 		&A4, &E0
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Draw a 3 byte x 24 row sprite on clear background, complete with
@@ -10087,7 +10239,7 @@ dfl_3
 	37AB D5             PUSH DE
 	37AC C5             PUSH BC
 	37AD CD 06 2A       CALL Load_sprite_image_address_into_DE
-	37B0 21 0C 18       LD HL,&180C
+	37B0 21 0C 18       LD HL,&18 * WORD_HIGH_BYTE + &0C
 	37B3 C1             POP BC
 	37B4 F1             POP AF
 	37B5 C3 D1 06       JP Draw_Sprite
@@ -10154,7 +10306,7 @@ Draw_sprite_3x32:
 ;; Clear the 6800 buffer
 .Clear_Dest_buffer:
 	380D 21 00 4E       LD HL,DestBuff
-	3810 01 00 01       LD BC,0100
+	3810 01 00 01       LD BC,&0100
 	3813 C3 A8 1B       JP Erase_forward_Block_RAM
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -10162,7 +10314,8 @@ Movement_Facing
 	3816 00             DEFB 0
 access_new_room_code
 	3817 00             DEFB 0
-	3818 00             DEFB 0 ;; Dying?
+Dying
+	3818 00             DEFB 0
 
 NR_Direction
 	3819 00             DEFB 0
@@ -10325,12 +10478,12 @@ DeadlyContact
 	38F2 3A D2 1B       LD A,(CNT_SHIELD)
 	38F5 A7             AND A
 	38F6 C0             RET NZ
-	38F7 3A 18 38       LD A,(3818)  ;; Dying
+	38F7 3A 18 38       LD A,(Dying)
 	38FA A7             AND A
 	38FB C0             RET NZ
 	38FC 3E 0C          LD A,&0C
-	38FE 32 18 38       LD (3818),A
-	3901 C3 80 0A       JP 0A80
+	38FE 32 18 38       LD (Dying),A
+	3901 C3 80 0A       JP DeadlyContactSong ;; sound dying
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Make the special object disappear when picking it up
@@ -10340,12 +10493,12 @@ DeadlyContact
 	3908 DD 36 04 80    LD (IX+O_FLAGS),&80
 	390C DD 7E 0A       LD A,(IX+O_FUNC)
 	390F E6 80          AND &80
-	3911 F6 12          OR &12 ;; OBJFN_FADE
+	3911 F6 12          OR OBJFN_FADE
 	3913 DD 77 0A       LD (IX+O_FUNC),A
 	3916 ED 4B 0E 01    LD BC,(current_Room_ID)
 	391A DD 7E 08       LD A,(IX+O_SPRITE)
-	391D CD 77 33       CALL 3377
-	3920 C3 67 0A       JP 0A67 ;; GetSpecial
+	391D CD 77 33       CALL Find_Specials
+	3920 C3 67 0A       JP GetSpecialSong
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; MoveTbl is indexed on a direction, as per LookupDir.
@@ -10979,10 +11132,10 @@ L_NoExit2
 GSS_1
 	3BF6 1F             RRA
 	3BF7 38 04          JR c,GSS_2
-	3BF9 01 04 01       LD BC,&0104
+	3BF9 01 04 01       LD BC,&01 * WORD_HIGH_BYTE + &04
 	3BFC C9             RET
 GSS_2
-	3BFD 01 01 04       LD BC,&0401
+	3BFD 01 01 04       LD BC,&04 * WORD_HIGH_BYTE + &01
 	3C00 C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -10993,7 +11146,7 @@ current_pen_number
 	3C11 02             DEFB &02
 
 Char_cursor_pixel_position
-	3C12 40 80          DEFW &8040
+	3C12 40 80          DEFW &80 * WORD_HIGH_BYTE + &40
 text_size
 	3C14 00             DEFB 0
 
@@ -11024,7 +11177,7 @@ Print_Char_base
 	3C1C D6 20          SUB &20
 	3C1E 38 2E          JR c,Control_Codes
 	3C20 CD E3 03       CALL Char_code_to_Addr
-	3C23 21 04 08       LD HL,&0804
+	3C23 21 04 08       LD HL,&08 * WORD_HIGH_BYTE + &04
 	3C26 3A 14 3C       LD A,(text_size)
 	3C29 A7             AND A
 	3C2A C4 C8 3C       CALL NZ,Double_sized_char
@@ -11124,7 +11277,7 @@ Control_Code_attribute_6_getcol
 	3C99 21 A5 3C       LD HL,Control_Code_attribute_6_getrow
 	3C9C 87             ADD A,A
 	3C9D 87             ADD A,A
-	3C9E C6 40          ADD A,&40
+	3C9E C6 40          ADD A,&40			;; &40=minX
 	3CA0 32 12 3C       LD (Char_cursor_pixel_position),A
 	3CA3 18 E8          JR Update_attribute_jump_address
 
@@ -11184,7 +11337,7 @@ dsc_loop
 	3CD1 23             INC HL
 	3CD2 13             INC DE
 	3CD3 10 F8          DJNZ dsc_loop
-	3CD5 21 04 10       LD HL,&1004
+	3CD5 21 04 10       LD HL,&10 * WORD_HIGH_BYTE + &04
 	3CD8 11 01 3C       LD DE,Double_size_char_buffer
 	3CDB C9             RET
 
@@ -11261,7 +11414,7 @@ ObjFnSub
 	3D30 C8             RET Z
 	3D31 2A 41 2B       LD HL,(CurrObject)
 	3D34 CD 1A 38       CALL MoveCurrent
-	3D37 DA 9D 0A       JP c,0A9D
+	3D37 DA 9D 0A       JP c,&0A9D	;; Sound
 	3D3A F5             PUSH AF
 	3D3B CD 8E 3F       CALL UpdateObjExtents
 	3D3E F1             POP AF
@@ -11278,15 +11431,17 @@ ObjFnSub
 	3D4F C3 59 36       JP UpdatePos
 
 ;; -----------------------------------------------------------------------------------------------------------
-ObjFn_TODO ;; ObjFnSwitch
+;; Turn off all object function is touched
+ObjFnSwitch
 	3D52 FD 7E 0C       LD A,(IY+&0C)
 	3D55 F6 C0          OR &C0
 	3D57 3C             INC A
 	3D58 C8             RET Z
-	3D59 CD E0 0A       CALL 0AE0
-	3D5C 21 62 3D       LD HL,3D62
-	3D5F C3 69 3F       JP 3F69
+	3D59 CD E0 0A       CALL &0AE0
+	3D5C 21 62 3D       LD HL,ObjFn_SwitchOff
+	3D5F C3 69 3F       JP objfnsw_2
 
+ObjFn_SwitchOff
 	3D62 DD 36 0A 00    LD (IX+O_FUNC),0
 	3D66 C9             RET
 
@@ -11362,7 +11517,7 @@ ObjFnDissolve2:																;; dissolving cushion, pad, book and rollers
 TestAndFade
 	3DA4 C8             RET Z
 Fadeify
-	3DA5 CD 99 0A       CALL 0A99	;; noise?
+	3DA5 CD 99 0A       CALL &0A99	;; noise?
 	3DA8 FD 7E 0A       LD A,(IY+O_FUNC)
 	3DAB E6 80          AND &80
 	3DAD F6 12          OR &12 ;; OBJFN_FADE
@@ -11696,6 +11851,7 @@ UCoordMatch
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Mark as previously touched...
+objfnsw_2
 	3F69 22 7B 3F       LD (smc_objfnsw+1),HL
 	3F6C 21 7E 2D       LD HL,ObjList_Regular_Near2Far
 objfnsw_loop
@@ -11703,13 +11859,13 @@ objfnsw_loop
 	3F70 23             INC HL
 	3F71 66             LD H,(HL)
 	3F72 6F             LD L,A
-	3F73 B4             OR H
-	3F74 28 0A          JR Z,objfnsw_3
+	3F73 B4             OR H				;; get next object pointer
+	3F74 28 0A          JR Z,objfnsw_3		;; if NULL (end) then jump objfnsw_3
 	3F76 E5             PUSH HL
 	3F77 E5             PUSH HL
 	3F78 DD E1          POP IX
 smc_objfnsw
-	3F7A CD 00 00       CALL &0000 ;; PerObjSwitch
+	3F7A CD 00 00       CALL &0000			;; call SwitchOff
 	3F7D E1             POP HL
 	3F7E 18 EF          JR objfnsw_loop
 
@@ -11759,7 +11915,6 @@ MarkToDraw
 	3FC3 32 02 3D       LD (DrawFlags),A
 	3FC6 C9             RET
 
-
 ;; -----------------------------------------------------------------------------------------------------------
 ;; collision check?
 ;; input A = ??; IY = ??
@@ -11796,7 +11951,7 @@ br_501F
 	3FFD 3A 43 2B       LD A,(ObjDir)
 	4000 3C             INC A
 	4001 C8             RET Z
-	4002 C3 9D 0A       JP 0A9D ;; sound
+	4002 C3 9D 0A       JP &0A9D ;; sound SetSound ??
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; check something and return Carry or NotCarry.
@@ -12343,22 +12498,22 @@ BackgrdBuff
 
 SaveRestore_Block4
 ObjectsBuffer
-	5040		DEFS 	&3F0
+	5040				DEFS 	&3F0
 TODO_6E30
-	5430		DEFS 	&190 			;; ???
+	5430				DEFS 	&190 			;; ???
 
 KeyScanningBuffer
-	55C0		DEFS 	10				;; Buffer (key scanning)
-	55CA		DEFS 	&10E
+	55C0				DEFS 	10				;; Buffer (key scanning)
+	55CA				DEFS 	&10E
 
 ;; -----------------------------------------------------------------------------------------------------------CPC
 ;; Moved Data from 4C00-AC8F to 56D8-B767
 	org &4C00 ;; &4C00 at build but is moved to 56D8 duing the init stuff
 
 PanelFlips
-	56D8 DEFS 8, 0
+	56D8				DEFS 8, 0
 SpriteFlips_buffer
-	56E0 DEFS 16, 0
+	56E0				DEFS 16, 0
 
 ;; -----------------------------------------------------------------------------------------------------------
 img_wall_deco:
@@ -19146,31 +19301,35 @@ Char_symbol_data:
 ;; These are the pillars sprites that may go under some of the doors (type 4)
 .img_pillar_top: 				;; 4x9 *2  Pillar Top
 	;; (shown as "msk1+msk2 img1+img2 : result" so it is easier to see the result)
-	B6D0 DEFB &00, &00, &00, &03, &00, &00, &00, &0F
-	B6D8 DEFB &00, &00, &00, &10, &AE, &FF, &F2, &BF, &FF, &03, &00, &F3, &00, &0F, &00, &FC
-;; B6D8 DEFB &00, &00, &00, &3F, &00, &00, &00, &CF, &00, &03, &00, &F3, &00, &0F, &00, &FC
-	B6E8 DEFB &00, &3F, &00, &FF, &00, &FF, &00, &FC, &00, &FF, &00, &F3, &00, &FF, &00, &CF
-	B6F8 DEFB &00, &FF, &00, &3E, &00, &FC, &00, &F8, &00, &F4, &04, &E4, &00, &CF, &14, &84
-;; B6F8 DEFB &00, &FF, &00, &3E, &00, &FC, &00, &F8, &00, &F3, &04, &E4, &00, &CF, &14, &84
-	B708 DEFB &00, &3E, &1A, &02, &01, &78, &2A, &32, &05, &64, &0A, &02, &1D, &1C, &9A, &02
-	;;	................ ..............@@
-	;;	................ ............@@@@
-	;;	................ ...........@....
-	;;	@.@.@@@.@@@@..@. @@@@@@@@@.@@@@@@
-	;;	@@@@@@@@........ ......@@@@@@..@@
-	;;	................ ....@@@@@@@@@@..
-	;;	................ ..@@@@@@@@@@@@@@
-	;;	................ @@@@@@@@@@@@@@..
-	;;	................ @@@@@@@@@@@@..@@
-	;;	................ @@@@@@@@@@..@@@@
-	;;	................ @@@@@@@@..@@@@@.
-	;;	................ @@@@@@..@@@@@...
-	;;	.............@.. @@@@.@..@@@..@..
-	;;	...........@.@.. @@..@@@@@....@..
-	;;	...........@@.@. ..@@@@@.......@.
-	;;	.......@..@.@.@. .@@@@.....@@..@.
-	;;	.....@.@....@.@. .@@..@........@.
-	;;	...@@@.@@..@@.@. ...@@@........@.
+	B6D0 DEFB &00, &00, &00, &03, &00, &00, &00, &0F, &00, &00, &00, &10, &AE, &FF, &F2, &BF
+	B6E0 DEFB &FF, &03, &00, &F3, &00, &0F, &00, &FC, &00, &3F, &00, &FF, &00, &FF, &00, &FC
+	B6F0 DEFB &00, &FF, &00, &F3, &00, &FF, &00, &CF, &00, &FF, &00, &3E, &00, &FC, &00, &F8
+	B700 DEFB &00, &F4, &04, &E4, &00, &CF, &14, &84, &00, &3E, &1A, &02, &01, &78, &2A, &32
+	B710 DEFB &05, &64, &0A, &02, &1D, &1C, &9A, &02
+;; To have a blit without the glitch, use these values instead (Alt):
+;;  B6D0 DEFB &00, &00, &00, &03, &00, &00, &00, &0F, &00, &00, &00, &3F, &00, &00, &00, &CF
+;;  B6E0 DEFB &00, &03, &00, &F3, &00, &0F, &00, &FC, &00, &3F, &00, &FF, &00, &FF, &00, &FC
+;;  B6F0 DEFB &00, &FF, &00, &F3, &00, &FF, &00, &CF, &00, &FF, &00, &3E, &00, &FC, &00, &F8
+;;  B700 DEFB &00, &F3, &04, &E4, &00, &CF, &14, &84, &00, &3E, &1A, &02, &01, &78, &2A, &32
+;;	B710 DEFB &05, &64, &0A, &02, &1D, &1C, &9A, &02
+	;;	................ ..............@@		;		................ ..............@@
+	;;	................ ............@@@@		; Alt:	................ ............@@@@
+	;;	................ ...........@....		;		................ ..........@@@@@@
+	;;	@.@.@@@.@@@@..@. @@@@@@@@@.@@@@@@		;		................ ........@@..@@@@
+	;;	@@@@@@@@........ ......@@@@@@..@@		;		................ ......@@@@@@..@@
+	;;	................ ....@@@@@@@@@@..		;		................ ....@@@@@@@@@@..
+	;;	................ ..@@@@@@@@@@@@@@		;		................ ..@@@@@@@@@@@@@@
+	;;	................ @@@@@@@@@@@@@@..		;		................ @@@@@@@@@@@@@@..
+	;;	................ @@@@@@@@@@@@..@@		;		................ @@@@@@@@@@@@..@@
+	;;	................ @@@@@@@@@@..@@@@		;		................ @@@@@@@@@@..@@@@
+	;;	................ @@@@@@@@..@@@@@.		;		................ @@@@@@@@..@@@@@.
+	;;	................ @@@@@@..@@@@@...		;		................ @@@@@@..@@@@@...
+	;;	.............@.. @@@@.@..@@@..@..		;		.............@.. @@@@..@@@@@..@..
+	;;	...........@.@.. @@..@@@@@....@..		;		...........@.@.. @@..@@@@@....@..
+	;;	...........@@.@. ..@@@@@.......@.		;		...........@@.@. ..@@@@@.......@.
+	;;	.......@..@.@.@. .@@@@.....@@..@.		;		.......@..@.@.@. .@@@@.....@@..@.
+	;;	.....@.@....@.@. .@@..@........@.		;		.....@.@....@.@. .@@..@........@.
+	;;	...@@@.@@..@@.@. ...@@@........@.		;		...@@@.@@..@@.@. ...@@@........@.
 
 img_pillar_mid
 	B718 DEFB &3E, &BE, &F6, &06, &17, &97, &0C, &0C, &17, &97, &FC, &FC, &0D, &8D, &FA, &F8
@@ -19207,4 +19366,8 @@ end_moved_block
 PillarBuf
 	B768 DEFS 296
 
-	B890
+DoorwayBuf
+DoorwayImgBuf
+	B890 DEFS 168	;;
+DoorwayMaskBuf
+	B938 DEFS 168	;;
