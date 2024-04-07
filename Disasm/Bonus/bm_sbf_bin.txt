@@ -1348,7 +1348,7 @@ clr_screen:
 	06D1 D5             PUSH DE
 	06D2 F5             PUSH AF
 	06D3 3E F8          LD A,&F8
-	06D5 32 30 04       LD (;; smc_BlitYOffset_value+1),A
+	06D5 32 30 04       LD (smc_BlitYOffset_value+1),A
 	06D8 50             LD D,B
 	06D9 78             LD A,B
 	06DA 84             ADD A,H
@@ -2252,7 +2252,7 @@ pu_loopv
 
 	0C5C 07             RLCA				;; << 1
 	0C5D CB 01          RLC C				;; &09
-	0C5F 10 FB          DJNZ 0C5C
+	0C5F 10 FB          DJNZ &0C5C
 	0C61 21 FF 0A       LD HL,&0AFF
 	0C64 AE             XOR (HL)    		;; &37
 	0C65 A1             AND C				;; &01
@@ -3723,6 +3723,7 @@ tcbl_1
 ;; * FlipPillar : Height in B, pointer to data in HL.
 .FlipPanel:
 	12C8 06 38          LD B,SHORT_WALL
+FlipPillar
 	12CA D5             PUSH DE
 	12CB 16 4F          LD D,RevTable / WORD_HIGH_BYTE ;; 4F00
 	12CD E5             PUSH HL
@@ -4588,6 +4589,13 @@ BaseFlags
 	16BB 00             DEFB	&00, &00
 
 ;; -----------------------------------------------------------------------------------------------------------
+;; This is the length of an object instance (as in OOP/Class "object")
+;; Head, Heels, a FireObject and any other item (that we also call object,
+;; but in the sense "item") in the room (using the TmpObj) use the same
+;; data collection format, 18 bytes long.
+OBJECT_LENGTH			EQU		18					;; &0012
+
+;; -----------------------------------------------------------------------------------------------------------
 O_NEAR2FAR_LST			EQU		&00
 O_FAR2NEAR_LST			EQU		&02
 O_FLAGS					EQU 	&04
@@ -4635,7 +4643,7 @@ ExpandDone
 DoorSprites
 	16D4 00 00          DEFB &00, &00
 
-current_Room_ID
+currentRoomID
 	16D6 00             DEFW &0000
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -4725,7 +4733,7 @@ BuildRoom
 	1724 22 C6 14       LD (ViewXExtent),HL
 	1727 21 FF 00       LD HL,&00 * WORD_HIGH_BYTE + &FF
 	172A 22 C8 14       LD (ViewYExtent),HL
-	172D ED 43 D6 16    LD (16D6),BC
+	172D ED 43 D6 16    LD (currentRoomID),BC
 	1731 21 C0 C0       LD HL,GROUND_LEVEL * WORD_HIGH_BYTE + GROUND_LEVEL
 	1734 22 18 17       LD (DoorHeightsTmp),HL
 	1737 22 1A 17       LD (DoorHeightsTmp+2),HL
@@ -4767,7 +4775,7 @@ br_sk1
 	;; Draw the room in V direction (Nw side)
 	1785 3E 01          LD A,&01
 	1787 CD 8A 2D       CALL SetObjList
-	178A ED 4B D6 16    LD BC,(current_Room_ID)
+	178A ED 4B D6 16    LD BC,(currentRoomID)
 	178E 78             LD A,B
 	178F 3C             INC A
 	1790 A8             XOR B
@@ -4790,7 +4798,7 @@ test_if_wall_far_U
 	;; Draw the room in U direction (Ne side)
 	17AF 3E 02          LD A,&02
 	17B1 CD 8A 2D       CALL SetObjList
-	17B4 ED 4B D6 16    LD BC,(current_Room_ID)
+	17B4 ED 4B D6 16    LD BC,(currentRoomID)
 	17B8 78             LD A,B
 	17B9 C6 10          ADD A,&10
 	17BB A8             XOR B
@@ -5189,7 +5197,7 @@ fm_loop
 ;; Returns with Carry set if the room above has a floor.
 ;; Returns with Carry reset if the room above has No floor.
 .HasFloorAbove:
-	19F0 ED 4B D6 16    LD BC,(current_Room_ID)
+	19F0 ED 4B D6 16    LD BC,(currentRoomID)
 	19F4 79             LD A,C
 	19F5 3D             DEC A
 	19F6 E6 F0          AND &F0
@@ -5734,7 +5742,7 @@ Batman_variables:  					;; &12 = 18
 	1BEE 08				DEFB &08	;; Batman_variables+O_FLAGS
 	1BEF 28				DEFB &28	;; Batman_variables+O_U
 	1BF0 0B				DEFB &0B	;; Batman_variables+O_V
-	1BF1 GROUND_LEVEL	DEFB &C0	;; Batman_variables+O_Z
+	1BF1 C0				DEFB GROUND_LEVEL	;; Batman_variables+O_Z
 	1BF2 10				DEFB &10	;; Batman_variables+O_SPRITE
 	1BF3 01				DEFB &01	;; Batman_variables+O_SPRFLAGS
 	1BF4 00				DEFB &00	;; Batman_variables+O_FUNC
@@ -5773,13 +5781,13 @@ Object_variables
 ;; If the bit7 of the sprite code is set, the sprite is mirrored.
 .Anim_Loops:
 Front_Batman_Walk_Loop
-	1C0E 0, SPR_BATMAN_1, SPR_BATMAN_0, SPR_BATMAN_2, SPR_BATMAN_0, 0
+	1C0E             	DEFB 0, SPR_BATMAN_1, SPR_BATMAN_0, SPR_BATMAN_2, SPR_BATMAN_0, 0
 Back_Batman_Walk_Loop
-	1C14 0, SPR_BATMAN_B1, SPR_BATMAN_B1, SPR_BATMAN_B0, SPR_BATMAN_B0, 0
+	1C14             	DEFB 0, SPR_BATMAN_B1, SPR_BATMAN_B1, SPR_BATMAN_B0, SPR_BATMAN_B0, 0
 Vape_loop
-	1C1A 0, SPR_VAPE_2 or SPR_FLIP, SPR_VAPE_2, SPR_VAPE_2 or SPR_FLIP
-	1C1E SPR_VAPE_1 or SPR_FLIP, SPR_VAPE_1, SPR_VAPE_1 or SPR_FLIP, SPR_VAPE_0
-	1C22 SPR_VAPE_0, SPR_VAPE_0 or SPR_FLIP, SPR_VAPE_0 or SPR_FLIP, SPR_VAPE_0, SPR_VAPE_0, 0
+	1C1A             	DEFB 0, SPR_VAPE_2 or SPR_FLIP, SPR_VAPE_2, SPR_VAPE_2 or SPR_FLIP
+	1C1E             	DEFB SPR_VAPE_1 or SPR_FLIP, SPR_VAPE_1, SPR_VAPE_1 or SPR_FLIP, SPR_VAPE_0
+	1C22             	DEFB SPR_VAPE_0, SPR_VAPE_0 or SPR_FLIP, SPR_VAPE_0 or SPR_FLIP, SPR_VAPE_0, SPR_VAPE_0, 0
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; checks if need to play anims, check Death anim
@@ -5858,11 +5866,11 @@ lose_a_life
 CharThing20
 	1CAA AF             XOR A
 	1CAB 32 EE 1B       LD (Batman_variables+O_FLAGS),A
-	1CAE 32 00 1C       LD (Obj_variables+O_FLAGS),A
+	1CAE 32 00 1C       LD (Object_variables+O_FLAGS),A
 	1CB1 21 1A 1C       LD HL,Vape_loop
 	1CB4 FD 21 EA 1B    LD IY,Batman_variables
 	1CB8 CD 73 36       CALL Read_Loop_byte
-	1CBB 32 04 1C       LD (Obj_variables+O_SPRITE),A
+	1CBB 32 04 1C       LD (Object_variables+O_SPRITE),A
 	1CBE F5             PUSH AF
 	1CBF 21 FC 1B       LD HL,Object_variables
 	1CC2 CD D1 14       CALL StoreObjExtents
@@ -6681,8 +6689,8 @@ CSIT_6
 	2214 DD 21 EA 1B    LD IX,Batman_variables
 	2218 CD 10 23       CALL CheckWeOverlap
 	221B 30 0A          JR NC,CSIT_7
-	221D FD 36 0D 00    LD (IY+0D),0
-	2221 FD 36 0E 00    LD (IY+0E),0
+	221D FD 36 0D 00    LD (IY+O_OBJUNDER),0
+	2221 FD 36 0E 00    LD (IY+O_OBJUNDER+1),0
 	2225 18 27          JR CSIT_11
 CSIT_7
 	2227 2A E2 20       LD HL,(ObjContact)
@@ -7001,7 +7009,7 @@ Main_menu_data
 	23C9 04             DEFB 	4  									;; MENU_NB_ITEMS : Number of items
 	23CA 05             DEFB 	&05    								;; MENU_INIT_COL : Initial column
 	23CB 89             DEFB 	&09 or MENU_PRINTSINGLE_SIZE  		;; MENU_INIT_ROW : Initial row, single size the selected row
-	23CC 8C             DEFB 	Print_Play_Game						;; MENU_SEL_STRINGID : Selected item; default: String ID STR_PLAY_THE_GAME
+	23CC 8C             DEFB 	Print_PlayTheGame					;; MENU_SEL_STRINGID : Selected item; default: String ID STR_PLAY_THE_GAME
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; This handle the Sound Menu
@@ -7025,7 +7033,7 @@ smstp_1
 	23E8 03             DEFB	3 	   								;; MENU_NB_ITEMS : Number of items
 	23E9 07             DEFB	&07    								;; MENU_INIT_COL : Initial column
 	23EA 08             DEFB	&08 or MENU_PRINTDOUBLE_SIZE		;; MENU_INIT_ROW : Initial row, double size selected
-	23EB 91             DEFB	Print_Lots							;; MENU_SEL_STRINGID : Current Selected item; default String ID STR_LOTS
+	23EB 91             DEFB	Print_Nasty							;; MENU_SEL_STRINGID : Current Selected item; default String ID STR_LOTS
 
 ;; -----------------------------------------------------------------------------------------------------------
 Control_menu
@@ -7359,6 +7367,7 @@ br_3123
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; String attributes
+Delimiter						EQU		&FF
 Print_WipeScreen				EQU		&00
 Print_NewLine					EQU		&01
 Print_ClrEOL					EQU		&02
@@ -7389,6 +7398,7 @@ Print_Title 					EQU		&8B
 Print_PlayTheGame				EQU		&8C
 Print_CONTROL					EQU		&8F
 Print_SOUND						EQU		&90
+Print_Nasty						EQU		&91
 Print_BatKeys_Menu				EQU		&94
 Print_ShiftToFinish				EQU		&95
 Print_ChooseNewKey				EQU		&96
@@ -7411,8 +7421,10 @@ Print_HUD_Left					EQU		&C1
 Print_BatSound_Menu				EQU		&C2
 Print_SENSITIVITY				EQU		&C3
 Print_SensMenu					EQU		&C4
+Print_High						EQU		&C5
 Print_Sgl_Pos					EQU		&C7
 Print_PlayOldNew				EQU		&CB
+Print_Old_Game					EQU		&CC
 Print_Title_Instr				EQU		&CE
 Print_GO_assembled				EQU		&CF
 Print_GO_parts					EQU		&D0
@@ -7464,7 +7476,7 @@ String_Table_Main
 	26B7				DEFB 	Delimiter, "USEFUL"								;; ID &92
 	26BE				DEFB 	Delimiter, "LATE AT NIGHT"						;; ID &93
 	26CC				DEFB 	Delimiter, Print_ClrDbl_Pos, 13, 0				;; ID &94
-	26D0				DEFB		Print_Color_Attr_1, Print_BAT,
+	26D0				DEFB		Print_Color_Attr_1, Print_BAT
 	26D2				DEFB		Print_KEY, "S", Print_ShiftToFinish
 	26D5				DEFB 	Delimiter, Print_Instructions					;; ID &95
 	26D7				DEFB		Print_SetPos, 5, 3, Print_PRESS
@@ -7473,7 +7485,7 @@ String_Table_Main
 	26E0				DEFB 	Delimiter, Print_SetPos, 5, 3					;; ID &96
 	26E4				DEFB		Print_ClrEOL, Print_SetPos, 1, 21
 	26E8				DEFB		Print_ClrEOL, Print_SetPos, 1, 23
-	26EC				DEFB		Print_PRESS, Print_Color_Attr_3,
+	26EC				DEFB		Print_PRESS, Print_Color_Attr_3
 	26EE				DEFB		Print_KEY, "S", Print_Color_Attr_2
 	26F1				DEFB		" REQUIRED FOR ", Print_Color_Attr_3
 	2700				DEFB 	Delimiter, "LEFT"								;; ID &97
@@ -7536,7 +7548,7 @@ String_Table_Main
 	2807				DEFB		Print_Arrow_1, Print_Arrow_2
 	2809				DEFB		Print_Color_Attr_3, Print_SetPos, 5, 22
 	280D				DEFB		Print_Icon_Spring, " ", Print_Color_Attr_2
-	2810				DEFB		" ", Print_Icon_Shield, " ",
+	2810				DEFB		" ", Print_Icon_Shield, " "
 	2813				DEFB		Print_Color_Attr_1, " ", Print_Icon_Speed
 	2816				DEFB 	Delimiter, Print_ClrDbl_Pos, 12, 0 				;; ID &C2
 	281A				DEFB		Print_Color_Attr_2, Print_BAT, Print_SOUND
@@ -7549,7 +7561,7 @@ String_Table_Main
 	2838				DEFB 	Delimiter, "LOW", Print_SENSITIVITY				;; ID &C6
 	283D				DEFB 	Delimiter, Print_SingleSize 					;; ID &C7
 	283F				DEFB		Print_SetPos, 10, 23, Print_Color_Attr_2
-	2843				DEFB 	Delimiter, Print_DoubleSize,  					;; ID &C8
+	2843				DEFB 	Delimiter, Print_DoubleSize  					;; ID &C8
 	2845				DEFB		Print_SetPos, 0, 22, Print_Color_Attr_3
 	2849				DEFB 	Delimiter, Print_SingleSize  					;; ID &C9
 	284B				DEFB		Print_SetPos, 4, 23, Print_Color_Attr_1
@@ -8201,7 +8213,7 @@ FIRST_ANIM_code			EQU		ANIM_VAPE_code
 ;; -----------------------------------------------------------------------------------------------------------
 
 .AnimTable:
-	2BDD 07 2C			DEFW anim_vape			;; &81 ; bit7 set, code1 will become &08 + phase in O_ANIM
+	2BDD 07 2C			DEFW anim_sml_vape		;; &81 ; bit7 set, code1 will become &08 + phase in O_ANIM
 	2BDF 0C 2C          DEFW anim_f_wolf		;; &82
 	2BE1 11 2C          DEFW anim_b_wolf        ;; &83
 	2BE3 16 2C          DEFW anim_f_shark       ;; &84
@@ -8212,25 +8224,25 @@ FIRST_ANIM_code			EQU		ANIM_VAPE_code
 	2BED 2C 2C          DEFW anim_b_joker       ;; &89
 	2BEF 33 2C          DEFW anim_f_demon       ;; &8A
 	2BF1 35 2C          DEFW anim_b_demon       ;; &8B
-	2BF3 37 2C          DEFW anim_salt          ;; &8C
-	2BF5 37 2C          DEFW anim_salt          ;; &8D
+	2BF3 37 2C          DEFW anim_x_salt        ;; &8C
+	2BF5 37 2C          DEFW anim_x_salt        ;; &8D
 	2BF7 3A 2C          DEFW anim_f_riddler     ;; &8E
 	2BF9 3C 2C          DEFW anim_b_riddler     ;; &8F
-	2BFB 3E 2C          DEFW anim_worm          ;; &90
-	2BFD 3E 2C          DEFW anim_worm          ;; &91
+	2BFB 3E 2C          DEFW anim_x_worm        ;; &90
+	2BFD 3E 2C          DEFW anim_x_worm        ;; &91
 	2BFF 43 2C          DEFW anim_big_vape      ;; &92
 	2C01 43 2C          DEFW anim_big_vape      ;; &93
-	2C03 4C 2C          DEFW anim_beacon        ;; &94
-	2C05 4C 2C          DEFW anim_beacon        ;; &95 ; bit7 set, code1 will become &A0 + phase in O_ANIM
+	2C03 4C 2C          DEFW anim_x_beacon      ;; &94
+	2C05 4C 2C          DEFW anim_x_beacon      ;; &95 ; bit7 set, code1 will become &A0 + phase in O_ANIM
 
 ;; -----------------------------------------------------------------------------------------------------------
 .AnimTable_data:
-anim_vape:
+anim_sml_vape:
 	2C07 				DEFB SPR_VAPE_2 or SPR_FLIP, SPR_VAPE_2, SPR_VAPE_1, SPR_VAPE_0, 0
 anim_f_wolf:
 	2C0C 				DEFB SPR_WOLF_0, SPR_WOLF_1, SPR_WOLF_0, SPR_WOLF_2, 0
 anim_b_wolf:
-	2C11 				DEFB SPR_WOLF_B0, SPR_WOLF_B1, 1B SPR_WOLF_B2, 0
+	2C11 				DEFB SPR_WOLF_B0, SPR_WOLF_B1, SPR_WOLF_B0, SPR_WOLF_B2, 0
 anim_f_shark:
 	2C16 				DEFB SPR_SHARK_0, SPR_SHARK_0, SPR_SHARK_1, SPR_SHARK_1, 0
 anim_b_shark:
@@ -8247,17 +8259,17 @@ anim_f_demon:
 	2C33 				DEFB SPR_DEMON, 0
 anim_b_demon:
 	2C35 				DEFB SPR_DEMONB, 0
-anim_salt:
+anim_x_salt:
 	2C37 				DEFB SPR_SALT, SPR_SALT or SPR_FLIP, 0
 anim_f_riddler:
 	2C3A 				DEFB SPR_RIDDLER, 0
 anim_b_riddler:
 	2C3C 				DEFB SPR_RIDDLERB, 0
-anim_worm:
+anim_x_worm:
 	2C3E 				DEFB SPR_WORM_0, SPR_WORM_0, SPR_WORM_1, SPR_WORM_1, 0
 anim_big_vape:
 	2C43 				DEFB SPR_VAPE_0, SPR_VAPE_0 or SPR_FLIP, SPR_VAPE_1 or SPR_FLIP, SPR_VAPE_1, SPR_VAPE_2, SPR_VAPE_2 or SPR_FLIP, SPR_VAPE_1 or SPR_FLIP, SPR_VAPE_1, 0
-anim_beacon:
+anim_x_beacon:
 	2C4C 				DEFB SPR_BEACON, SPR_BEACON or SPR_FLIP, 0
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -9053,6 +9065,7 @@ Walls_DoorZ
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Configure the walls.
 ;; Height of highest door in A.
+DoConfigWalls
 .ConfigWalls:
 	302C 32 12 30       LD (Walls_DoorZ),A
 	302F CD 4E 30       CALL VWall
@@ -9135,7 +9148,7 @@ Panel_WorldData_m1		EQU		Panel_WorldData - 1							;; = &3173; minus 1 so that t
 	30A7 66             LD H,(HL)
 	30A8 6F             LD L,A
 	30A9 22 0B 30       LD (Walls_PanelBase),HL
-	30AC 3E FF          LD A,FF
+	30AC 3E FF          LD A,&FF
 	30AE 08             EX AF,AF'
 	30AF 79             LD A,C
 	30B0 F5             PUSH AF
@@ -9271,13 +9284,13 @@ br_3D71
 ;; to pick the wall panel we want for each part of the wall.
 .PanelsBaseAddr:															;; panel images base addr
 	3163 F0 56         DEFW		img_wall_0 + MOVE_OFFSET ;; 56F0
-	3165 70 5A         DEFW		img_wall_3 + MOVE_OFFSET ;; 5A70
-	3167 F0 5D         DEFW		img_wall_7 + MOVE_OFFSET ;; 5DF0
-	3169 90 60         DEFW		img_wall_10 + MOVE_OFFSET ;; 6090
-	316B 30 63         DEFW		img_wall_13 + MOVE_OFFSET ;; 6330
-	316D D0 65         DEFW		img_wall_16 + MOVE_OFFSET ;; 65D0
-	316F 70 68         DEFW		img_wall_19 + MOVE_OFFSET ;; 6870
-	3171 30 6A         DEFW		img_wall_21 + MOVE_OFFSET ;; 6A30
+	3165 70 5A         DEFW		img_wall_4 + MOVE_OFFSET ;; 5A70
+	3167 F0 5D         DEFW		img_wall_8 + MOVE_OFFSET ;; 5DF0
+	3169 90 60         DEFW		img_wall_11 + MOVE_OFFSET ;; 6090
+	316B 30 63         DEFW		img_wall_14 + MOVE_OFFSET ;; 6330
+	316D D0 65         DEFW		img_wall_17 + MOVE_OFFSET ;; 65D0
+	316F 70 68         DEFW		img_wall_20 + MOVE_OFFSET ;; 6870
+	3171 30 6A         DEFW		img_wall_22 + MOVE_OFFSET ;; 6A30
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Used when Wall building.
@@ -9469,8 +9482,8 @@ Change_Special_Effect:
 	;; flow in Mutate_items
 ;; -----------------------------------------------------------------------------------------------------------
 ;; This will swap (or not) 2 specific items depending on a random value
-Mutable_Item1_fn		EQU		SpecialList + (16*7) + 6	;; id 16 in SpecialList, 7 bytes per entry, byte #6 (ie. last one = function)
-Mutable_Item2_fn		EQU		SpecialList + (23*7) + 6	;; id 23 in SpecialList, 7 bytes per entry, byte #6 (ie. last one = function)
+Mutable_Item1_fn		EQU		16*7 + SpecialList + 6	;; 3277 : id 16 in SpecialList, 7 bytes per entry, byte #6 (ie. last one = function)
+Mutable_Item2_fn		EQU		23*7 + SpecialList + 6	;; 32A8 : id 23 in SpecialList, 7 bytes per entry, byte #6 (ie. last one = function)
 
 Mutate_items:
 	336E 32 77 32       LD (Mutable_Item1_fn),A		;; Will keep 6 (Spring Bonus) or change to 9 (Malus) depending on random value
@@ -10331,6 +10344,7 @@ MoveCurrent
 	381E D9             EXX
 	381F F1             POP AF
 	3820 32 19 38       LD (NR_Direction),A
+DoMove
 	3823 CD 2A 38       CALL DoMoveAux
 	3826 3A 19 38       LD A,(NR_Direction)
 	3829 C9             RET
@@ -10834,6 +10848,7 @@ D_Exit
 	3A99 BB             CP E
 	3A9A C0             RET NZ
 	3A9B 3E 01          LD A,1
+LeaveRoom
 	3A9D 32 17 38       LD (access_new_room_code),A
 	3AA0 37             SCF
 	3AA1 C9             RET
@@ -11232,6 +11247,8 @@ Control_Codes
 ;; This is the string attribute 02: clear the line from current cursor
 ;; position to the end of line (erase any old character that could
 ;; remain when text has changed)
+SPACE_CHAR				EQU		&20
+
 Control_Code_space_erase_end:
 	3C63 3A 12 3C       LD A,(Char_cursor_pixel_position)
 	3C66 FE C0          CP &C0
@@ -11262,7 +11279,7 @@ ccnewln_single
 .Control_Codes_more:											;; Handles Codes 5, 6 and 7
 	3C85 21 91 3C       LD HL,Control_Code_attribute_5_setmode  ;; Control_Code_attribute_5_setmode
 	3C88 28 03          JR Z,Update_attribute_jump_address
-	3C8A 21 99 3C       LD HL,Control_Code_attribute_6_getcolv
+	3C8A 21 99 3C       LD HL,Control_Code_attribute_6_getcol
 Update_attribute_jump_address
 	3C8D 22 16 3C       LD (smc_print_string_routine+1),HL
 	3C90 C9             RET
@@ -12349,7 +12366,8 @@ Room_list: ;; 151 rooms
 	436F DEFB &10, &33, &3C, &92, &40, &83, &85, &FF, &21, &91, &F0, &BD, &1E, &8E, &FE, &3F, &C0
 	4380 DEFB &15, &34, &39, &52, &23, &0D, &90, &07, &2A, &8E, &F1, &CC, &C4, &66, &B5, &9B, &EE, &77, &BB, &FF, &F1, &FE
 	4396 DEFB &18, &35, &39, &52, &E0, &8D, &90, &07, &2A, &CE, &E7, &AC, &F1, &F9, &F8, &1C, &CE, &76, &3B, &3D, &BE, &D7, &FC, &7F, &80
-	43AF DEFB &3B, &36, &31, &12, &E1, &01, &8F, &07, &C7, &8F, &92, &40, &C1, &DC, &00, &1F, &40, &78, &1E, &0B, &F1, &FF, &04, &98, &A2, &18, &10, &7E, &04, &F4, &F0, &78, &7C, &5E, &3F, &3F, &02, &B8, &38, &2C, &1A, &09, &3F, &03, &78, &A4, &54, &29, &86, &49, &A5, &72, &B1, &54, &22, &8E, &67, &FE, &3F, &C0
+	43AF DEFB &3B, &36, &31, &12, &E1, &01, &8F, &07, &C7, &8F, &92, &40, &C1, &DC, &00, &1F, &40, &78, &1E, &0B, &F1, &FF, &04, &98, &A2, &18, &10, &7E, &04, &F4, &F0, &78, &7C, &5E, &3F, &3F, &02
+	43D4 DEFB	   &B8, &38, &2C, &1A, &09, &3F, &03, &78, &A4, &54, &29, &86, &49, &A5, &72, &B1, &54, &22, &8E, &67, &FE, &3F, &C0
 	43EB DEFB &0C, &37, &32, &12, &D9, &02, &05, &A4, &F6, &75, &3F, &E3, &FC
 	43F8 DEFB &06, &38, &3C, &FC, &41, &0B, &FE
 	43FF DEFB &06, &39, &3F, &7C, &09, &2B, &FE
@@ -12502,6 +12520,7 @@ ObjectsBuffer
 TODO_6E30
 	5430				DEFS 	&190 			;; ???
 
+BlitRot_Buffer
 KeyScanningBuffer
 	55C0				DEFS 	10				;; Buffer (key scanning)
 	55CA				DEFS 	&10E
@@ -12737,7 +12756,7 @@ img_wall_2:
 	;;	@@.............. ................
 	;;	................ ................
 
-img_wall_2:
+img_wall_3:
 	5990 DEFB &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &01, &00, &00, &00, &01
 	59A0 DEFB &00, &00, &00, &03, &00, &07, &00, &E2, &00, &1C, &00, &16, &03, &30, &E0, &0E
 	59B0 DEFB &0F, &60, &F0, &06, &1C, &C0, &38, &02, &3B, &80, &9C, &00, &71, &00, &0E, &00
@@ -12809,7 +12828,7 @@ img_wall_2:
 	;;	@@.............. ................
 	;;	................ ................
 
-img_wall_3:
+img_wall_4:
 	5A70 DEFB &00, &00, &01, &00, &00, &00, &1D, &00, &00, &00, &7E, &00, &01, &00, &E2, &00
 	5A80 DEFB &07, &00, &8C, &0C, &1E, &00, &66, &06, &79, &00, &9C, &1C, &E6, &00, &72, &70
 	5A90 DEFB &99, &01, &C4, &C0, &67, &07, &12, &00, &9C, &1C, &4C, &00, &B1, &30, &32, &00
@@ -12881,7 +12900,7 @@ img_wall_3:
 	;;	@@@............. ................
 	;;	................ ................
 
-img_wall_4:
+img_wall_5:
 	5B50 DEFB &00, &00, &01, &00, &00, &00, &1D, &00, &00, &00, &7E, &00, &01, &00, &E2, &00
 	5B60 DEFB &07, &00, &8C, &0C, &1E, &00, &66, &06, &79, &00, &9C, &1C, &E6, &00, &7A, &78
 	5B70 DEFB &99, &01, &E4, &E0, &67, &67, &92, &80, &7E, &7E, &4C, &00, &39, &38, &32, &00
@@ -12953,7 +12972,7 @@ img_wall_4:
 	;;	@@@............. ................
 	;;	................ ................
 
-img_wall_5:
+img_wall_6:
 	5C30 DEFB &00, &00, &01, &00, &00, &00, &1D, &00, &00, &00, &7E, &00, &01, &00, &E2, &00
 	5C40 DEFB &07, &00, &9C, &00, &1E, &00, &60, &03, &79, &00, &80, &0D, &E6, &00, &00, &75
 	5C50 DEFB &99, &01, &80, &95, &67, &67, &C0, &D5, &7E, &7E, &C0, &D5, &38, &38, &C0, &D4
@@ -13025,7 +13044,7 @@ img_wall_5:
 	;;	@@@............. ................
 	;;	................ ................
 
-img_wall_6:
+img_wall_7:
 	5D10 DEFB &00, &00, &01, &00, &00, &00, &1D, &00, &00, &00, &7E, &00, &01, &00, &E2, &00
 	5D20 DEFB &07, &00, &9C, &00, &1E, &00, &62, &00, &79, &00, &9C, &00, &E6, &00, &62, &60
 	5D30 DEFB &99, &01, &F4, &F0, &67, &67, &B2, &B0, &7E, &7E, &34, &30, &38, &38, &B2, &30
@@ -13097,7 +13116,7 @@ img_wall_6:
 	;;	@@@............. ................
 	;;	................ ................
 
-img_wall_7:
+img_wall_8:
 	5DF0 DEFB &00, &00, &00, &00, &00, &00, &00, &05, &00, &00, &00, &16, &00, &00, &01, &58
 	5E00 DEFB &00, &01, &00, &60, &00, &05, &1C, &80, &00, &16, &7A, &00, &01, &58, &7E, &00
 	5E10 DEFB &04, &60, &BE, &00, &1C, &80, &DE, &00, &7A, &00, &FE, &00, &7E, &00, &FE, &00
@@ -13169,7 +13188,7 @@ img_wall_7:
 	;;	.@@............. ................
 	;;	................ ................
 
-img_wall_8:
+img_wall_9:
 	5ED0 DEFB &00, &00, &00, &00, &00, &00, &00, &05, &00, &00, &00, &16, &00, &00, &01, &58
 	5EE0 DEFB &00, &01, &00, &60, &00, &05, &1C, &80, &00, &16, &7A, &00, &01, &58, &7E, &00
 	5EF0 DEFB &04, &60, &BE, &00, &1C, &80, &DE, &00, &7A, &00, &FE, &00, &7E, &00, &FE, &00
@@ -13241,7 +13260,7 @@ img_wall_8:
 	;;	.@@............. @...............
 	;;	@............... ................
 
-img_wall_9:
+img_wall_10:
 	5FB0 DEFB &00, &00, &00, &00, &00, &00, &00, &05, &00, &00, &00, &16, &00, &00, &01, &58
 	5FC0 DEFB &00, &01, &00, &60, &00, &05, &1C, &80, &00, &16, &7A, &00, &01, &58, &7E, &00
 	5FD0 DEFB &04, &60, &BE, &00, &1C, &80, &DE, &00, &7A, &00, &FE, &00, &7E, &00, &FE, &00
@@ -13313,7 +13332,7 @@ img_wall_9:
 	;;	.@@............. ................
 	;;	@............... ................
 
-img_wall_10:
+img_wall_11:
 	6090 DEFB &00, &00, &00, &00, &00, &00, &00, &01, &00, &00, &01, &07, &00, &00, &06, &1E
 	60A0 DEFB &00, &00, &19, &78, &00, &01, &67, &E0, &01, &07, &9F, &80, &06, &1E, &33, &00
 	60B0 DEFB &19, &78, &AB, &00, &67, &E0, &AB, &00, &9F, &80, &AB, &00, &33, &00, &BB, &00
@@ -13385,7 +13404,7 @@ img_wall_10:
 	;;	..@@............ ................
 	;;	@@.............. ................
 
-img_wall_11:
+img_wall_12:
 	6170 DEFB &00, &00, &00, &00, &00, &00, &00, &01, &00, &00, &01, &07, &00, &00, &06, &1E
 	6180 DEFB &00, &00, &19, &78, &00, &01, &67, &E0, &01, &07, &9F, &80, &06, &1E, &33, &00
 	6190 DEFB &19, &78, &AB, &00, &67, &E0, &AB, &00, &9F, &80, &AB, &00, &33, &00, &BB, &00
@@ -13457,7 +13476,7 @@ img_wall_11:
 	;;	..@@............ ................
 	;;	@@.............. ................
 
-img_wall_12:
+img_wall_13:
 	6250 DEFB &00, &00, &00, &00, &00, &00, &00, &01, &00, &00, &01, &07, &00, &00, &06, &1E
 	6260 DEFB &00, &00, &19, &78, &00, &01, &67, &E0, &01, &07, &9F, &80, &06, &1E, &33, &00
 	6270 DEFB &19, &78, &AB, &00, &67, &E0, &AB, &00, &9F, &80, &AB, &00, &33, &00, &BB, &00
@@ -13529,7 +13548,7 @@ img_wall_12:
 	;;	..@@............ ................
 	;;	@@.............. ................
 
-img_wall_13:
+img_wall_14:
 	6330 DEFB &00, &00, &00, &00, &00, &00, &00, &00, &00, &01, &00, &C0, &00, &02, &00, &40
 	6340 DEFB &00, &02, &00, &20, &00, &01, &00, &20, &00, &01, &0C, &10, &08, &02, &02, &10
 	6350 DEFB &34, &01, &11, &20, &42, &00, &01, &90, &42, &00, &81, &50, &84, &00, &41, &20
@@ -13601,7 +13620,7 @@ img_wall_13:
 	;;	.@@@............ ................
 	;;	@............... ................
 
-img_wall_14:
+img_wall_15:
 	6410 DEFB &00, &00, &00, &00, &00, &00, &00, &00, &00, &01, &00, &C0, &00, &02, &00, &40
 	6420 DEFB &00, &02, &00, &20, &00, &01, &00, &20, &00, &01, &0C, &10, &08, &02, &02, &10
 	6430 DEFB &34, &01, &11, &20, &42, &00, &01, &90, &42, &00, &81, &50, &84, &00, &41, &20
@@ -13673,7 +13692,7 @@ img_wall_14:
 	;;	.@@@............ ................
 	;;	@............... ................
 
-img_wall_15:
+img_wall_16:
 	64F0 DEFB &00, &00, &00, &00, &00, &00, &00, &00, &00, &01, &00, &C0, &00, &02, &00, &40
 	6500 DEFB &00, &02, &00, &20, &00, &01, &00, &20, &00, &01, &0C, &10, &08, &02, &02, &10
 	6510 DEFB &34, &01, &11, &20, &42, &00, &01, &90, &42, &00, &81, &50, &84, &00, &41, &20
@@ -13745,7 +13764,7 @@ img_wall_15:
 	;;	.@@@............ ................
 	;;	@............... ................
 
-img_wall_16:
+img_wall_17:
 	65D0 DEFB &00, &00, &00, &00, &00, &00, &01, &00, &00, &00, &03, &00, &00, &00, &1A, &00
 	65E0 DEFB &00, &00, &56, &00, &01, &00, &56, &00, &05, &00, &6D, &00, &17, &00, &6A, &00
 	65F0 DEFB &52, &00, &6B, &00, &6C, &00, &DB, &00, &2B, &00, &12, &00, &5B, &00, &B5, &00
@@ -13817,7 +13836,7 @@ img_wall_16:
 	;;	.@@............. ................
 	;;	@............... ................
 
-img_wall_17:
+img_wall_18:
 	66B0 DEFB &00, &00, &00, &00, &00, &00, &01, &00, &00, &00, &03, &00, &00, &00, &1A, &00
 	66C0 DEFB &00, &00, &56, &00, &01, &00, &56, &00, &05, &00, &6D, &00, &17, &00, &6A, &00
 	66D0 DEFB &52, &00, &6B, &00, &6C, &00, &DB, &00, &2B, &00, &12, &00, &5B, &00, &B5, &00
@@ -13889,7 +13908,7 @@ img_wall_17:
 	;;	.@@............. ................
 	;;	@............... ................
 
-img_wall_18:
+img_wall_19:
 	6790 DEFB &00, &00, &00, &00, &00, &00, &81, &80, &03, &03, &CB, &C0, &05, &05, &AB, &A0
 	67A0 DEFB &04, &04, &6A, &60, &05, &05, &E5, &E0, &05, &05, &E5, &E0, &05, &05, &EB, &E0
 	67B0 DEFB &45, &05, &E6, &E0, &45, &05, &EA, &E0, &85, &05, &EA, &E0, &A5, &05, &E4, &E0
@@ -13961,7 +13980,7 @@ img_wall_18:
 	;;	@............... ................
 	;;	................ ................
 
-img_wall_19:
+img_wall_20:
 	6870 DEFB &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &01, &00, &00, &00, &1D, &00
 	6880 DEFB &00, &00, &73, &00, &01, &00, &CD, &0C, &07, &00, &3E, &3E, &1C, &00, &F2, &F2
 	6890 DEFB &33, &03, &C2, &CA, &6F, &0F, &00, &3C, &DC, &1C, &00, &FE, &DC, &1D, &00, &FE
@@ -14033,7 +14052,7 @@ img_wall_19:
 	;;	.@@............. ................
 	;;	@............... ................
 
-img_wall_20:
+img_wall_21:
 	6950 DEFB &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &00, &39, &00
 	6960 DEFB &00, &00, &E7, &00, &03, &00, &85, &10, &0E, &00, &20, &68, &39, &01, &20, &6C
 	6970 DEFB &60, &03, &90, &B4, &DC, &1D, &90, &B4, &82, &1E, &50, &D6, &61, &07, &48, &5A
@@ -14105,7 +14124,7 @@ img_wall_20:
 	;;	.@@............. ................
 	;;	@............... ................
 
-img_wall_21:
+img_wall_22:
 	6A30 DEFB &00, &00, &00, &00, &00, &10, &00, &00, &00, &18, &00, &00, &00, &3A, &00, &00
 	6A40 DEFB &00, &1B, &00, &00, &00, &5F, &00, &00, &00, &F4, &18, &00, &00, &F4, &34, &00
 	6A50 DEFB &00, &A8, &34, &00, &00, &18, &38, &00, &04, &18, &14, &04, &38, &00, &38, &38
@@ -14177,7 +14196,7 @@ img_wall_21:
 	;;	................ ................
 	;;	................ ................
 
-img_wall_22:
+img_wall_23:
 	6B10 DEFB &00, &00, &00, &00, &00, &00, &00, &00, &00, &10, &00, &00, &00, &18, &00, &00
 	6B20 DEFB &00, &3A, &00, &00, &00, &1B, &00, &00, &00, &5F, &00, &00, &00, &F4, &00, &18
 	6B30 DEFB &00, &F4, &00, &34, &00, &A8, &00, &34, &00, &18, &00, &38, &04, &1C, &04, &14
