@@ -4,7 +4,8 @@
 ;; Author : Fred Limouzin (fphenix@hotmail.com)
 ;; Tool used: mostly WinApe and Notepad++!
 ;; -----------------------------------------------------------------------------------------------------------
-;; THis is a Bonus work of the Head Over Heels dissassembly.  WORK UNDER PROGRESS
+;; THis is a Bonus work of the Head Over Heels dissassembly.
+;; Compilable (need to run the txt2asm script). WORK UNDER PROGRESS
 ;; Note that Batman was the base game "HoH" was developped from, hence many functions are identical.
 ;; -----------------------------------------------------------------------------------------------------------
 
@@ -324,6 +325,7 @@ Sub_Do_Objects_entry
 ;; -----------------------------------------------------------------------------------------------------------
 ;; RST init
 JUMP_OPCODE				EQU		&C3						;; "JP addr", used to generate RST7 (int handler) and 0 (reset to Entry)
+LDIX_OPCODE				EQU		&DD						;; to transform a "LD HL,.." into a "LD IX,..." in order to cancel it
 LDAvv_OPCODE			EQU		&3E 					;; "LD A,vv", used in BlitRot<*> functions
 RST0_ADDR				EQU		&0000
 RST7_ADDR				EQU		&0038
@@ -1759,7 +1761,7 @@ silence_sound
 	0926 14             DEFB 20		;; ref note
 	0927 08             DEFB 8
 	0928 00             DEFB 0		;; envp num
-
+sound_run
 	0929 00             DEFB 0
 	092A 				DEFB &81, &B9, &A1, &E1, &FF, &00
 
@@ -1767,7 +1769,7 @@ silence_sound
 	0930 14             DEFB 20		;; ref note
 	0931 08             DEFB 8
 	0932 00             DEFB 0		;; envp num
-
+sound_speed_run
 	0933 00             DEFB 0
 	0934 				DEFB &80, &B8, &A0, &E0, &FF, &00
 
@@ -1965,27 +1967,27 @@ PlayVoice
 ;; -----------------------------------------------------------------------------------------------------------
 ;; *****
 	0AAD 21 23 09       LD HL,silence_sound
-	0AB0 CD D0 0A       CALL &0AD0		;; Snd_Play_voice0
+	0AB0 CD D0 0A       CALL Snd_Play_voice0
 	0AB3 21 23 09       LD HL,silence_sound
-	0AB6 18 2E          JR &0AE6		;; Snd_Play_voice2
+	0AB6 18 2E          JR Snd_Play_voice2
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; *****
-	0AB8 21 29 09       LD HL,0929
-	0ABB 3A D0 1B       LD A,(CNT_SPEED)
+Sound_ID_Run
+	0AB8 21 29 09       LD HL,sound_run
+	0ABB 3A D0 1B       LD A,(Counter_speed)
 	0ABE A7             AND A
 	0ABF 28 0B          JR Z,&0ACC
-	0AC1 21 33 			LD HL, &0933
+	0AC1 21 33 09		LD HL,sound_speed_run
+	0AC4 DD				DEFB LDIX_OPCODE			;; LD IX,&0949
 ;; *****
-	0AC5 09      		ADD HL,BC		;; this instruction is cancelled if comming from 0AB8
-	0AC4 DD 21 49 09    LD IX,&0949
-	0AC8 DD 			LD IX,&093D
-;; ******
-	0AC9 21 3D 09    	LD HL,&093D		;; this instruction is cancelled if comming from 0AC5
-;; ******
+	0AC5 21 49 09    	LD HL, &0949				;; this instruction is cancelled if comming from 0AC4
+	0AC8 DD 			DEFB LDIX_OPCODE			;; LD IX,&093D
+;; *****
+	0AC9 21 3D 09    	LD HL,&093D					;; this instruction is cancelled if comming from 0AC5
+
 	0ACC CD AD 0C       CALL Check_volume_amount
 	0ACF C8             RET Z
-;; ******
 Snd_Play_voice0
 	0AD0 AF             XOR A
 Snd_Play_curr_voice:
@@ -1994,19 +1996,16 @@ Snd_Play_curr_voice:
 ;; -----------------------------------------------------------------------------------------------------------
 ;; *****
 	0AD4 21 6F 09       LD HL,&096F
-	0AD7 DD 			LD IX,&0976
+	0AD7 DD 			DEFB LDIX_OPCODE			;; LD IX,&0976
 ;; *****
-	0AD8 21 76 09    	LD HL,&0976		;; this instruction is cancelled if comming from 0AD4
-	0ADB DD 21 			LD IX,&0961
-;; *****
+	0AD8 21 76 09    	LD HL,&0976					;; this instruction is cancelled if comming from 0AD4
+	0ADB DD 			DEFB LDIX_OPCODE			;; LD IX,&0961
 Sound_ID_Menu_Blip
-	0ADC 61 			LD H,C			;; this instruction is cancelled if comming from 0AD8
-	0ADD 09   			ADD HL,BC		;; this instruction is cancelled if comming from 0AD8
-	0ADF DD 21 68		LD IX,&0968
+	0ADC 21 61 09		LD HL,&0961					;; this instruction is cancelled if comming from 0AD8
+	0ADF DD				DEFB LDIX_OPCODE			;; LD IX,&0968
 ;; *****
-	0AE0 09    			ADD HL,BC		;; this instruction is cancelled if comming from 0ADC
+	0AE0 21 68 09		LD HL,&0968					;; this instruction is cancelled if comming from 0ADC
 	0AE3 CD AD 0C       CALL Check_volume_amount
-;; ******
 Snd_Play_voice2
 	0AE6 3E 02          LD A,2
 	0AE8 18 E7          JR Snd_Play_curr_voice
@@ -2029,7 +2028,7 @@ SONG_PTR				EQU		5
 
 ;; -----------------------------------------------------------------------------------------------------------
 Voice_0_data
-	0AEA 00        		DEFB 0			;; +0
+	0AEA 00        		DEFB 0			;; +0	; voice nb
 	0AEB 00             DEFB 0			;; +1	; duration offset
 	0AEC 00             DEFB 0			;; +2	;
 	0AED 00             DEFB 0			;; +3 	; envp ???
@@ -2037,7 +2036,7 @@ Voice_0_data
 	0AEF 23 09          DEFW silence_sound      ;; +5&6 SONG_PTR
 
 Voice_1_data
-	0AF1 01             DEFB 0			;; +0
+	0AF1 01             DEFB 1			;; +0
 	0AF2 00             DEFB 0			;; +1
 	0AF3 00       		DEFB 0			;; +2
 	0AF4 00             DEFB 0			;; +3
@@ -2045,7 +2044,7 @@ Voice_1_data
 	0AF6 23 09          DEFW silence_sound     ;; +5&6 SONG_PTR
 
 Voice_2_data
-	0AF8 02				DEFB 0			;; +0
+	0AF8 02				DEFB 2			;; +0
 	0AF9 00            	DEFB 0			;; +1
 	0AFA 00            	DEFB 0			;; +2
 	0AFB 00            	DEFB 0			;; +3
@@ -3154,6 +3153,7 @@ DBC_Clear
 	102C 87             ADD A,A
 	102D 87             ADD A,A
 	102E C6 04          ADD A,4
+smc_CornerPos:
 	1030 FE 00          CP 0
 	1032 38 0C          JR c,DBC_Left
 	1034 1E 00          LD E,0
@@ -4692,9 +4692,9 @@ MaxV
 
 ;; AltLimits[12] are also used as IY for drawing extra rooms.
 AltLimits1:
-	16EC 20 20 20 50         DEFS 	4, 0
+	16EC 20 20 20 50         DEFB	&20, &20, &20, &50
 AltLimits2:
-	16F0 52 4E 00 00         DEFS 	4, 0
+	16F0 52 4E 00 00         DEFB	&52, &4E, &00, &00
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Room Dimensions Array: Min U, Min V, Max U, Max V
@@ -5525,7 +5525,7 @@ br_240F
 	1B50 94             SUB H
 	;; And use this to set the X coordinate of the corner.
 	1B51 C6 80          ADD A,&80
-	1B53 32 31 10       LD (1031),A			;; smc_CornerPos+1
+	1B53 32 31 10       LD (smc_CornerPos+1),A
 	1B56 4F             LD C,A
 	;; Then set the Y coordinate of the corner, taking into
     ;; account various fudge factors.
@@ -5556,7 +5556,7 @@ br_240F
 	1B75 D8             RET c
 ;; Scan from the right for the first drawn column
 NukeColR
-	1B76 21 3E 50       LD HL,BackgrdBuff + 31*2  ;; 503E
+	1B76 21 3E 50       LD HL,BackgrdBuff + 62  ;; &503E = &5000 + 31*2
 ScanR
 	1B79 7E             LD A,(HL)
 	1B7A A7             AND A
@@ -5638,16 +5638,16 @@ Erase_block_val_in_E:
 
 ;; -----------------------------------------------------------------------------------------------------------
 sounds_pointer_array
-	1BB5 AD 0A          DEFW &0AAD		;; 0 0AAD
-	1BB7 B8 0A          DEFW &0AB8		;; 1 0AB8
-	1BB9 E0 0A          DEFW &0AE0		;; 2 0AE0
-	1BBB C5 0A          DEFW &0AC5		;; 3 0AC5
-	1BBD C9 0A          DEFW &0AC9		;; 4 0AC9
+	1BB5 AD 0A          DEFW &0AAD					;; 0 0AAD
+	1BB7 B8 0A          DEFW Sound_ID_Run			;; 1 0AB8
+	1BB9 E0 0A          DEFW &0AE0					;; 2 0AE0
+	1BBB C5 0A          DEFW &0AC5					;; 3 0AC5
+	1BBD C9 0A          DEFW &0AC9					;; 4 0AC9
 	1BBF DC 0A          DEFW Sound_ID_Menu_Blip		;; 5 0ADC
 	1BC1 DC 0A          DEFW Sound_ID_Menu_Blip		;; 6 0ADC
-	1BC3 D4 0A      	DEFW &0AD4		;; 7 0AD4
-	1BC5 D8 0A          DEFW &0AD8		;; 8 0AD8
-	1BC7 D8 0A          DEFW &0AD8		;; 9 0AD8
+	1BC3 D4 0A      	DEFW &0AD4					;; 7 0AD4
+	1BC5 D8 0A          DEFW &0AD8					;; 8 0AD8
+	1BC7 D8 0A          DEFW &0AD8					;; 9 0AD8
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; These are the init/default values for the Inventory (see 247B) and
@@ -5849,7 +5849,7 @@ CheckDying
 	1C85 C2 5D 03       JP NZ,Set_colors
 	1C88 CD D4 35       CALL Incr_died_number
 lose_a_life
-	1C8B 21 D3 1B       LD HL,CNT_LIVES
+	1C8B 21 D3 1B       LD HL,Counter_lives
 	1C8E 7E             LD A,(HL)
 	1C8F D6 01          SUB 1
 	1C91 27             DAA
@@ -6179,7 +6179,7 @@ br_29B6
 	1EFD 21 EA 1B       LD HL,Batman_variables
 	1F00 CD 59 36       CALL UpdatePos
 	1F03 C1             POP BC
-	1F04 3A D0 1B       LD A,(CNT_SPEED)
+	1F04 3A D0 1B       LD A,(Counter_speed)
 	1F07 A7             AND A
 	1F08 C8             RET Z
 	1F09 21 D5 1B       LD HL,SpeedModulo
@@ -7077,7 +7077,7 @@ cmloop
 ;; Data for the Menu "Controls"
 Control_menu_data
 	2436 00             DEFB	0     								;; MENU_CURR_SEL : Which_selected in menu ; 0 = first
-	2437 07             DEFB	8	    							;; MENU_NB_ITEMS : Number of items
+	2437 07             DEFB	7	    							;; MENU_NB_ITEMS : Number of items
 	2438 00             DEFB	&00    								;; MENU_INIT_COL : Initial column
 	2439 86             DEFB	&06 or MENU_PRINTSINGLE_SIZE		;; MENU_INIT_ROW : Initial row, single size the selected row
 	243A 97             DEFB	Print_Left							;; MENU_SEL_STRINGID : Selected item String ID
@@ -7254,7 +7254,7 @@ Joystick_menu_data
 	2551 00             DEFB	0				;; MENU_CURR_SEL : Which_selected in menu ; 0 = first
 	2552 03             DEFB	3				;; MENU_NB_ITEMS : Number of items
 	2553 04             DEFB	4				;; MENU_INIT_COL : Initial column
-	2554 0A             DEFB	1				;; MENU_INIT_ROW : Initial row, double size the selected row0
+	2554 0A             DEFB	10				;; MENU_INIT_ROW : Initial row, double size the selected row0
 	2555 B4             DEFB	Print_JoyMenu	;; MENU_SEL_STRINGID : Selected item ; default String ID
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -7475,7 +7475,7 @@ String_Table_Main
 	26B1				DEFB 	Delimiter, "NASTY"								;; ID &91
 	26B7				DEFB 	Delimiter, "USEFUL"								;; ID &92
 	26BE				DEFB 	Delimiter, "LATE AT NIGHT"						;; ID &93
-	26CC				DEFB 	Delimiter, Print_ClrDbl_Pos, 13, 0				;; ID &94
+	26CC				DEFB 	Delimiter, Print_ClrDbl_Pos, 12, 0				;; ID &94
 	26D0				DEFB		Print_Color_Attr_1, Print_BAT
 	26D2				DEFB		Print_KEY, "S", Print_ShiftToFinish
 	26D5				DEFB 	Delimiter, Print_Instructions					;; ID &95
@@ -7508,7 +7508,7 @@ String_Table_Main
 	274D				DEFB 	Delimiter, Print_Color_Attr_3, "CTRL"			;; ID &A6
 	2753				DEFB 	Delimiter, Print_Color_Attr_3, "COPY"			;; ID &A7
 	2759				DEFB 	Delimiter, Print_Color_Attr_3, "ESC"			;; ID &A8
-	275E				DEFB 	Delimiter, Print_Color_Attr_3, "ACT"			;; ID &A9
+	275E				DEFB 	Delimiter, Print_Color_Attr_3, "ALT"			;; ID &A9
 	2763				DEFB 	Delimiter, Print_Color_Attr_3, "ERAZE"			;; ID &AA
 	276A				DEFB 	Delimiter, Print_Color_Attr_3, "INS"			;; ID &AB
 	276F				DEFB 	Delimiter, Print_Color_Attr_3, "STOP"			;; ID &AC
@@ -7525,7 +7525,7 @@ String_Table_Main
 	27A2				DEFB 	Delimiter, " JOYSTICK"							;; ID &B3
 	27AC				DEFB 	Delimiter, Print_KEY, "S", &2F					;; ID &B4
 	27B0				DEFB		Print_KEY, Print_JOYSTICK
-	27B2				DEFB 	Delimiter, "KEMPSTONE", Print_JOYSTICK			;; ID &B5
+	27B2				DEFB 	Delimiter, "KEMPSTON", Print_JOYSTICK			;; ID &B5
 	27BC				DEFB 	Delimiter, "FULLER", Print_JOYSTICK				;; ID &B6
 	27C4				DEFB 	Delimiter, Print_Color_Attr_1, "JOY"			;; ID &B7
 	27C9				DEFB 	Delimiter, Print_JOY, "F"						;; ID &B8
@@ -7578,7 +7578,7 @@ String_Table_Main
 	2879				DEFB		Print_Color_Attr_1, Print_SetPos, 12, 8
 	287D				DEFB		Print_YOU, "HAVE", Print_SetPos, 3, 10
 	2885				DEFB		Print_Color_Attr_2, "ASSEMBLED"
-	288F				DEFB 	Delimiter, " ", Print_Dogs, "PARTS" 			;; ID &D0
+	288F				DEFB 	Delimiter, " ", Print_BATCRAFT, "PARTS" 		;; ID &D0
 	2897				DEFB		Print_SetPos, 7, 12, "EXPLORED"
 	28A2				DEFB 	Delimiter, "YOU "								;; ID &D1
 	28A7				DEFB 	Delimiter, Print_WipeScreen, Print_DoubleSize	;; ID &D2 (needs to be followed by pos x,y)
@@ -7606,7 +7606,7 @@ String_Table_Main
 	2918				DEFB		"SCORE "
 	291E				DEFB	Delimiter, "BATCRAFT "							;; ID &DB
 	2928				DEFB	Delimiter, Print_Title, Print_DoubleSize		;; ID &DC
-	292B				DEFB		Print_Color_Attr_3, Print_SetPos, 7, 5
+	292B				DEFB		Print_Color_Attr_1, Print_SetPos, 7, 5
 	292F				DEFB 		Print_BATCRAFT, "COMPLETE"
 	2938				DEFB	Delimiter										;; END ID &DD
 
@@ -7697,7 +7697,7 @@ Sprite_Code
 ;;  4FE0 : 07 87 47 C7    ....                       77 F7
 ;;  4FF0 : 0F 8F 4F CF 2F AF 6F EF 1F 9F 5F DF 3F BF 7F FF
 Init_table_rev:
-	298C 21 00 4F      	LD BC,RevTable ;; 4F00
+	298C 21 00 4F      	LD HL,RevTable ;; 4F00
 table2_next_idx
 	298F 4D             LD C,L
 	2990 3E 01          LD A,1
@@ -8107,8 +8107,8 @@ sos_skip
 	2B6C 7E             LD A,(HL)
 	2B6D FE 80          CP &80
 	2B6F CB BF          RES 7,A
-	2B71 FD 77 FF       LD (IY-1),A	;; BaseFlags+1 (IY = TmpObj_variables)
-	2B74 FD 36 FE 02    LD (IY-2),&02 ;; BaseFlags (IY = TmpObj_variables)
+	2B71 FD 77 FF       LD (IY-1),A			;; BaseFlags+1 (IY = TmpObj_variables)
+	2B74 FD 36 FE 02    LD (IY-2),&02		;; BaseFlags (IY = TmpObj_variables)
 	2B78 FD CB 09 96    RES 2,(IY+O_SPRFLAGS)
 	2B7C D8             RET c
 	2B7D FD CB 09 D6    SET 2,(IY+O_SPRFLAGS)
@@ -9298,14 +9298,14 @@ br_3D71
 ;; to pick for each part of the wall. It is essentially an index to add
 ;; to PanelsBaseAddr
 .Panel_WorldData:
-	3173         		DEFW	&EB, &EB, &F5, &FD, &07, &D7, &EB, &F0		;; 3,2,1,3,....
-	317B         		DEFW	&E4, &E4, &E3, &4E, &34, &CC, &E4, &CC
-	3183         		DEFW	&06, &18, &10, &82, &04, &10, &00, &01
-	318B         		DEFW	&08, &20, &10, &42, &08, &00, &14, &00
-	3193         		DEFW	&08, &20, &05, &02, &08, &14, &00, &50
-	319B         		DEFW	&41, &41, &10, &41, &04, &41, &14, &0A
-	31A3         		DEFW	&40, &01, &55, &54, &01, &55, &41, &54
-	31AB         		DEFW	&00, &00, &00, &05, &55, &55, &00, &05
+	3173         		DEFB	&EB, &EB, &F5, &FD, &07, &D7, &EB, &F0		;; 3,2,1,3,....
+	317B         		DEFB	&E4, &E4, &E3, &4E, &34, &CC, &E4, &CC
+	3183         		DEFB	&06, &18, &10, &82, &04, &10, &00, &01
+	318B         		DEFB	&08, &20, &10, &42, &08, &00, &14, &00
+	3193         		DEFB	&08, &20, &05, &02, &08, &14, &00, &50
+	319B         		DEFB	&41, &41, &10, &41, &04, &41, &14, &0A
+	31A3         		DEFB	&40, &01, &55, &54, &01, &55, &41, &54
+	31AB         		DEFB	&00, &00, &00, &05, &55, &55, &00, &05
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Bit mask of worlds saved (5 bits : "1" means got crown for corresponding world).
@@ -9567,9 +9567,9 @@ Show_Num
 ;; So this is it: when we get a "reset" bonus, aka Malus, clears all active bonuses
 PickedUp_Malus
 	33D9 AF             XOR A
-	33DA 32 D2 1B       LD (CNT_SHIELD),A
-	33DD 32 D0 1B       LD (CNT_SPEED),A
-	33E0 32 D1 1B       LD (CNT_SPRING),A
+	33DA 32 D2 1B       LD (Counter_shield),A
+	33DD 32 D0 1B       LD (Counter_speed),A
+	33E0 32 D1 1B       LD (Counter_spring),A
 	33E3 C3 9C 34       JP PrintStatus
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -9581,7 +9581,7 @@ Picked_BatSignal:		;; save game (C, B, CNT_LIVES, parts_got_Mask)
 	33EF ED 6F          RLD
 	33F1 23             INC HL
 	33F2 70             LD (HL),B
-	33F3 3A D3 1B       LD A,(CNT_LIVES)
+	33F3 3A D3 1B       LD A,(Counter_lives)
 	33F6 23             INC HL
 	33F7 77             LD (HL),A
 	33F8 3A B3 31       LD A,(parts_got_Mask)
@@ -9608,7 +9608,7 @@ Picked_BatSignal:		;; save game (C, B, CNT_LIVES, parts_got_Mask)
 	3416 ED 43 0E 01    LD (current_Room_ID),BC
 	341A 23             INC HL
 	341B 7E             LD A,(HL)
-	341C 32 D3 1B       LD (CNT_LIVES),A
+	341C 32 D3 1B       LD (Counter_lives),A
 	341F 23             INC HL
 	3420 7E             LD A,(HL)
 	3421 32 B3 31       LD (parts_got_Mask),A
@@ -9813,7 +9813,7 @@ nbcollected_bonus
 NB_ROOMS				EQU		&A0 ;;	151 defined but 160 forseen
 
 RoomMask_buffer
-	34F4 00             DEFS 	NB_ROOMS, &00
+	34F4 	            DEFS 	NB_ROOMS, &00
 
 ;; -----------------------------------------------------------------------------------------------------------
 RecoreredParts
@@ -10489,7 +10489,7 @@ Contact_Player_Obj
 	38ED FD CB 09 56    BIT 2,(IY+O_SPRFLAGS)
 	38F1 C0             RET NZ
 DeadlyContact
-	38F2 3A D2 1B       LD A,(CNT_SHIELD)
+	38F2 3A D2 1B       LD A,(Counter_shield)
 	38F5 A7             AND A
 	38F6 C0             RET NZ
 	38F7 3A 18 38       LD A,(Dying)
@@ -10997,7 +10997,7 @@ MoveT_Left
 	3B6B 3A 14 17       LD A,(DoorHeights)
 	3B6E CD D5 3B       CALL DoorHeightCheck
 	3B71 38 1C          JR c,L_NoExit
-	3B73 CD B5 3B       CALL DoorHeightCheck
+	3B73 CD B5 3B       CALL LR_InFrame
 	3B76 38 1E          JR c,L_NearDoor
 	3B78 3A EB 16       LD A,(MaxV)
 	3B7B C6 04          ADD A,4
@@ -11108,7 +11108,7 @@ L_NoExit2
 	3BD7 FE 03          CP 3
 	3BD9 3F             CCF
 	3BDA C9             RET
-	3BDB FD CB 09 46    BIT 0,(IY+O_SPRFLAGS)
+
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Points IX at the room boundaries, sets zero flag (can't leave room) if:
 ;; Bit 0 of IY+O_SPRFLAGS is not zero, or bottom 7 bits of IY+0A are not zero.
@@ -11120,6 +11120,7 @@ L_NoExit2
 ;; TODO: Can't leave room if it's a not a player, or the object
 ;; function is zero'd.
 .ChkCantLeave:
+	3BDB FD CB 09 46    BIT 0,(IY+O_SPRFLAGS)
 	3BDF DD 21 E8 16    LD IX,Max_min_UV_Table
 	3BE3 C9             RET
 
