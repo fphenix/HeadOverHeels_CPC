@@ -112,49 +112,53 @@ test_posish_data
 	0181 				DEFB &08, &14, &28, &B4, SPR_BATMAN_0 ;; Winning position : Flag, U,V,Z,Sprite
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; Go_to_room ???
+;; from the access code (1:Down,2:Right,3:Up,4:Left,5:Below,6:Above),
+;; go to the next UVZx room resp U-1, V-1, U+1, V+1, Z+1, Z-1
+Go_to_room
 	0186 3A         	LD A,(access_new_room_code)
 	0189 3D          	DEC A
 	018A 2A 0E 01       LD HL,(current_Room_ID)
-	018D FE 05          CP &05
-	018F 30 25          JR NC,&01B6
+	018D FE 05          CP 5
+	018F 30 25          JR NC,goto_choose_z					;; >=5 jump 1b6
 	0191 1F             RRA
-	0192 38 0B          JR c,&019F
-	0194 11 10 F0       LD DE,&F010
+	0192 38 0B          JR c,goto_v
+	0194 11 10 F0       LD DE,&F0 * WORD_HIGH_BYTE + &10	;; -16 ; +16 (+/-1 for U)
 	0197 1F             RRA
-	0198 30 01          JR NC,&019B
+	0198 30 01          JR NC,goto_u
 	019A 53             LD D,E
-
+goto_u
 	019B 7C             LD A,H
-	019C 82             ADD A,D
-	019D 18 0D          JR &01AC
+	019C 82             ADD A,D								;; U : H-16 if access_new_room_code=1 ; H+16 if access_new_room_code=3
+	019D 18 0D          JR goto_newroomuv
 
-	019F 11 01 FF       LD DE,&FF01
+goto_v
+	019F 11 01 FF       LD DE,&FF * WORD_HIGH_BYTE + &01	;; -/+1 for V
 	01A2 1F             RRA
-	01A3 30 01          JR NC,&01A6
+	01A3 30 01          JR NC,goto_uv
 	01A5 53             LD D,E
-
+goto_uv
 	01A6 7C             LD A,H
-	01A7 82             ADD A,D
+	01A7 82             ADD A,D								;; V : H-1 if access_new_room_code=2 ; H+1 if access_new_room_code=4
 	01A8 AC             XOR H
 	01A9 E6 0F          AND &0F
 	01AB AC             XOR H
-
+goto_newroomuv
 	01AC 67             LD H,A
-
+goto_newroom
 	01AD 22 0E 01       LD (current_Room_ID),HL
 
 	01B0 31 00 01       LD SP,Stack
 	01B3 C3 36 01       JP Enter_New_Room
 
+goto_choose_z
 	01B6 1F             RRA
-	01B7 3E 10          LD A,&10
-	01B9 38 02          JR c,&01BD
-	01BB 3E F0          LD A,&F0
-
-	01BD 85             ADD A,L
-	01BE 6F             LD L,A
-	01BF 18 EC          JR &01AD
+	01B7 3E 10          LD A,&10			;; +1 for Z
+	01B9 38 02          JR c,goto_z
+	01BB 3E F0          LD A,&F0			;; -1 for Z
+goto_z
+	01BD 85             ADD A,L				;; Z : L+16 if access_new_room_code=5 ; L-16 if access_new_room_code=6
+	01BE 6F             LD L,A				;; (+/-1 for Z)
+	01BF 18 EC          JR goto_newroom
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Controls the frame rate (FPS) by syncing with a number of VSYNC.
@@ -1761,7 +1765,7 @@ silence_sound
 	0926 14             DEFB 20		;; ref note
 	0927 08             DEFB 8
 	0928 00             DEFB 0		;; envp num
-sound_run
+sound_walk
 	0929 00             DEFB 0
 	092A 				DEFB &81, &B9, &A1, &E1, &FF, &00
 
@@ -1769,7 +1773,7 @@ sound_run
 	0930 14             DEFB 20		;; ref note
 	0931 08             DEFB 8
 	0932 00             DEFB 0		;; envp num
-sound_speed_run
+sound_run
 	0933 00             DEFB 0
 	0934 				DEFB &80, &B8, &A0, &E0, &FF, &00
 
@@ -1809,7 +1813,7 @@ sound_speed_run
 	095E 14             DEFB 20		;; ref note
 	095F 08             DEFB 8
 	0960 04             DEFB 4		;; envp num
-
+sound_blip
 	0961 00             DEFB 0
 	0962 18 FF FF     	DEFB &18, &FF, &FF
 
@@ -1825,7 +1829,7 @@ sound_speed_run
 	096C 12             DEFB 18		;; ref note
 	096D 08             DEFB 8
 	096E 02             DEFB 2		;; envp num
-
+sound_fly
 	096F 00             DEFB 0
 	0970 11 FF FF       DEFB &11, &FF, &FF
 
@@ -1833,7 +1837,7 @@ sound_speed_run
 	0973 1E				DEFB 30		;; ref note
 	0974 08          	DEFB 8
 	0975 04             DEFB 4		;; envp num
-
+sound_jump
 	0976 00             DEFB 0
 	0977 30 FF FF       DEFB &30, &FF, &FF
 
@@ -1954,9 +1958,12 @@ PlayVoice
 	0A97 18 38          JR Snd_Play_curr_voice
 
 ;; -----------------------------------------------------------------------------------------------------------
+;; *****
 	0A99 21 53 09       LD HL,&0953
-	0A9C DD 21 5A 09    LD IX,&095A
-	0AA0 CD AD 0C       CALL Check_volume_amount   ;; if Sound_amount = 0 ("late at night") silence it, else
+	0A9C DD				DEFB LDIX_OPCODE			;; LD IX,&095A
+;; *****
+	0A9D 21 5A 09   	LD HL,&095A					;; this instruction is cancelled if comming from 0A99
+	0AA0 CD AD 0C       CALL Check_volume_amount	;; if Sound_amount = 0 ("late at night") silence it, else
 	0AA3 E5             PUSH HL
 	0AA4 CD B5 0C       CALL TestHasSomthingToBePlayed
 	0AA7 E1             POP HL
@@ -1965,27 +1972,27 @@ PlayVoice
 	0AAB 18 24          JR Snd_Play_curr_voice
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; *****
+Sound_ID_Silence
 	0AAD 21 23 09       LD HL,silence_sound
 	0AB0 CD D0 0A       CALL Snd_Play_voice0
 	0AB3 21 23 09       LD HL,silence_sound
 	0AB6 18 2E          JR Snd_Play_voice2
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; *****
-Sound_ID_Run
-	0AB8 21 29 09       LD HL,sound_run
+Sound_ID_WalkRun
+	0AB8 21 29 09       LD HL,sound_walk
 	0ABB 3A D0 1B       LD A,(Counter_speed)
 	0ABE A7             AND A
-	0ABF 28 0B          JR Z,&0ACC
-	0AC1 21 33 09		LD HL,sound_speed_run
+	0ABF 28 0B          JR Z,playsnd
+	0AC1 21 33 09		LD HL,sound_run
 	0AC4 DD				DEFB LDIX_OPCODE			;; LD IX,&0949
 ;; *****
-	0AC5 21 49 09    	LD HL, &0949				;; this instruction is cancelled if comming from 0AC4
+	0AC5 21 49 09    	LD HL,&0949					;; this instruction is cancelled if comming from 0AC4
 	0AC8 DD 			DEFB LDIX_OPCODE			;; LD IX,&093D
 ;; *****
 	0AC9 21 3D 09    	LD HL,&093D					;; this instruction is cancelled if comming from 0AC5
 
+playsnd
 	0ACC CD AD 0C       CALL Check_volume_amount
 	0ACF C8             RET Z
 Snd_Play_voice0
@@ -1994,14 +2001,15 @@ Snd_Play_curr_voice:
 	0AD1 C3 88 0B       JP Snd_Play
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; *****
-	0AD4 21 6F 09       LD HL,&096F
+Sound_ID_Fly
+	0AD4 21 6F 09       LD HL,sound_fly
 	0AD7 DD 			DEFB LDIX_OPCODE			;; LD IX,&0976
-;; *****
-	0AD8 21 76 09    	LD HL,&0976					;; this instruction is cancelled if comming from 0AD4
+Sound_ID_PickUp
+Sound_ID_Jump
+	0AD8 21 76 09    	LD HL,sound_jump			;; this instruction is cancelled if comming from 0AD4
 	0ADB DD 			DEFB LDIX_OPCODE			;; LD IX,&0961
 Sound_ID_Menu_Blip
-	0ADC 21 61 09		LD HL,&0961					;; this instruction is cancelled if comming from 0AD8
+	0ADC 21 61 09		LD HL,sound_blip			;; this instruction is cancelled if comming from 0AD8
 	0ADF DD				DEFB LDIX_OPCODE			;; LD IX,&0968
 ;; *****
 	0AE0 21 68 09		LD HL,&0968					;; this instruction is cancelled if comming from 0ADC
@@ -2252,7 +2260,7 @@ pu_loopv
 	0C5C 07             RLCA				;; << 1
 	0C5D CB 01          RLC C				;; &09
 	0C5F 10 FB          DJNZ &0C5C
-	0C61 21 FF 0A       LD HL,&0AFF
+	0C61 21 FF 0A       LD HL,Mixer_control
 	0C64 AE             XOR (HL)    		;; &37
 	0C65 A1             AND C				;; &01
 	0C66 AE             XOR (HL)			;; &3E
@@ -5638,16 +5646,16 @@ Erase_block_val_in_E:
 
 ;; -----------------------------------------------------------------------------------------------------------
 sounds_pointer_array
-	1BB5 AD 0A          DEFW &0AAD					;; 0 0AAD
-	1BB7 B8 0A          DEFW Sound_ID_Run			;; 1 0AB8
-	1BB9 E0 0A          DEFW &0AE0					;; 2 0AE0
-	1BBB C5 0A          DEFW &0AC5					;; 3 0AC5
-	1BBD C9 0A          DEFW &0AC9					;; 4 0AC9
-	1BBF DC 0A          DEFW Sound_ID_Menu_Blip		;; 5 0ADC
-	1BC1 DC 0A          DEFW Sound_ID_Menu_Blip		;; 6 0ADC
-	1BC3 D4 0A      	DEFW &0AD4					;; 7 0AD4
-	1BC5 D8 0A          DEFW &0AD8					;; 8 0AD8
-	1BC7 D8 0A          DEFW &0AD8					;; 9 0AD8
+	1BB5 AD 0A          DEFW Sound_ID_Silence		;; 0 &0AAD (data &0923)
+	1BB7 B8 0A          DEFW Sound_ID_WalkRun		;; 1 &0AB8 (data &0929 and &0933)
+	1BB9 E0 0A          DEFW &0AE0					;; 2 &0AE0 (data &0968)
+	1BBB C5 0A          DEFW &0AC5					;; 3 &0AC5 (data &0949)
+	1BBD C9 0A          DEFW &0AC9					;; 4 &0AC9 (data &093D)
+	1BBF DC 0A          DEFW Sound_ID_Menu_Blip		;; 5 &0ADC (data &0961)
+	1BC1 DC 0A          DEFW Sound_ID_Menu_Blip		;; 6 &0ADC (data &0961)
+	1BC3 D4 0A      	DEFW Sound_ID_Fly			;; 7 &0AD4 (data &096F)
+	1BC5 D8 0A          DEFW Sound_ID_Jump			;; 8 &0AD8 (data &0976)
+	1BC7 D8 0A          DEFW Sound_ID_PickUp		;; 9 &0AD8 (data &0976)
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; These are the init/default values for the Inventory (see 247B) and
@@ -5837,7 +5845,7 @@ CheckDying
 	1C73 3A 17 38       LD A,(access_new_room_code)
 	1C76 E6 7F          AND &7F
 	1C78 C8             RET Z
-	1C79 C3 86 01       JP &0186
+	1C79 C3 86 01       JP Go_to_room
 
 ;; -----------------------------------------------------------------------------------------------------------
 .HandleDeath:
@@ -5921,13 +5929,13 @@ br_27AF
 	1D1C CD 81 22       CALL ChkSatOn
 	1D1F 38 0A          JR c,br_27C2
 	1D21 FD 35 07       DEC (IY+O_Z)
-	1D24 3E 03          LD A,&03
+	1D24 3E 03          LD A,3
 	1D26 CD FE 1F       CALL SetOtherSound
 	1D29 18 11          JR br_27D3
 
 br_27C2
 	1D2B 08             EX AF,AF'
-	1D2C 3E 06          LD A,&06
+	1D2C 3E 06          LD A,6
 	1D2E FD CB 0B 66    BIT 4,(IY+O_IMPACT)
 	1D32 FD CB 0B E6    SET 4,(IY+O_IMPACT)
 	1D36 CC FE 1F       CALL Z,SetOtherSound
@@ -5967,7 +5975,7 @@ br_27F8
 	1D7E 3A F2 1B       LD A,(Batman_variables+O_SPRITE)
 	1D81 D6 15          SUB SPR_BATMAN_FLY
 	1D83 E6 FE          AND &FE				;; test if SPR_BATMAN_FLY or SPR_BATMAN_FLYB
-	1D85 3E 07          LD A,&07
+	1D85 3E 07          LD A,7
 	1D87 CC FE 1F       CALL Z,SetOtherSound
 	1D8A C3 C6 1D       JP br_284B
 
@@ -5977,7 +5985,7 @@ br_2812
 	1D91 30 04          JR NC,br_281C
 	1D93 FD 36 0C FF    LD (IY+&0C),&FF
 br_281C
-	1D97 3E 07          LD A,&07
+	1D97 3E 07          LD A,7
 	1D99 FD CB 0B 6E    BIT 5,(IY+O_IMPACT)
 	1D9D FD CB 0B EE    SET 5,(IY+O_IMPACT)
 	1DA1 CC FE 1F       CALL Z,SetOtherSound
@@ -5988,7 +5996,7 @@ br_281C
 	1DB1 CD 81 22       CALL ChkSatOn
 	1DB4 30 09          JR NC,EPIC_40
 	1DB6 20 07          JR NZ,EPIC_40
-	1DB8 3E 06          LD A,&06
+	1DB8 3E 06          LD A,6
 	1DBA CD FE 1F       CALL SetOtherSound
 	1DBD 18 07          JR br_284B
 
@@ -6015,9 +6023,9 @@ br_2855
 	1DE2 32 0E 1C       LD (Front_Batman_Walk_Loop),A
 	1DE5 32 14 1C       LD (Back_Batman_Walk_Loop),A
 	1DE8 08             EX AF,AF'
-	1DE9 3E 13          LD A,&13
+	1DE9 3E 13          LD A,&13			;; SPR_BATMAN_B0
 	1DEB 38 13          JR c,br_28BC
-	1DED 3E 10          LD A,&10
+	1DED 3E 10          LD A,&10			;; SPR_BATMAN_0
 	1DEF 18 32          JR DoFootTap
 br_288C
 	1DF1 CD 9E 1E       CALL &1E9E
@@ -6089,15 +6097,15 @@ CharThing23
 	1E6A AF             XOR A
 	1E6B 32 E1 1B       LD (&1BE1),A ;; TODO_248e
 	1E6E CD 9E 1E       CALL &1E9E
-	1E71 3E 04          LD A,&04
+	1E71 3E 04          LD A,4
 	1E73 CD FE 1F       CALL SetOtherSound
 	1E76 FD CB 0B AE    RES 5,(IY+O_IMPACT)
 	1E7A 3A CF 1B       LD A,(Inventory)
 	1E7D E6 02          AND &02
 	1E7F 20 03          JR NZ,br_292E
-	1E81 FD 34 07       INC (IY+O_Z)
+	1E81 FD 34 07       INC (IY+O_Z)	;; down
 br_292E
-	1E84 FD 34 07       INC (IY+O_Z)
+	1E84 FD 34 07       INC (IY+O_Z)	;; down
 	1E87 3A CF 1B       LD A,(Inventory)
 	1E8A 1F             RRA
 	1E8B 30 07          JR NC,br_2949
@@ -6110,6 +6118,7 @@ br_2949
 	1E99 CE 00          ADC A,0
 	1E9B C3 04 1E       JP UpdateCharFrame
 
+;; -----------------------------------------------------------------------------------------------------------
 	1E9E 3E 30          LD A,&30
 	1EA0 32 B2 1B       LD (&1BB2),A
 	1EA3 C9             RET
@@ -6141,7 +6150,7 @@ br_2976
 	1EC1 08             EX AF,AF'
 	1EC2 AF             XOR A
 	1EC3 32 DD 1B       LD (IsStill),A
-	1EC6 3E 01          LD A,&01
+	1EC6 3E 01          LD A,1
 	1EC8 CD FE 1F       CALL SetOtherSound
 	1ECB 08             EX AF,AF'
 	1ECC 21 E2 1B       LD HL,character_direction
@@ -6162,7 +6171,7 @@ br_2993
 	1EE8 3A F5 1B       LD A,(Batman_variables+O_IMPACT)
 	1EEB F6 F0          OR &F0
 	1EED 3C             INC A
-	1EEE 3E 05          LD A,&05
+	1EEE 3E 05          LD A,5
 	1EF0 C4 FE 1F       CALL NZ,SetOtherSound ;; sound
 br_29B6
 	1EF3 F1             POP AF
@@ -6199,7 +6208,7 @@ speedskip
 	1F22 CD 1A 38       CALL MoveCurrent
 	1F25 E1             POP HL
 	1F26 D2 59 36       JP NC,UpdatePos
-	1F29 3E 05          LD A,&05
+	1F29 3E 05          LD A,5
 	1F2B C3 FE 1F       JP SetOtherSound
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -6247,8 +6256,10 @@ calculate_jump
 	1F69 FE 0A          CP 10
 br_gotjumpheight
 	1F6B 32 DC 1B       LD (Jump_Height),A
-	1F6E 3E 08          LD A,&08
+	1F6E 3E 08          LD A,8
 	1F70 C3 FE 1F       JP SetOtherSound
+
+;; -----------------------------------------------------------------------------------------------------------
 TryCarry
 	1F73 3A CF 1B       LD A,(Inventory) ;; check if batbag owned
 	1F76 E6 08          AND &08			;; test bit3 (bag)
