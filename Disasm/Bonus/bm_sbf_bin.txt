@@ -4,9 +4,11 @@
 ;; Author : Fred Limouzin (fphenix@hotmail.com)
 ;; Tool used: mostly WinApe and Notepad++!
 ;; -----------------------------------------------------------------------------------------------------------
-;; THis is a Bonus work of the Head Over Heels dissassembly.
+;; This is a Bonus work of the Head Over Heels dissassembly.
 ;; Compilable (need to run the txt2asm script). WORK UNDER PROGRESS
 ;; Note that Batman was the base game "HoH" was developped from, hence many functions are identical.
+;; -----------------------------------------------------------------------------------------------------------
+;; WARNING : Some of the comments have simply been copied from HoH, hence do not always apply to Batman!!
 ;; -----------------------------------------------------------------------------------------------------------
 
 						ORG		&0100
@@ -22,7 +24,7 @@ Reentry:
 
 ;; -----------------------------------------------------------------------------------------------------------
 current_Room_ID
-	010E 00 00          DEFW &0000 ;; curr room id
+	010E 00 00          DEFW NULL_PTR ;; curr room id
 Sound_amount
 	0110 02             DEFB 2 ;; 2="nasty" (plenty), 1="useful", 0="late at night" (quiet)
 
@@ -113,7 +115,7 @@ test_posish_data
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; from the access code (1:Down,2:Right,3:Up,4:Left,5:Below,6:Above),
-;; go to the next UVZx room resp U-1, V-1, U+1, V+1, Z+1, Z-1
+;; go to the next room (roomID = UVZx) resp U-1, V-1, U+1, V+1, Z+1, Z-1
 Go_to_room
 	0186 3A         	LD A,(access_new_room_code)
 	0189 3D          	DEC A
@@ -146,7 +148,7 @@ goto_newroomuv
 	01AC 67             LD H,A
 goto_newroom
 	01AD 22 0E 01       LD (current_Room_ID),HL
-
+Reenter_room
 	01B0 31 00 01       LD SP,Stack
 	01B3 C3 36 01       JP Enter_New_Room
 
@@ -331,6 +333,7 @@ Sub_Do_Objects_entry
 JUMP_OPCODE				EQU		&C3						;; "JP addr", used to generate RST7 (int handler) and 0 (reset to Entry)
 LDIX_OPCODE				EQU		&DD						;; to transform a "LD HL,.." into a "LD IX,..." in order to cancel it
 LDAvv_OPCODE			EQU		&3E 					;; "LD A,vv", used in BlitRot<*> functions
+
 RST0_ADDR				EQU		&0000
 RST7_ADDR				EQU		&0038
 
@@ -627,9 +630,9 @@ TapFoot_Offset			EQU		85    ;; Batman's foot offset in SPR_BM_STANDING sprite
 TapFoot:
 	03B1 3A E2 56       LD A,(SpriteFlips_buffer + 2 + MOVE_OFFSET) ;; 56E2 : check if the sprite is flipped or not
 	03B4 CB 47          BIT 0,A
-	03B6 11 DC 03       LD DE,TapFoot_XOR_facing_Right ;; Blink_XOR_facing_right
+	03B6 11 DC 03       LD DE,TapFoot_XOR_facing_Right		;; Blink_XOR_facing_right
 	03B9 28 03          JR Z,weybw_doit
-	03BB 11 D5 03       LD DE,TapFoot_XOR_facing_Left ;; Blink_XOR_facing_Left
+	03BB 11 D5 03       LD DE,TapFoot_XOR_facing_Left		;; Blink_XOR_facing_Left
 weybw_doit
 	03BE 21 E5 83       LD HL,img_bm_standing_1 + TapFoot_Offset + MOVE_OFFSET ;; 83E5
 	03C1 06 03          LD B,3
@@ -1633,7 +1636,7 @@ ec_0
 	0889 22 12 3C       LD (Char_cursor_pixel_position),HL
 	088C 3E C0          LD A,&C0
 	088E 95             SUB L
-	088F FE 14          CP &14
+	088F FE 14          CP &14			;; KEPMAP_4
 	0891 30 D3          JR NC,ec_wait
 ec_1
 	0893 D9             EXX
@@ -1646,7 +1649,7 @@ ec_1_loop
 	089D 20 07          JR NZ,ec_2
 	089F 10 FA          DJNZ ec_1_loop
 	08A1 D9             EXX
-	08A2 3E 12          LD A,&12
+	08A2 3E 12          LD A,&12 		;; KEPMAP_RETURN
 	08A4 18 CA          JR ec_0
 ec_2
 	08A6 E1             POP HL
@@ -1781,7 +1784,7 @@ sound_run
 	093A 14             DEFB 20		;; ref note
 	093B 08             DEFB 8
 	093C 00             DEFB 0		;; envp num
-
+sound_todo_1
 	093D 00             DEFB 0
 	093E 				DEFB &81, &79, &69, &59, &49, &41, &FF, &00
 
@@ -1789,7 +1792,7 @@ sound_run
 	0946 1E				DEFB 30		;; ref note
 	0947 08          	DEFB 8
 	0948 04             DEFB 4		;; envp num
-
+sound_todo_2
 	0949 00             DEFB 0
 	094A 				DEFB &30, &50, &68, &90, &FF, &FF
 
@@ -1797,7 +1800,7 @@ sound_run
 	0950 14             DEFB 20		;; ref note
 	0951 01				DEFB 1
 	0952 06				DEFB 6		;; envp num
-
+sound_todo_3
 	0953 00       		DEFB 0
 	0954 54 FF FF       DEFB &54, &FF, &FF
 
@@ -1805,7 +1808,7 @@ sound_run
 	0957 14             DEFB 20		;; ref note
 	0958 08             DEFB 8
 	0959 00             DEFB 0		;; envp num
-
+sound_todo_4
 	095A 00             DEFB 0
 	095B 10 FF FF       DEFB &10, &FF, &FF
 
@@ -1821,7 +1824,7 @@ sound_blip
 	0965 1E				DEFB 30		;; ref note
 	0966 08          	DEFB 8
 	0967 04             DEFB 4		;; envp num
-
+sound_todo_5
 	0968 00             DEFB 0
 	0969 A2 FF FF       DEFB &A2, &FF, &FF
 
@@ -1959,13 +1962,15 @@ PlayVoice
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; *****
-	0A99 21 53 09       LD HL,&0953
+Sound_ID_Todo_3
+	0A99 21 53 09       LD HL,sound_todo_3
 	0A9C DD				DEFB LDIX_OPCODE			;; LD IX,&095A
 ;; *****
-	0A9D 21 5A 09   	LD HL,&095A					;; this instruction is cancelled if comming from 0A99
+Sound_ID_Todo_4
+	0A9D 21 5A 09   	LD HL,sound_todo_4			;; this instruction is cancelled if comming from 0A99
 	0AA0 CD AD 0C       CALL Check_volume_amount	;; if Sound_amount = 0 ("late at night") silence it, else
 	0AA3 E5             PUSH HL
-	0AA4 CD B5 0C       CALL TestHasSomthingToBePlayed
+	0AA4 CD B5 0C       CALL HasVoice1DataToPlay
 	0AA7 E1             POP HL
 	0AA8 C0             RET NZ
 	0AA9 3E 01          LD A,1
@@ -1987,10 +1992,12 @@ Sound_ID_WalkRun
 	0AC1 21 33 09		LD HL,sound_run
 	0AC4 DD				DEFB LDIX_OPCODE			;; LD IX,&0949
 ;; *****
-	0AC5 21 49 09    	LD HL,&0949					;; this instruction is cancelled if comming from 0AC4
+Sound_ID_Todo_2
+	0AC5 21 49 09    	LD HL,sound_todo_2			;; this instruction is cancelled if comming from 0AC4
 	0AC8 DD 			DEFB LDIX_OPCODE			;; LD IX,&093D
 ;; *****
-	0AC9 21 3D 09    	LD HL,&093D					;; this instruction is cancelled if comming from 0AC5
+Sound_ID_Todo_1
+	0AC9 21 3D 09    	LD HL,sound_todo_1			;; this instruction is cancelled if comming from 0AC5
 
 playsnd
 	0ACC CD AD 0C       CALL Check_volume_amount
@@ -2012,7 +2019,8 @@ Sound_ID_Menu_Blip
 	0ADC 21 61 09		LD HL,sound_blip			;; this instruction is cancelled if comming from 0AD8
 	0ADF DD				DEFB LDIX_OPCODE			;; LD IX,&0968
 ;; *****
-	0AE0 21 68 09		LD HL,&0968					;; this instruction is cancelled if comming from 0ADC
+Sound_ID_Todo_5
+	0AE0 21 68 09		LD HL,sound_todo_5			;; this instruction is cancelled if comming from 0ADC
 	0AE3 CD AD 0C       CALL Check_volume_amount
 Snd_Play_voice2
 	0AE6 3E 02          LD A,2
@@ -2166,7 +2174,7 @@ Silence_all_Voices:
 ;; -----------------------------------------------------------------------------------------------------------
 sub_IntH_play_update
 	0BBF FD 21 EA 0A    LD IY,Voice_0_data
-	0BC3 06 03          LD B,3					;; 3 voices ??
+	0BC3 06 03          LD B,3					;; 3 voices
 pu_loopv
 	0BC5 FD 6E 05       LD L,(IY+SONG_PTR)
 	0BC8 FD 66 06       LD H,(IY+SONG_PTR+1)
@@ -2175,7 +2183,7 @@ pu_loopv
 	0BCE C5             PUSH BC					;; ## 032F
 	0BCF CD DB 0B       CALL &0BDB
 	0BD2 C1             POP BC					;; ## 032F
-	0BD3 11 07 00       LD DE,7					;; length of data array ??
+	0BD3 11 07 00       LD DE,7					;; length of data array
 	0BD6 FD 19          ADD IY,DE				;; next Voice_x_data
 	0BD8 10 EB          DJNZ pu_loopv			;; loop all voices
 	0BDA C9             RET
@@ -2257,9 +2265,10 @@ pu_loopv
 	0C59 0F             RRCA				;; >> 1
 	0C5A 0E 84          LD C,&84
 
+mixerset
 	0C5C 07             RLCA				;; << 1
 	0C5D CB 01          RLC C				;; &09
-	0C5F 10 FB          DJNZ &0C5C
+	0C5F 10 FB          DJNZ mixerset
 	0C61 21 FF 0A       LD HL,Mixer_control
 	0C64 AE             XOR (HL)    		;; &37
 	0C65 A1             AND C				;; &01
@@ -2315,9 +2324,9 @@ Check_volume_amount
 	0CB4 C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; Returns Zero if nothing to play, NZ if something to play
-TestHasSomthingToBePlayed
-	0CB5 2A F6 0A       LD HL,(&0AF6)
+;; Returns Zero if nothing to play, NZ if something to play on voice 1
+HasVoice1DataToPlay
+	0CB5 2A F6 0A       LD HL,(Voice_1_data+SONG_PTR)
 	0CB8 11 23 09       LD DE,silence_sound
 	0CBB A7             AND A
 	0CBC ED 52          SBC HL,DE
@@ -3217,7 +3226,7 @@ dbcfloor
 	1075 78             LD A,B
 BlitFloorFnPtr:
 smc_blitfloor_fnptr:
-	1076 C3 00 00       JP &0000
+	1076 C3 00 00       JP NULL_PTR
 ;; Draw the floor and then edge etc.
 .DBC_FloorNEdge:
 	1079 F5             PUSH AF
@@ -3751,11 +3760,11 @@ fcol_1
 	12DE 77             LD (HL),A
 	12DF 1A             LD A,(DE)
 smc_dest_addr1:
-	12E0 32 00 00       LD (&0000),A
+	12E0 32 00 00       LD (NULL_PTR),A
 	12E3 59             LD E,C
 	12E4 1A             LD A,(DE)
 smc_dest_addr2
-	12E5 32 00 00       LD (&0000),A
+	12E5 32 00 00       LD (NULL_PTR),A
 	12E8 23             INC HL
 	12E9 10 E3          DJNZ fcol_1
 	12EB E1             POP HL
@@ -3826,14 +3835,14 @@ btrot_0
 	1330 06 00          LD B,0
 	1332 F3             DI
 smc_btrot_1
-	1333 CD 00 00       CALL &0000
+	1333 CD 00 00       CALL NULL_PTR
 	1336 EB             EX DE,HL
 	1337 E1             POP HL
 	1338 D5             PUSH DE
 	1339 3A CB 14       LD A,(SpriteRowCount)
 	133C 06 FF          LD B,&FF
 smc_btrot_2
-	133E CD 00 00       CALL &0000
+	133E CD 00 00       CALL NULL_PTR
 	1341 21 C0 55       LD HL,BlitRot_Buffer ;; = KeyScanningBuffer
 	1344 D1             POP DE
 	1345 FB             EI
@@ -3855,7 +3864,7 @@ BlitRot4s
 
 ;; -----------------------------------------------------------------------------------------------------------
 Save_Stack_ptr:
-	1356 00 00          DEFW 0
+	1356 00 00          DEFW NULL_PTR
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Do a copy with 2-bit shift.
@@ -4331,7 +4340,7 @@ drwc_1
 	1598 22 9F 15       LD (smc_CurrObject2+1),HL
 	159B CD A3 15       CALL Sub_BlitObject
 smc_CurrObject2
-	159E 21 00 00       LD HL,&0000
+	159E 21 00 00       LD HL,NULL_PTR
 	15A1 18 EF          JR Blit_Objects
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -4620,23 +4629,25 @@ O_ANIM					EQU 	&0F
 O_DIRECTION				EQU 	&10
 O_SPECIAL				EQU 	&11
 
+NULL_PTR				EQU		&0000
+
 ;; Temp Object used during unpacking room data
 .TmpObj_variables:								;; 18 bytes
-	16BD 00 00          DEFW 	&0000			;;	0&1 : O_NEAR2FAR_LST (A list)
-	16BF 00 00          DEFW 	&0000			;;	2&3 : O_FAR2NEAR_LST (B list)
-	16C1 00             DEFB 	&00				;;	4 : O_FLAGS
-	16C2 00             DEFB 	&00				;;	5 : O_U coordinate
-	16C3 00             DEFB 	&00				;;	6 : O_V coordinate
-	16C4 00             DEFB 	&00				;;	7 : O_Z coordinate
-	16C5 00             DEFB 	&00				;;	8 : O_SPRITE
-	16C6 00             DEFB 	&00				;;	9 : O_SPRFLAGS
-	16C7 00             DEFB 	&00				;;	A : O_FUNC
-	16C8 FF             DEFB 	&FF				;;	B : O_IMPACT
-	16C9 FF             DEFB 	&FF				;;	C :
-	16CA 00 00          DEFW 	&0000			;;	D&E : O_OBJUNDER
-	16CC 00             DEFB 	&00				;;	F : O_ANIM
-	16CD 00             DEFB 	&00				;;	10 : O_DIRECTION (dir code (0 to 7 or FF))
-	16CE 00             DEFB 	&00				;;	11 : O_SPECIAL
+	16BD 00 00          DEFW 	NULL_PTR		;; 0&1 : O_NEAR2FAR_LST (A list)
+	16BF 00 00          DEFW 	NULL_PTR		;; 2&3 : O_FAR2NEAR_LST (B list)
+	16C1 00             DEFB 	&00				;; 4 : O_FLAGS
+	16C2 00             DEFB 	&00				;; 5 : O_U coordinate
+	16C3 00             DEFB 	&00				;; 6 : O_V coordinate
+	16C4 00             DEFB 	&00				;; 7 : O_Z coordinate
+	16C5 00             DEFB 	&00				;; 8 : O_SPRITE
+	16C6 00             DEFB 	&00				;; 9 : O_SPRFLAGS
+	16C7 00             DEFB 	&00				;; A : O_FUNC
+	16C8 FF             DEFB 	&FF				;; B : O_IMPACT
+	16C9 FF             DEFB 	&FF				;; C :
+	16CA 00 00          DEFW 	NULL_PTR		;; D&E : O_OBJUNDER
+	16CC 00             DEFB 	&00				;; F : O_ANIM
+	16CD 00             DEFB 	&00				;; 10 : O_DIRECTION (dir code (0 to 7 or FF))
+	16CE 00             DEFB 	&00				;; 11 : O_SPECIAL
 
 UnpackFlags
 	16CF 00             DEFB &00
@@ -4652,7 +4663,7 @@ DoorSprites
 	16D4 00 00          DEFB &00, &00
 
 currentRoomID
-	16D6 00             DEFW &0000
+	16D6 00             DEFW NULL_PTR
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Half-Door flags when building a room (the value will be copied in the object O_FLAGS).
@@ -5648,9 +5659,9 @@ Erase_block_val_in_E:
 sounds_pointer_array
 	1BB5 AD 0A          DEFW Sound_ID_Silence		;; 0 &0AAD (data &0923)
 	1BB7 B8 0A          DEFW Sound_ID_WalkRun		;; 1 &0AB8 (data &0929 and &0933)
-	1BB9 E0 0A          DEFW &0AE0					;; 2 &0AE0 (data &0968)
-	1BBB C5 0A          DEFW &0AC5					;; 3 &0AC5 (data &0949)
-	1BBD C9 0A          DEFW &0AC9					;; 4 &0AC9 (data &093D)
+	1BB9 E0 0A          DEFW Sound_ID_Todo_5		;; 2 &0AE0 (data &0968)
+	1BBB C5 0A          DEFW Sound_ID_Todo_2		;; 3 &0AC5 (data &0949)
+	1BBD C9 0A          DEFW Sound_ID_Todo_1		;; 4 &0AC9 (data &093D)
 	1BBF DC 0A          DEFW Sound_ID_Menu_Blip		;; 5 &0ADC (data &0961)
 	1BC1 DC 0A          DEFW Sound_ID_Menu_Blip		;; 6 &0ADC (data &0961)
 	1BC3 D4 0A      	DEFW Sound_ID_Fly			;; 7 &0AD4 (data &096F)
@@ -5712,7 +5723,7 @@ reset_stat
 reset_stat_data
 	1BD7 00             DEFB 0
 	1BD8 FF             DEFB &FF
-	1BD9 00             DEFW &0000
+	1BD9 00             DEFW NULL_PTR
 	1BDB 00             DEFB 0
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -5722,7 +5733,7 @@ IsStill
 	1BDD FF             DEFB &FF
 
 Carried_Object
-	1BDE 00 00          DEFW &0000
+	1BDE 00 00          DEFW NULL_PTR
 Corrying_bool
 	1BE0 00             DEFB 0
 
@@ -5744,41 +5755,41 @@ EntryPosition_uvz
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Character instance
-Batman_variables:  					;; &12 = 18
-	1BEA 00 00			DEFW 0		;; Batman_variables+O_NEAR2FAR_LST
-	1BEC 00 00 			DEFW 0		;; Batman_variables+O_FAR2NEAR_LST
-	1BEE 08				DEFB &08	;; Batman_variables+O_FLAGS
-	1BEF 28				DEFB &28	;; Batman_variables+O_U
-	1BF0 0B				DEFB &0B	;; Batman_variables+O_V
+Batman_variables:  							;; &12 = 18
+	1BEA 00 00			DEFW NULL_PTR		;; Batman_variables+O_NEAR2FAR_LST
+	1BEC 00 00 			DEFW NULL_PTR		;; Batman_variables+O_FAR2NEAR_LST
+	1BEE 08				DEFB &08			;; Batman_variables+O_FLAGS
+	1BEF 28				DEFB &28			;; Batman_variables+O_U
+	1BF0 0B				DEFB &0B			;; Batman_variables+O_V
 	1BF1 C0				DEFB GROUND_LEVEL	;; Batman_variables+O_Z
-	1BF2 10				DEFB &10	;; Batman_variables+O_SPRITE
-	1BF3 01				DEFB &01	;; Batman_variables+O_SPRFLAGS
-	1BF4 00				DEFB &00	;; Batman_variables+O_FUNC
-	1BF5 FF				DEFB &FF	;; Batman_variables+O_IMPACT
-	1BF6 FF				DEFB &FF	;; Batman_variables+&0C
-	1BF7 00	00			DEFW &00	;; Batman_variables+O_OBJUNDER
-	1BF9 00				DEFB &00	;; Batman_variables+O_ANIM
-	1BFA 00				DEFB &00	;; Batman_variables+O_DIRECTION
-	1BFB 00				DEFB &00	;; Batman_variables+O_SPECIAL
+	1BF2 10				DEFB &10			;; Batman_variables+O_SPRITE
+	1BF3 01				DEFB &01			;; Batman_variables+O_SPRFLAGS
+	1BF4 00				DEFB &00			;; Batman_variables+O_FUNC
+	1BF5 FF				DEFB &FF			;; Batman_variables+O_IMPACT
+	1BF6 FF				DEFB &FF			;; Batman_variables+&0C
+	1BF7 00	00			DEFW NULL_PTR		;; Batman_variables+O_OBJUNDER
+	1BF9 00				DEFB &00			;; Batman_variables+O_ANIM
+	1BFA 00				DEFB &00			;; Batman_variables+O_DIRECTION
+	1BFB 00				DEFB &00			;; Batman_variables+O_SPECIAL
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; Object instance                  ; &12 = 18
+;; Object instance                 			; &12 = 18
 Object_variables
-	1BFC 00 00          DEFW 0      ;; Obj_variables+O_NEAR2FAR_LST
-	1BFE 00 00          DEFW 0      ;; Obj_variables+O_FAR2NEAR_LST
-	1C00 00             DEFB 0      ;; Obj_variables+O_FLAGS
-	1C01 00             DEFB 0      ;; Obj_variables+O_U
-	1C02 00             DEFB 0      ;; Obj_variables+O_V
-	1C03 00             DEFB 0      ;; Obj_variables+O_Z
-	1C04 00             DEFB 0      ;; Obj_variables+O_SPRITE
-	1C05 03             DEFB 3      ;; Obj_variables+O_SPRFLAGS
-	1C06 00             DEFB 0      ;; Obj_variables+O_FUNC
-	1C07 00             DEFB 0      ;; Obj_variables+O_IMPACT
-	1C08 00             DEFB 0      ;; Obj_variables+&0C
-	1C09 00             DEFW 0      ;; Obj_variables+O_OBJUNDER
-	1C0B 00             DEFB 0      ;; Obj_variables+O_ANIM
-	1C0C 00             DEFB 0      ;; Obj_variables+O_DIRECTION
-	1C0D 00             DEFB 0      ;; Obj_variables+O_SPECIAL
+	1BFC 00 00          DEFW NULL_PTR		;; Obj_variables+O_NEAR2FAR_LST
+	1BFE 00 00          DEFW NULL_PTR		;; Obj_variables+O_FAR2NEAR_LST
+	1C00 00             DEFB 0				;; Obj_variables+O_FLAGS
+	1C01 00             DEFB 0				;; Obj_variables+O_U
+	1C02 00             DEFB 0				;; Obj_variables+O_V
+	1C03 00             DEFB 0				;; Obj_variables+O_Z
+	1C04 00             DEFB 0				;; Obj_variables+O_SPRITE
+	1C05 03             DEFB 3				;; Obj_variables+O_SPRFLAGS
+	1C06 00             DEFB 0				;; Obj_variables+O_FUNC
+	1C07 00             DEFB 0				;; Obj_variables+O_IMPACT
+	1C08 00             DEFB 0				;; Obj_variables+&0C
+	1C09 00             DEFW NULL_PTR		;; Obj_variables+O_OBJUNDER
+	1C0B 00             DEFB 0				;; Obj_variables+O_ANIM
+	1C0C 00             DEFB 0				;; Obj_variables+O_DIRECTION
+	1C0D 00             DEFB 0				;; Obj_variables+O_SPECIAL
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; This defines the sprites list that compose an animation for
@@ -5833,15 +5844,15 @@ br_25B6
 	1C5A CD F3 1C       CALL CharThing4
 	1C5D 3A F1 1B       LD A,(Batman_variables+O_Z)
 	1C60 FE 84          CP GROUND_LEVEL - 60
-	1C62 30 0F          JR NC,&1C73	;; CheckFired or CheckDying
+	1C62 30 0F          JR NC,CheckEnd		;; CheckFired or CheckDying
 	1C64 AF             XOR A
 	1C65 32 DC 1B       LD (Jump_Height),A
 	1C68 3A E3 16       LD A,(FloorAboveFlag)
 	1C6B A7             AND A
-	1C6C 20 05          JR NZ,&1C73 ;; CheckFired or CheckDying
+	1C6C 20 05          JR NZ,CheckEnd		;; CheckFired or CheckDying
 	1C6E 3E 07          LD A,7
 	1C70 32 17 38       LD (access_new_room_code),A
-CheckDying
+CheckEnd
 	1C73 3A 17 38       LD A,(access_new_room_code)
 	1C76 E6 7F          AND &7F
 	1C78 C8             RET Z
@@ -5852,14 +5863,14 @@ CheckDying
 	1C7C 35             DEC (HL)
 	1C7D 20 2B          JR NZ,CharThing20
 	1C7F 34             INC (HL)
-	1C80 CD B5 0C       CALL TestHasSomthingToBePlayed
+	1C80 CD B5 0C       CALL HasVoice1DataToPlay
 	1C83 3E 08          LD A,8
 	1C85 C2 5D 03       JP NZ,Set_colors
 	1C88 CD D4 35       CALL Incr_died_number
 lose_a_life
 	1C8B 21 D3 1B       LD HL,Counter_lives
 	1C8E 7E             LD A,(HL)
-	1C8F D6 01          SUB 1
+	1C8F D6 01          SUB 1					;; Infinite lives : POKE &1C90,0
 	1C91 27             DAA
 	1C92 77             LD (HL),A
 	1C93 DC E5 1C       CALL c,&1CE5
@@ -5869,7 +5880,7 @@ lose_a_life
 	1C9F ED B0          LDIR
 	1CA1 3A E6 1B       LD A,(saved_access_code)
 	1CA4 32 17 38       LD (access_new_room_code),A
-	1CA7 C3 B0 01       JP &01B0
+	1CA7 C3 B0 01       JP Reenter_room
 
 CharThing20
 	1CAA AF             XOR A
@@ -6261,10 +6272,10 @@ br_gotjumpheight
 
 ;; -----------------------------------------------------------------------------------------------------------
 TryCarry
-	1F73 3A CF 1B       LD A,(Inventory) ;; check if batbag owned
-	1F76 E6 08          AND &08			;; test bit3 (bag)
-	1F78 C8             RET Z			;; no leave
-	1F79 21 E0 1B       LD HL,Corrying_bool		;; else try to pick up
+	1F73 3A CF 1B       LD A,(Inventory)			;; check if batbag owned
+	1F76 E6 08          AND &08						;; test bit3 (bag)
+	1F78 C8             RET Z						;; no leave
+	1F79 21 E0 1B       LD HL,Corrying_bool			;; else try to pick up
 	1F7C 3A 14 01       LD A,(action_key_pressed)
 	1F7F A7             AND A
 	1F80 20 03          JR NZ,DoCarry
@@ -6328,7 +6339,7 @@ carryLoop
 	1FDC ED A8          LDD
 	1FDE E1             POP HL
 	1FDF CD 02 37       CALL InsertObject
-	1FE2 21 00 00       LD HL,&0000
+	1FE2 21 00 00       LD HL,NULL_PTR
 	1FE5 22 DE 1B       LD (Carried_Object),HL
 	1FE8 01 40 D0       LD BC,CARRIED_OBJ_HUD_POS
 	1FEB CD D0 37       CALL Clear_3x24
@@ -6351,7 +6362,7 @@ BumpUp
 
 ;; -----------------------------------------------------------------------------------------------------------
 Play_Other_Sound
-	2005 CD B5 0C       CALL TestHasSomthingToBePlayed
+	2005 CD B5 0C       CALL HasVoice1DataToPlay
 	2008 C0             RET NZ
 	2009 3A E3 1B       LD A,(Other_sound_ID)
 	200C 87             ADD A,A
@@ -6419,9 +6430,9 @@ EPIC_90
 	2069 13             INC DE
 	206A 13             INC DE
 	206B 1F             RRA
-	206C 3E 84          LD A,&84  ;; GROUND_LEVEL - 60
+	206C 3E 84          LD A,GROUND_LEVEL - 60
 	206E 38 02          JR c,EPIC_91
-	2070 3E BA          LD A,&BA ;; GROUND_LEVEL - 6
+	2070 3E BA          LD A,GROUND_LEVEL - 6
 EPIC_91
 	2072 12             LD (DE),A
 	2073 F1             POP AF
@@ -6455,7 +6466,7 @@ EPIC_97
 	2098 11 E7 1B       LD DE,EntryPosition_uvz
 	209B 01 03 00       LD BC,&0003
 	209E ED B0          LDIR
-	20A0 21 00 00       LD HL,&0000
+	20A0 21 00 00       LD HL,NULL_PTR
 	20A3 22 F7 1B       LD (Batman_variables+O_OBJUNDER),HL
 	20A6 2B             DEC HL
 	20A7 22 F5 1B       LD (Batman_variables+O_IMPACT),HL
@@ -6506,7 +6517,7 @@ WallSideBitmap:											;; index 0 = 8 = bit3, index 1 = 4 = bit2 etc.
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Takes object (character?) in IY. Pointer to an object contacting the character.
 .ObjContact:
-	20E2 00 00       	DEFW &0000
+	20E2 00 00       	DEFW NULL_PTR
 
 ;; -----------------------------------------------------------------------------------------------------------
 .DoorContact:
@@ -7190,7 +7201,7 @@ bwa_loop1
 	24C9 20 F6          JR NZ,bwa_loop1
 bwa_loop2
 	24CB CD D4 24       CALL Play_Batman_Walking
-	24CE CD B5 0C       CALL TestHasSomthingToBePlayed
+	24CE CD B5 0C       CALL HasVoice1DataToPlay
 	24D1 20 F8          JR NZ,bwa_loop2
 	24D3 C9             RET
 
@@ -7958,7 +7969,7 @@ fspr3_loop
 	2AC1 5E             LD E,(HL)
 	2AC2 1A             LD A,(DE)
 smc_flipsprite3
-	2AC3 32 00 00       LD (&0000),A
+	2AC3 32 00 00       LD (NULL_PTR),A
 	2AC6 59             LD E,C
 	2AC7 1A             LD A,(DE)
 	2AC8 77             LD (HL),A
@@ -8017,7 +8028,7 @@ fspr4_loop
 	2B03 5E             LD E,(HL)
 	2B04 1A             LD A,(DE)
 smc_fs_addr
-	2B05 32 00 00       LD (&0000),A
+	2B05 32 00 00       LD (NULL_PTR),A
 	2B08 59             LD E,C
 	2B09 1A             LD A,(DE)
 	2B0A 77             LD (HL),A
@@ -8400,11 +8411,11 @@ ObjVars_reset_data
 	2D53 40 50          DEFW 	ObjectsBuffer      				;; reset for dest Objects 5040
 	2D55 74 2D          DEFW 	ObjList_Regular_Far2Near		;; reset for B List Pointer ObjectLists
 	2D57 7E 2D          DEFW 	ObjList_Regular_Near2Far		;; reset for A List Pointer ObjectLists + 2
-	2D59 00 00 00 00    DEFW 	&0000, &0000					;; reset for B and A usual list 1st item
-	2D5D 00 00 00 00 	DEFW 	&0000, &0000					;; reset for Next V room B & A
-	2D61 00 00 00 00 	DEFW 	&0000, &0000					;; reset for Next U room B & A
-	2D65 00 00 00 00 	DEFW 	&0000, &0000					;; reset for Next Far room B & A
-	2D69 00 00 00 00 	DEFW 	&0000, &0000					;; reset for Next Near room B & A
+	2D59 00 00 00 00    DEFW 	NULL_PTR, NULL_PTR				;; reset for B and A usual list 1st item
+	2D5D 00 00 00 00 	DEFW 	NULL_PTR, NULL_PTR				;; reset for Next V room B & A
+	2D61 00 00 00 00 	DEFW 	NULL_PTR, NULL_PTR				;; reset for Next U room B & A
+	2D65 00 00 00 00 	DEFW 	NULL_PTR, NULL_PTR				;; reset for Next Far room B & A
+	2D69 00 00 00 00 	DEFW 	NULL_PTR, NULL_PTR				;; reset for Next Near room B & A
 
 .SaveRestore_Block2:											;; Save/Restore block 2 : &1D (29 bytes)
 .ObjListIdx:													;; The index into ObjectLists.
@@ -8419,30 +8430,30 @@ Object_Destination:												;; Current pointer for where we write objects int
 
 ObjectLists:
 ObjList_Regular_Far2Near:										;; list type 0 ; ObjectLists + 0 ; Regular B (Far to Near) list 1st item pointer
-	2D74 00 00          DEFW 	&0000
+	2D74 00 00          DEFW 	NULL_PTR
 ObjList_NextRoomV_Far2Near:                        				;; list type 1 ; ObjectLists + 4 ; Next room in V direction B list pointers
-	2D76 00 00          DEFW 	&0000
+	2D76 00 00          DEFW 	NULL_PTR
 ObjList_NextRoomU_Far2Near:           							;; list type 2 ; ObjectLists + 8 ; Next room in U direction B list pointers
-	2D78 00 00          DEFW 	&0000
+	2D78 00 00          DEFW 	NULL_PTR
 ObjList_Far_Far2Near:                 							;; list type 3 ; ObjectLists + 12 ; Far (far corner of main room) B list pointers
-	2D7A 00 00          DEFW 	&0000
+	2D7A 00 00          DEFW 	NULL_PTR
 ObjList_Near_Far2Near:                							;; list type 4 ; ObjectLists + 16 ; Near (near corner of main room) B list pointers
-	2D7C 00 00          DEFW 	&0000
+	2D7C 00 00          DEFW 	NULL_PTR
 
 ObjList_Regular_Near2Far:                         				;; list type 0 ; ObjectLists + 2 ; Regular A (Near to Far) list 1st item pointer
-	2D7E 00 00          DEFW 	&0000
+	2D7E 00 00          DEFW 	NULL_PTR
 ObjList_NextRoomV_Near2Far:           		            		;; list type 1 ; ObjectLists + 6 ; Next room in V direction A list pointers
-	2D80 00 00          DEFW 	&0000
+	2D80 00 00          DEFW 	NULL_PTR
 ObjList_NextRoomU_Near2Far:          							;; list type 2 ; ObjectLists + 10 ; Next room in U direction A list pointers
-	2D82 00 00          DEFW 	&0000
+	2D82 00 00          DEFW 	NULL_PTR
 ObjList_Far_Near2Far:                 							;; list type 3 ; ObjectLists + 14 ; Far A list pointers
-	2D84 00 00          DEFW 	&0000
+	2D84 00 00          DEFW 	NULL_PTR
 ObjList_Near_Near2Far:                							;; list type 4 ; ObjectLists + 18 ; Near A list pointers
-	2D86 00 00          DEFW 	&0000
+	2D86 00 00          DEFW 	NULL_PTR
 
 ;; -----------------------------------------------------------------------------------------------------------
 .SortObj:
-	2D88 00 00          DEFW 	&0000
+	2D88 00 00          DEFW 	NULL_PTR
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Set the object list index and pointers. list index in A (3 far, 4 near, 0 mid), .
@@ -9042,9 +9053,9 @@ VZNoUOverlap
 
 ;; -----------------------------------------------------------------------------------------------------------
 Walls_PanelBase
-	300B 00 00          DEFW 	&0000
+	300B 00 00          DEFW 	NULL_PTR
 Walls_PanelFlipsPtr
-	300D 00 00          DEFW 	&0000
+	300D 00 00          DEFW 	NULL_PTR
 Walls_ScreenMaxV
 	300F 00             DEFB 	&00
 Walls_ScreenMaxU
@@ -9372,14 +9383,14 @@ SpecialList: ;; 30
 	325C				DEFB &30, &51, &05, &05, &03, SPR_BONUS, &06 				;; SPR_BONUS : CNT_SPRING
 	3263				DEFB &30, &8B, &04, &06, &05, SPR_BONUS, &06
 	326A				DEFB &20, &A4, &06, &07, &07, SPR_BONUS, &06				;; ...
-	3271				DEFB &80, &6A, &00, &03, &07, SPR_BONUS, &06				;; This one may be changed to a Malus
+	3271				DEFB &80, &6A, &00, &03, &07, SPR_BONUS, &06				;; This one may be changed (randomly) to a Malus
 	3278				DEFB &30, &56, &04, &04, &00, SPR_BONUS, &06 				;; SPR_BONUS : CNT_SPRING
 	327F				DEFB &40, &59, &01, &06, &06, SPR_BONUS, &07 				;; SPR_BONUS : CNT_SHIELD
 	3286				DEFB &30, &2F, &00, &01, &01, SPR_BONUS, &07
 	328D				DEFB &30, &B3, &06, &01, &06, SPR_BONUS, &07				;; ...
 	3294				DEFB &50, &5C, &00, &03, &06, SPR_BONUS, &07 				;; SPR_BONUS : CNT_SHIELD
 	329B				DEFB &30, &75, &03, &02, &07, SPR_BONUS, &09 				;; SPR_BONUS : Reset boost
-	32A2				DEFB &80, &8A, &07, &04, &07, SPR_BONUS, &09				;; ... This one may be changed to a Bonus
+	32A2				DEFB &80, &8A, &07, &04, &07, SPR_BONUS, &09				;; ... This one may be changed (randomly) to a Bonus
 	32A9				DEFB &30, &35, &02, &00, &07, SPR_BONUS, &09 				;; SPR_BONUS : Reset boost
 	32B0				DEFB &40, &48, &04, &04, &04, SPR_BATSIGNAL, &04			;; SPR_BATSIGNAL (same thing than FISH in HoH)
 	32B7				DEFB &30, &33, &03, &03, &04, SPR_BATSIGNAL, &04
@@ -9544,23 +9555,23 @@ FindSpecCont
 	33A1 C2 2B 34       JP NZ,dconti_1
 	33A4 E1             POP HL
 	33A5 2B             DEC HL
-	33A6 CB C6          SET 0,(HL)		;; set bit0 to says "already picked up"
+	33A6 CB C6          SET 0,(HL)						;; set bit0 to says "already picked up"
 	33A8 E1             POP HL
-	33A9 D6 04          SUB 4			;; test if 7th byte (special function) is >= 4
-	33AB 30 0B          JR NC,pu_skip		;; yes: jump 33B8
+	33A9 D6 04          SUB 4							;; test if 7th byte (special function) is >= 4
+	33AB 30 0B          JR NC,pu_skip					;; yes: jump 33B8
 PickedUp_Tool:
-	33AD C6 05          ADD A,5		;; else picked up a tools; beacuse of the "sub 4" above and because wa want bitN for the (N+1)th item; need to add 5 here
+	33AD C6 05          ADD A,5							;; else picked up a tools; beacuse of the "sub 4" above and because wa want bitN for the (N+1)th item; need to add 5 here
 	33AF 21 CF 1B       LD HL,Inventory
 	33B2 CD 79 34       CALL Set_bit_nb_A_in_content_HL ;; bit0:SPR_BATTHRUSTER, 1:SPR_BATBELT, 2:SPR_BATBOOTS, bit3:SPR_BATBAG
 	33B5 C3 6B 37       JP Draw_Screen_Periphery
 pu_skip
-	33B8 D6 01          SUB 1			;; align special fn "4, 5, ..." to "FF, 0, ..."
-	33BA 38 2A          JR c,Picked_BatSignal		;; if was a BATSIGNAL (save game), jump 33E6
-	33BC FE 04          CP &04			;; if special fn was 9
-	33BE 28 19          JR Z,PickedUp_Malus		;; then special fn "reset boost" , jump 33D9
-	33C0 D2 6E 34       JP NC,PickedUp_Part		;; if was >= &0A (batcraft parts) jump 346E
+	33B8 D6 01          SUB 1							;; align special fn "4, 5, ..." to "FF, 0, ..."
+	33BA 38 2A          JR c,Picked_BatSignal			;; if was a BATSIGNAL (save game), jump 33E6
+	33BC FE 04          CP &04							;; if special fn was 9
+	33BE 28 19          JR Z,PickedUp_Malus				;; then special fn "reset boost" , jump 33D9
+	33C0 D2 6E 34       JP NC,PickedUp_Part				;; if was >= &0A (batcraft parts) jump 346E
 PickedUp_Bonus
-	33C3 CD C3 34       CALL Get_Count_pointer		;; else was a Bonus (5 (0):speed, 6 (1):spring, 7 (2):shield, 8 (3):lives)
+	33C3 CD C3 34       CALL Get_Count_pointer			;; else was a Bonus (5 (0):speed, 6 (1):spring, 7 (2):shield, 8 (3):lives)
 	33C6 CD B1 34       CALL Boost_HLcontent_base10_clamp99
 	33C9 F5             PUSH AF
 	33CA CD CF 35       CALL Incr_Bonus_collected		;; TOVERIFY
@@ -9828,7 +9839,7 @@ RoomMask_buffer
 
 ;; -----------------------------------------------------------------------------------------------------------
 RecoreredParts
-	3594 11 00 00       LD DE,&0000
+	3594 11 00 00       LD DE,&0000		;; init to 0
 	3597 18 08          JR gotParts
 CountInventory
 	3599 21 CF 1B       LD HL,Inventory
@@ -10178,7 +10189,7 @@ waitkp_loop
 	374D B5             OR L
 	374E 20 F7          JR NZ,waitkp_loop
 wait_loop
-	3750 CD B5 0C       CALL TestHasSomthingToBePlayed
+	3750 CD B5 0C       CALL HasVoice1DataToPlay
 	3753 C8             RET Z
 	3754 18 FA          JR wait_loop
 
@@ -10543,19 +10554,19 @@ MoveTbl:
 	3923 FD         	DEFB	FACING_DOWN
 	3924 6A 3A 30 3A    DEFW	MoveT_Down, CollideT_Down		;; MoveT_Down 3A6A, CollideT_Down 3A30
 	3928 FF             DEFB	&FF
-	3929 4B 39 00 00    DEFW	MoveT_DownRight, &0000			;; MoveT_DownRight 394B
+	3929 4B 39 00 00    DEFW	MoveT_DownRight, NULL_PTR		;; MoveT_DownRight 394B
 	392D FB             DEFB	FACING_RIGHT
 	392E C1 3A 4E 3A    DEFW	MoveT_Right, CollideT_Right		;; MoveT_Right 3AC1, CollideT_Right 3A4E
 	3932 FF             DEFB	&FF
-	3933 6C 39 00 00    DEFW	MoveT_UpRight, &0000			;; MoveT_UpRight 396C
+	3933 6C 39 00 00    DEFW	MoveT_UpRight, NULL_PTR			;; MoveT_UpRight 396C
 	3937 FE           	DEFB	FACING_UP
 	3938 11 3B D4 39	DEFW	MoveT_Up, CollideT_Up			;; MoveT_Up 3B11, CollideT_Up 39D4
 	393C FF       		DEFB	&FF
-	393D 90 39 00 00    DEFW 	MoveT_UpLeft, &0000				;; MoveT_UpLeft 3990
+	393D 90 39 00 00    DEFW 	MoveT_UpLeft, NULL_PTR			;; MoveT_UpLeft 3990
 	3941 F7             DEFB	FACING_LEFT
 	3942 59 3B 15 3A    DEFW	MoveT_Left, CollideT_Left		;; MoveT_Left 3B59, CollideT_Left 3A15
 	3946 FF				DEFB	&FF
-	3947 B3 39 00 00    DEFW	MoveT_DownLeft, &0000			;; MoveT_DownLeft 39B3
+	3947 B3 39 00 00    DEFW	MoveT_DownLeft, NULL_PTR		;; MoveT_DownLeft 39B3
 
 DOOR_LOW				EQU		&24
 DOOR_HIGH				EQU		&2C
@@ -11322,7 +11333,7 @@ Control_Code_attribute_6_getrow
 ;; Input: BC is the position;
 ;; Output: HL = pointer on Cursor_position_code string attribute.
 .Set_Cursor_position:
-	3CAD ED 43 B8 3C    LD (Cursor_position_code_pos),BC
+	3CAD ED 43 B8 3C    LD (smc_Cursor_pos),BC
 	3CB1 21 B7 3C       LD HL,Cursor_position_code
 	3CB4 C3 42 3C       JP print_char_until_delimiter
 
@@ -11331,8 +11342,8 @@ Control_Code_attribute_6_getrow
 ;; the position is set by Set_Cursor_position
 .Cursor_position_code:
 	3CB7 06 			DEFB	Print_SetPos ;; 06
-Cursor_position_code_pos
-	3CB8 00 00          DEFW	&0000
+smc_Cursor_pos
+	3CB8 00 00          DEFW	&00 * WORD_HIGH_BYTE + &00
 	3CBA FF             DEFB	Delimiter
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -11443,7 +11454,7 @@ ObjFnSub
 	3D30 C8             RET Z
 	3D31 2A 41 2B       LD HL,(CurrObject)
 	3D34 CD 1A 38       CALL MoveCurrent
-	3D37 DA 9D 0A       JP c,&0A9D	;; Sound
+	3D37 DA 9D 0A       JP c,Sound_ID_Todo_4
 	3D3A F5             PUSH AF
 	3D3B CD 8E 3F       CALL UpdateObjExtents
 	3D3E F1             POP AF
@@ -11466,7 +11477,7 @@ ObjFnSwitch
 	3D55 F6 C0          OR &C0
 	3D57 3C             INC A
 	3D58 C8             RET Z
-	3D59 CD E0 0A       CALL &0AE0
+	3D59 CD E0 0A       CALL Sound_ID_Todo_5
 	3D5C 21 62 3D       LD HL,ObjFn_SwitchOff
 	3D5F C3 69 3F       JP objfnsw_2
 
@@ -11482,13 +11493,13 @@ ObjFn_SwitchOff
 ;; hence letting the "LD A,&60" take over.
 ObjFnHeliplat90:
 	3D67 3E 90          LD		A,&90
-	3D69 01				DEFB 	&01						;;LD BC,...
+	3D69 01				DEFB 	&01						;;LD BC,... to cancel the LD A,&60
 ObjFnHeliplat60:
 	3D6A 3E 60       	LD		A,&60
-	3D6C 01				DEFB 	&01						;;LD BC,...
+	3D6C 01				DEFB 	&01						;;LD BC,... to cancel the LD A,&30
 ObjFnHeliplat30:
 	3D6D 3E 30       	LD		A,&30
-	3D6F 01				DEFB 	&01						;;LD BC,...
+	3D6F 01				DEFB 	&01						;;LD BC,... to cancel the LD A,&10
 ObjFnHeliplat10:
 	3D70 3E 10       	LD		A,&10
 	3D72 FD 77 11       LD		(IY+O_SPECIAL),A
@@ -11536,22 +11547,22 @@ writeRollerDir
 ;; * TestAndFade : dissolving hushpuppies if Head is in the room (no contact needed here, just entering)
 ObjFnDissolve:
 	3D9B 3E C0          LD		A,&C0
-	3D9D 01				DEFB 	&01				;;LD BC,...
-ObjFnDissolve2:																;; dissolving cushion, pad, book and rollers
+	3D9D 01				DEFB 	&01									;; LD BC,... to cancel the "LD A,&CF" below
+ObjFnDissolve2:														;; dissolving cushion, pad, book and rollers
 	;; if comming from ObjFnDissolve, the "LD A,&CF" does not exist
 	;; as it became a dummy "LD BC,&CF3E"
-	3D9E 3E CF       	LD		A,&CF										;; ObjFnDissolve2: A=&CF, ObjFnDissolve: A=&C0
+	3D9E 3E CF       	LD		A,&CF								;; ObjFnDissolve2: A=&CF, ObjFnDissolve: A=&C0
 	3DA0 FD B6 0C       OR		(IY+&0C)
 	3DA3 3C             INC		A
 TestAndFade
 	3DA4 C8             RET Z
 Fadeify
-	3DA5 CD 99 0A       CALL &0A99	;; noise?
+	3DA5 CD 99 0A       CALL Sound_ID_Todo_3	;; noise?
 	3DA8 FD 7E 0A       LD A,(IY+O_FUNC)
 	3DAB E6 80          AND &80
-	3DAD F6 12          OR &12 ;; OBJFN_FADE
+	3DAD F6 12          OR OBJFN_FADE
 	3DAF FD 77 0A       LD (IY+O_FUNC),A
-	3DB2 FD 36 0F 08    LD (IY+O_ANIM),&08 ;; ANIM_VAPE1_code
+	3DB2 FD 36 0F 08    LD (IY+O_ANIM),&08		;; ANIM_VAPE1_code
 ObjFnFade
 	3DB6 FD 36 04 80    LD (IY+O_FLAGS),&80
 	3DBA CD 8E 3F       CALL UpdateObjExtents
@@ -11809,10 +11820,10 @@ HalfTurn
 	3F17 CD 34 3F       CALL CharDistAndDir
 	3F1A 7A             LD A,D
 	3F1B BB             CP E
-	3F1C 06 F3          LD B,&F3
+	3F1C 06 F3          LD B,&F3		;; %11110011
 	3F1E 38 03          JR c,hmin_1
 	3F20 7B             LD A,E
-	3F21 06 FC          LD B,&FC
+	3F21 06 FC          LD B,&FC		;; %11111100
 hmin_1
 	3F23 A7             AND A
 	3F24 78             LD A,B
@@ -11894,7 +11905,7 @@ objfnsw_loop
 	3F77 E5             PUSH HL
 	3F78 DD E1          POP IX
 smc_objfnsw
-	3F7A CD 00 00       CALL &0000			;; call SwitchOff
+	3F7A CD 00 00       CALL NULL_PTR			;; call SwitchOff
 	3F7D E1             POP HL
 	3F7E 18 EF          JR objfnsw_loop
 
@@ -11980,7 +11991,7 @@ br_501F
 	3FFD 3A 43 2B       LD A,(ObjDir)
 	4000 3C             INC A
 	4001 C8             RET Z
-	4002 C3 9D 0A       JP &0A9D ;; sound SetSound ??
+	4002 C3 9D 0A       JP Sound_ID_Todo_4
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; check something and return Carry or NotCarry.
@@ -12094,13 +12105,11 @@ sfd_1
 ;;	4096 FD CB 0C 66    BIT 4,(IY+0C)
 ;;	409A C0             RET NZ
 ;;	409B 18 1E          JR 40BB
-;;
 ;;	409D FD CB 0C 66    BIT 4,(IY+0C)
 ;;	40A1 37             SCF
 ;;	40A2 20 05          JR NZ,40A9
 ;;	40A4 FD CB 0B A6    RES 4,(IY+0B)
 ;;	40A8 C9             RET
-;;
 ;;	40A9 F5             PUSH AF
 ;;	40AA CD 8E 3F       CALL 3F8E
 ;;	40AD FD CB 0B AE    RES 5,(IY+0B)
@@ -12110,7 +12119,6 @@ sfd_1
 ;;	40B6 FD 34 07       INC (IY+07)
 ;;	40B9 37             SCF
 ;;	40BA C9             RET
-;;
 ;;	40BB 2A 41 2B       LD HL,(2B41)
 ;;	40BE CD 81 22       CALL 2281
 ;;	40C1 FD CB 0B A6    RES 4,(IY+0B)
@@ -12121,7 +12129,6 @@ sfd_1
 ;;	40CC FD 35 07       DEC (IY+07)
 ;;	40CF 37             SCF
 ;;	40D0 C9             RET
-;;
 ;;	40D1 FD 7E 10       LD A,(IY+10)
 ;;	40D4 C6 5D          ADD A,5D
 ;;	40D6 6F             LD L,A
@@ -12130,7 +12137,6 @@ sfd_1
 ;;	40DA 67             LD H,A
 ;;	40DB 7E             LD A,(HL)
 ;;	40DC C9             RET
-;;
 ;;	40DD FD F9          LD SP,IY
 ;;	40DF FB             EI
 ;;	40E0 FA FE F6       JP M,F6FE
@@ -12284,7 +12290,7 @@ Room_Macro_data
 	4242 DEFB &00
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; Left over garbage more likely
+;; Left over garbage (more likely)
 ;;	4243 06 00          LD B,00
 ;;	4245 7E             LD A,(HL)
 ;;	4246 FE 1A          CP 1A
@@ -12379,7 +12385,7 @@ Room_list: ;; 151 rooms
 	4380 DEFB &15, &34, &39, &52, &23, &0D, &90, &07, &2A, &8E, &F1, &CC, &C4, &66, &B5, &9B, &EE, &77, &BB, &FF, &F1, &FE
 	4396 DEFB &18, &35, &39, &52, &E0, &8D, &90, &07, &2A, &CE, &E7, &AC, &F1, &F9, &F8, &1C, &CE, &76, &3B, &3D, &BE, &D7, &FC, &7F, &80
 	43AF DEFB &3B, &36, &31, &12, &E1, &01, &8F, &07, &C7, &8F, &92, &40, &C1, &DC, &00, &1F, &40, &78, &1E, &0B, &F1, &FF, &04, &98, &A2, &18, &10, &7E, &04, &F4, &F0, &78, &7C, &5E, &3F, &3F, &02
-	43D4 DEFB	   &B8, &38, &2C, &1A, &09, &3F, &03, &78, &A4, &54, &29, &86, &49, &A5, &72, &B1, &54, &22, &8E, &67, &FE, &3F, &C0
+	43D4 DEFB	        &B8, &38, &2C, &1A, &09, &3F, &03, &78, &A4, &54, &29, &86, &49, &A5, &72, &B1, &54, &22, &8E, &67, &FE, &3F, &C0
 	43EB DEFB &0C, &37, &32, &12, &D9, &02, &05, &A4, &F6, &75, &3F, &E3, &FC
 	43F8 DEFB &06, &38, &3C, &FC, &41, &0B, &FE
 	43FF DEFB &06, &39, &3F, &7C, &09, &2B, &FE
@@ -12509,11 +12515,11 @@ Room_list: ;; 151 rooms
 	4BFC DEFB &00
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; Left over garbage most likely
+;; Left over garbage (most likely).
 ;;	4BFD 1A             LD A,(DE)
 ;;	4BFE ED B1          CPIR
 
-	org &4c00
+	org &4c00		;; (will be overridden at build, this space is freed at init when data is moved further)
 
 BlitBuff:
 	4C00 				DEFS	256, 0
