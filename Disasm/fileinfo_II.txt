@@ -27,13 +27,13 @@ Entry:
 	010C 18 0E          JR		Main										;; Continue at Main (&011C)
 
 ;; -----------------------------------------------------------------------------------------------------------
+SR_LENGTH_BLOCK1		EQU		&0004
 .SaveRestore_Block1:										;; Save/Restore block 1 (4 bytes)
 .current_Room_ID:
 	010E 00 00			DEFW 	NULL_PTR					;; Current room ID ; (eg. Head's first room = &8A40)
 .Do_Objects_Phase:
 	0110 00				DEFB 	&00             			;; top bit toggles every "Do_Objects" loop
 
-;; -----------------------------------------------------------------------------------------------------------
 ;; "CFSLRDUJ" user inputs and directions (Carry,Fire,Swop,Left,Right,Down,Up,Jump)
 .Last_User_Inputs:
 	0111 EF				DEFB 	&EF
@@ -85,7 +85,7 @@ DELAY_CANNONBALL		EQU		&60
 .Main_game_start:															;; Play the game
 	012F CD 41 45       CALL 	Show_World_Crowns_screen					;; show the Crowns/Worlds page
 	0132 3E 40          LD		A,DELAY_CANNONBALL_1st						;; Delay Setting for the First cannon ball in the Victory room
-	0134 32 28 4C       LD		(delay_CannonBall),A						;; Update delay_CannonBall to &40 (64)
+	0134 32 28 4C       LD		(delayCannonBall),A							;; Update delayCannonBall to &40 (64)
 .Enter_New_Room:															;; "Entering a room" game loop
 	0137 AF             XOR 	A											;; phase = 0
 	0138 32 10 01       LD		(Do_Objects_Phase),A						;; init Do_Objects_Phase
@@ -126,23 +126,23 @@ RoomID_Heels_1st		EQU		&8940					;; This is Heels' first room ID (894)
 ;; and flash the "Freedom" text...
 ;; If not in Victory room then leave with Zero flag reset.
 ;; Note: The room &8D3 (Victory room) also display the far room &8E3.
-;; The victory room defines 6 Cannon Balls objects of type "&3C" in ObjDefns:
+;; The victory room defines 6 Cannon Balls objects of function type "&3C" in ObjDefns:
 ;;    sprite = SPR_BALL, function = OBJFN_CANNONBALL (ObjFnCannonFire)
-;; As long as one of these exist, the function ObjFnCannonFire will reset
-;; delay_CannonBall to &60, thus preventing going to Game_over (see addr &0179).
+;; As long as one Cannon Ball object exist, the function ObjFnCannonFire will reset
+;; delayCannonBall to &60, thus preventing going to Game_over (see addr &0179).
 ;; When all 6 Cannon Balls have been processed by Do_Objects, then the
-;; delay_CannonBall will be able to go to 0 and thus let it jump to Game_over.
+;; delayCannonBall will be able to go to 0 and thus allow the jump to Game_over.
 .Victory_Room:
 	0168 CD 5E 01       CALL 	Sub_Check_Victory_Room						;; get Zero flag : Z set = in Victory room, Zero reset = any other room
 	016B C0             RET 	NZ											;; if not in Victory Room then RET, else:
 	016C 32 14 01       LD		(SwopChara_Pressed),A						;; else, in Victory Room, reset SwopChara_Pressed = No swopping allowed (Note: Accu A was set to 0 at addr &0164 in Sub_Check_Victory_Room)
 	016F 3D             DEC 	A											;; A = FF
 	0170 32 12 01       LD		(Current_User_Inputs),A						;; reset Current_User_Inputs (FF = No movement/No inputs) CFSLRDUJ
-	0173 21 28 4C       LD		HL,delay_CannonBall							;; point delay_CannonBall
+	0173 21 28 4C       LD		HL,delayCannonBall							;; point delayCannonBall
 	0176 35             DEC 	(HL)										;; count down delay value before we trigger fire a cannon ball
-	0177 7E             LD		A,(HL)										;; get current delay_CannonBall value; Note that delay_CannonBall value is reset back to &60 when a CannonBall is fired (see ObjFnCannonFire); When no more cannon ball, the value can reach 0
-	0178 3C             INC 	A											;; A = prev(HL) ; if delay_CannonBall was FF (FF+1=0) then Zero is set
-	0179 CA 19 01       JP		Z,Game_over									;; if Zero set, then delay_CannonBall was FF (-1) so goto Game_over (only possible when all 6 Cannon Balls in the objects link list have been processed), else:
+	0177 7E             LD		A,(HL)										;; get current delayCannonBall value; Note that delayCannonBall value is reset back to &60 when a CannonBall is fired (see ObjFnCannonFire); When no more cannon ball, the value can reach 0
+	0178 3C             INC 	A											;; A = prev(HL) ; if delayCannonBall was FF (FF+1=0) then Zero is set
+	0179 CA 19 01       JP		Z,Game_over									;; if Zero set, then delayCannonBall was FF (-1) so goto Game_over (only possible when all 6 Cannon Balls in the objects link list have been processed), else:
 victory_song:																;; else:
 	017C 06 C1          LD		B,Sound_ID_Tada								;; prepare Sound_Id &C1 = "Tada!" song
 	017E FE 30          CP		DELAY_CANNONBALL / 2						;; compare delay with &30 (if < &30 Carry flag set, if = &30 Zero flag set)
@@ -607,16 +607,16 @@ sscf_sk2
 copy_array_direction:
 	03A0 08             EX		AF,AF'										;; Save or Restore "4 + &1D + &19 + &3F0" bytes to or from Other_Character_state
 	03A1 CD F4 03       CALL 	Copy_Data
-	03A4 04 00			DEFW 	&0004										;; Argument 1: length &0004
+	03A4 04 00			DEFW 	SR_LENGTH_BLOCK1							;; Argument 1: length &0004
 	03A6 0E 01			DEFW 	SaveRestore_Block1							;; Argument 2: current_Room_ID, Do_Objects_Phase, Last_User_Inputs
 	03A8 CD F4 03       CALL 	Copy_Data
-	03AB 1D 00			DEFW 	&001D										;; Argument 1: length &001D
+	03AB 1D 00			DEFW 	SR_LENGTH_BLOCK2							;; Argument 1: length &001D
 	03AD A2 39 			DEFW 	SaveRestore_Block2							;; Argument 2: ObjListIdx (39A2)
 	03AF CD F4 03       CALL 	Copy_Data
-	03B2 19 00 			DEFW 	&0019										;; Argument 1: length &0019 (25 bytes)
+	03B2 19 00 			DEFW 	SR_LENGTH_BLOCK3							;; Argument 1: length &0019 (25 bytes)
 	03B4 92 24			DEFW 	SaveRestore_Block3							;; Argument 2: saved_room_access_code, EntryPosition_uvz, saved_selected_chars, Corrying, and FireObject
 	03B6 CD F4 03       CALL 	Copy_Data
-	03B9 F0 03			DEFW 	&03F0										;; Argument 1: length ObjectsLen (&03F0 = 56 x 18 bytes = 1008)
+	03B9 F0 03			DEFW 	SR_LENGTH_BLOCK4							;; Argument 1: length ObjectsLen (&03F0 = 56 x 18 bytes = 1008)
 	03BB 40 6A			DEFW 	SaveRestore_Block4							;; Argument 2: ObjectsBuffer (6A40)
 	03BD C9             RET
 
@@ -780,6 +780,8 @@ Sub_Do_Objects_entry:
 ;; RST init
 JUMP_OPCODE				EQU		&C3						;; "JP addr", used to generate RST7 (int handler) and 0 (reset to Entry)
 LDAvv_OPCODE			EQU		&3E 					;; "LD A,vv", used in BlitRot<*> functions
+
+INT_MODE				EQU		1
 RST0_ADDR				EQU		&0000
 RST7_ADDR				EQU		&0038
 
@@ -790,7 +792,7 @@ NIBBLE_HIGH				EQU		16
 NiBBLE_LOW				EQU		1
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; Amastrad CPC System specific constants
+;; Amstrad CPC System specific constants
 GATEARRAY_BORDER		EQU		&7F10
 GATEARRAY_PENS			EQU		&7F00
 GATEARRAY_INKS			EQU		&7F40
@@ -835,7 +837,7 @@ move_loaded_data_section:
 	046C ED B8          LDDR												;; Copy: repeats LD (DE), (HL); DE--, HL--, BC-- until BC==0
 erase_buffer_6800:
 	046E 21 00 68       LD		HL,DestBuff									;; array from &6800
-	0471 01 00 01       LD		BC,&0100									;; length 256 bytes
+	0471 01 00 01       LD		BC,BUFFER_LENGTH							;; length 256 bytes
 	0474 CD 67 24       CALL 	Erase_forward_Block_RAM						;; Erase from &6800 to &68FF
 inth_and_rst:
 	0477 3E C3          LD		A,JUMP_OPCODE								;; A = &C3 (will be a JP instruction)
@@ -845,7 +847,7 @@ inth_and_rst:
 	0482 21 00 01       LD		HL,Entry									;; override the RST0 Reset with...
 	0485 32 00 00       LD		(RST0_ADDR),A								;; ...with a....
 	0488 22 01 00       LD		(RST0_ADDR+1),HL							;; ...Jump at Entry
-	048B ED 56          IM 		1											;; Interrupt Mode 1 = exec a RST7 (RST &38) when an Interrupt occurs
+	048B ED 56          IM 		INT_MODE									;; Interrupt Mode 1 = exec a RST7 (RST &38) when an Interrupt occurs
 	048D CD EB 04       CALL 	Init_6600_table
 init_CTRC_and_screen:
 	0490 01 8D 7F       LD		BC,GATEARRAY_MODE1							;; Gate Array Access:
@@ -983,7 +985,7 @@ dbl_loop1:
 
 ;; -----------------------------------------------------------------------------------------------------------CPC
 ;; This reconfigure the value of PEN 3 only from the color Scheme numer in A
-;; Note : This is #_NOT_USED_# (it comes from "Batman")!
+;; Note : This is #_NOT_USED_# in HoH (it comes from "Batman")!
 Set_pen3_only_UNUSED:
 	051E CD 4A 05       CALL 	Get_color_scheme_value						;; update HL on the first color in the current color scheme
 	0521 23             INC 	HL
@@ -3400,15 +3402,15 @@ SND_TODO				EQU		&10			;; ???? TODO ???
 NOISE_DELTA_FINE		EQU		&11
 NOISE_DELTA_COARSE		EQU		&12			;; Noise delta pitch (fine and coarse) for bend/vibrato effects
 
-SOUND_OBJECT_LENGTH		EQU		&13
+SOUND_OBJECT_LENGTH		EQU		&13			;; 19
 
 ;; -----------------------------------------------------------------------------------------------------------
 .Voice_channel_0_data:
-	1061 				DEFS 	19, &00
+	1061 				DEFS 	SOUND_OBJECT_LENGTH, &00
 .Voice_channel_1_data:
-	1074 				DEFS 	19, &00
+	1074 				DEFS 	SOUND_OBJECT_LENGTH, &00
 .Voice_channel_2_data:
-	1087 				DEFS 	19, &00
+	1087 				DEFS 	SOUND_OBJECT_LENGTH, &00
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Channel 0 data to compute the AY3 registers for noise ; 8 bytes
@@ -3756,600 +3758,600 @@ Sound_ID_Teleport_Down		EQU 	&C8 		;; Teleport down
 ;; Destination is BC', source image is in DE', mask is in HL'.
 .BlitMask1of3:
 	149A D9             EXX
-	149B 0A             LD A,(BC)
-	149C A6             AND (HL)
-	149D EB             EX DE,HL
-	149E B6             OR (HL)
-	149F 02             LD (BC),A
-	14A0 04             INC B
-	14A1 0A             LD A,(BC)
-	14A2 B6             OR (HL)
-	14A3 EB             EX DE,HL
-	14A4 A6             AND (HL)
-	14A5 02             LD (BC),A
-	14A6 05             DEC B
-	14A7 23             INC HL
-	14A8 13             INC DE
-	14A9 79             LD A,C
-	14AA C6 06          ADD A,6
-	14AC 4F             LD C,A
-	14AD 23             INC HL
-	14AE 13             INC DE
-	14AF 23             INC HL
-	14B0 13             INC DE
+	149B 0A             LD		A,(BC)
+	149C A6             AND		(HL)
+	149D EB             EX		DE,HL
+	149E B6             OR		(HL)
+	149F 02             LD		(BC),A
+	14A0 04             INC		B
+	14A1 0A             LD		A,(BC)
+	14A2 B6             OR		(HL)
+	14A3 EB             EX		DE,HL
+	14A4 A6             AND		(HL)
+	14A5 02             LD		(BC),A
+	14A6 05             DEC		B
+	14A7 23             INC		HL
+	14A8 13             INC		DE
+	14A9 79             LD		A,C
+	14AA C6 06          ADD		A,6
+	14AC 4F             LD		C,A
+	14AD 23             INC		HL
+	14AE 13             INC		DE
+	14AF 23             INC		HL
+	14B0 13             INC		DE
 	14B1 D9             EXX
-	14B2 10 E6          DJNZ BlitMask1of3
+	14B2 10 E6          DJNZ	BlitMask1of3
 	14B4 C9             RET
 
 .BlitMask2of3:
 	14B5 D9             EXX
-	14B6 0A             LD A,(BC)
-	14B7 A6             AND (HL)
-	14B8 EB             EX DE,HL
-	14B9 B6             OR (HL)
-	14BA 02             LD (BC),A
-	14BB 04             INC B
-	14BC 0A             LD A,(BC)
-	14BD B6             OR (HL)
-	14BE EB             EX DE,HL
-	14BF A6             AND (HL)
-	14C0 02             LD (BC),A
-	14C1 05             DEC B
-	14C2 0C             INC C
-	14C3 23             INC HL
-	14C4 13             INC DE
-	14C5 0A             LD A,(BC)
-	14C6 A6             AND (HL)
-	14C7 EB             EX DE,HL
-	14C8 B6             OR (HL)
-	14C9 02             LD (BC),A
-	14CA 04             INC B
-	14CB 0A             LD A,(BC)
-	14CC B6             OR (HL)
-	14CD EB             EX DE,HL
-	14CE A6             AND (HL)
-	14CF 02             LD (BC),A
-	14D0 05             DEC B
-	14D1 23             INC HL
-	14D2 13             INC DE
-	14D3 79             LD A,C
-	14D4 C6 05          ADD A,5
-	14D6 4F             LD C,A
-	14D7 23             INC HL
-	14D8 13             INC DE
+	14B6 0A             LD		A,(BC)
+	14B7 A6             AND		(HL)
+	14B8 EB             EX		DE,HL
+	14B9 B6             OR		(HL)
+	14BA 02             LD		(BC),A
+	14BB 04             INC		B
+	14BC 0A             LD		A,(BC)
+	14BD B6             OR		(HL)
+	14BE EB             EX		DE,HL
+	14BF A6             AND		(HL)
+	14C0 02             LD		(BC),A
+	14C1 05             DEC		B
+	14C2 0C             INC		C
+	14C3 23             INC		HL
+	14C4 13             INC		DE
+	14C5 0A             LD		A,(BC)
+	14C6 A6             AND		(HL)
+	14C7 EB             EX		DE,HL
+	14C8 B6             OR		(HL)
+	14C9 02             LD		(BC),A
+	14CA 04             INC		B
+	14CB 0A             LD		A,(BC)
+	14CC B6             OR		(HL)
+	14CD EB             EX		DE,HL
+	14CE A6             AND		(HL)
+	14CF 02             LD		(BC),A
+	14D0 05             DEC		B
+	14D1 23             INC		HL
+	14D2 13             INC		DE
+	14D3 79             LD		A,C
+	14D4 C6 05          ADD		A,5
+	14D6 4F             LD		C,A
+	14D7 23             INC		HL
+	14D8 13             INC		DE
 	14D9 D9             EXX
-	14DA 10 D9          DJNZ BlitMask2of3
+	14DA 10 D9          DJNZ	BlitMask2of3
 	14DC C9             RET
 
 .BlitMask3of3:
 	14DD D9             EXX
-	14DE 0A             LD A,(BC)
-	14DF A6             AND (HL)
-	14E0 EB             EX DE,HL
-	14E1 B6             OR (HL)
-	14E2 02             LD (BC),A
-	14E3 04             INC B
-	14E4 0A             LD A,(BC)
-	14E5 B6             OR (HL)
-	14E6 EB             EX DE,HL
-	14E7 A6             AND (HL)
-	14E8 02             LD (BC),A
-	14E9 05             DEC B
-	14EA 0C             INC C
-	14EB 23             INC HL
-	14EC 13             INC DE
-	14ED 0A             LD A,(BC)
-	14EE A6             AND (HL)
-	14EF EB             EX DE,HL
-	14F0 B6             OR (HL)
-	14F1 02             LD (BC),A
-	14F2 04             INC B
-	14F3 0A             LD A,(BC)
-	14F4 B6             OR (HL)
-	14F5 EB             EX DE,HL
-	14F6 A6             AND (HL)
-	14F7 02             LD (BC),A
-	14F8 05             DEC B
-	14F9 0C             INC C
-	14FA 23             INC HL
-	14FB 13             INC DE
-	14FC 0A             LD A,(BC)
-	14FD A6             AND (HL)
-	14FE EB             EX DE,HL
-	14FF B6             OR (HL)
-	1500 02             LD (BC),A
-	1501 04             INC B
-	1502 0A             LD A,(BC)
-	1503 B6             OR (HL)
-	1504 EB             EX DE,HL
-	1505 A6             AND (HL)
-	1506 02             LD (BC),A
-	1507 05             DEC B
-	1508 23             INC HL
-	1509 13             INC DE
-	150A 79             LD A,C
-	150B C6 04          ADD A,4
-	150D 4F             LD C,A
+	14DE 0A             LD		A,(BC)
+	14DF A6             AND		(HL)
+	14E0 EB             EX		DE,HL
+	14E1 B6             OR		(HL)
+	14E2 02             LD		(BC),A
+	14E3 04             INC		B
+	14E4 0A             LD		A,(BC)
+	14E5 B6             OR		(HL)
+	14E6 EB             EX		DE,HL
+	14E7 A6             AND		(HL)
+	14E8 02             LD		(BC),A
+	14E9 05             DEC		B
+	14EA 0C             INC		C
+	14EB 23             INC		HL
+	14EC 13             INC		DE
+	14ED 0A             LD		A,(BC)
+	14EE A6             AND		(HL)
+	14EF EB             EX		DE,HL
+	14F0 B6             OR		(HL)
+	14F1 02             LD		(BC),A
+	14F2 04             INC		B
+	14F3 0A             LD		A,(BC)
+	14F4 B6             OR		(HL)
+	14F5 EB             EX		DE,HL
+	14F6 A6             AND		(HL)
+	14F7 02             LD		(BC),A
+	14F8 05             DEC		B
+	14F9 0C             INC		C
+	14FA 23             INC		HL
+	14FB 13             INC		DE
+	14FC 0A             LD		A,(BC)
+	14FD A6             AND		(HL)
+	14FE EB             EX		DE,HL
+	14FF B6             OR		(HL)
+	1500 02             LD		(BC),A
+	1501 04             INC		B
+	1502 0A             LD		A,(BC)
+	1503 B6             OR		(HL)
+	1504 EB             EX		DE,HL
+	1505 A6             AND		(HL)
+	1506 02             LD		(BC),A
+	1507 05             DEC		B
+	1508 23             INC		HL
+	1509 13             INC		DE
+	150A 79             LD		A,C
+	150B C6 04          ADD		A,4
+	150D 4F             LD		C,A
 	150E D9             EXX
-	150F 10 CC          DJNZ BlitMask3of3
+	150F 10 CC          DJNZ	BlitMask3of3
 	1511 C9             RET
 
 .BlitMask1of4:
 	1512 D9             EXX
-	1513 0A             LD A,(BC)
-	1514 A6             AND (HL)
-	1515 EB             EX DE,HL
-	1516 B6             OR (HL)
-	1517 02             LD (BC),A
-	1518 04             INC B
-	1519 0A             LD A,(BC)
-	151A B6             OR (HL)
-	151B EB             EX DE,HL
-	151C A6             AND (HL)
-	151D 02             LD (BC),A
-	151E 05             DEC B
-	151F 23             INC HL
-	1520 13             INC DE
-	1521 79             LD A,C
-	1522 C6 06          ADD A,6
-	1524 4F             LD C,A
-	1525 23             INC HL
-	1526 13             INC DE
-	1527 23             INC HL
-	1528 13             INC DE
-	1529 23             INC HL
-	152A 13             INC DE
+	1513 0A             LD		A,(BC)
+	1514 A6             AND		(HL)
+	1515 EB             EX		DE,HL
+	1516 B6             OR		(HL)
+	1517 02             LD		(BC),A
+	1518 04             INC		B
+	1519 0A             LD		A,(BC)
+	151A B6             OR		(HL)
+	151B EB             EX		DE,HL
+	151C A6             AND		(HL)
+	151D 02             LD		(BC),A
+	151E 05             DEC		B
+	151F 23             INC		HL
+	1520 13             INC		DE
+	1521 79             LD		A,C
+	1522 C6 06          ADD		A,6
+	1524 4F             LD		C,A
+	1525 23             INC		HL
+	1526 13             INC		DE
+	1527 23             INC		HL
+	1528 13             INC		DE
+	1529 23             INC		HL
+	152A 13             INC		DE
 	152B D9             EXX
-	152C 10 E4          DJNZ BlitMask1of4
+	152C 10 E4          DJNZ	BlitMask1of4
 	152E C9             RET
 
 .BlitMask2of4:
 	152F D9             EXX
-	1530 0A             LD A,(BC)
-	1531 A6             AND (HL)
-	1532 EB             EX DE,HL
-	1533 B6             OR (HL)
-	1534 02             LD (BC),A
-	1535 04             INC B
-	1536 0A             LD A,(BC)
-	1537 B6             OR (HL)
-	1538 EB             EX DE,HL
-	1539 A6             AND (HL)
-	153A 02             LD (BC),A
-	153B 05             DEC B
-	153C 0C             INC C
-	153D 23             INC HL
-	153E 13             INC DE
-	153F 0A             LD A,(BC)
-	1540 A6             AND (HL)
-	1541 EB             EX DE,HL
-	1542 B6             OR (HL)
-	1543 02             LD (BC),A
-	1544 04             INC B
-	1545 0A             LD A,(BC)
-	1546 B6             OR (HL)
-	1547 EB             EX DE,HL
-	1548 A6             AND (HL)
-	1549 02             LD (BC),A
-	154A 05             DEC B
-	154B 23             INC HL
-	154C 13             INC DE
-	154D 79             LD A,C
-	154E C6 05          ADD A,5
-	1550 4F             LD C,A
-	1551 23             INC HL
-	1552 13             INC DE
-	1553 23             INC HL
-	1554 13             INC DE
+	1530 0A             LD		A,(BC)
+	1531 A6             AND		(HL)
+	1532 EB             EX		DE,HL
+	1533 B6             OR		(HL)
+	1534 02             LD		(BC),A
+	1535 04             INC		B
+	1536 0A             LD		A,(BC)
+	1537 B6             OR		(HL)
+	1538 EB             EX		DE,HL
+	1539 A6             AND		(HL)
+	153A 02             LD		(BC),A
+	153B 05             DEC		B
+	153C 0C             INC		C
+	153D 23             INC		HL
+	153E 13             INC		DE
+	153F 0A             LD		A,(BC)
+	1540 A6             AND		(HL)
+	1541 EB             EX		DE,HL
+	1542 B6             OR		(HL)
+	1543 02             LD		(BC),A
+	1544 04             INC		B
+	1545 0A             LD		A,(BC)
+	1546 B6             OR		(HL)
+	1547 EB             EX		DE,HL
+	1548 A6             AND		(HL)
+	1549 02             LD		(BC),A
+	154A 05             DEC		B
+	154B 23             INC		HL
+	154C 13             INC		DE
+	154D 79             LD		A,C
+	154E C6 05          ADD		A,5
+	1550 4F             LD		C,A
+	1551 23             INC		HL
+	1552 13             INC		DE
+	1553 23             INC		HL
+	1554 13             INC		DE
 	1555 D9             EXX
-	1556 10 D7          DJNZ BlitMask2of4
+	1556 10 D7          DJNZ	BlitMask2of4
 	1558 C9             RET
 
 .BlitMask3of4:
 	1559 D9             EXX
-	155A 0A             LD A,(BC)
-	155B A6             AND (HL)
-	155C EB             EX DE,HL
-	155D B6             OR (HL)
-	155E 02             LD (BC),A
-	155F 04             INC B
-	1560 0A             LD A,(BC)
-	1561 B6             OR (HL)
-	1562 EB             EX DE,HL
-	1563 A6             AND (HL)
-	1564 02             LD (BC),A
-	1565 05             DEC B
-	1566 0C             INC C
-	1567 23             INC HL
-	1568 13             INC DE
-	1569 0A             LD A,(BC)
-	156A A6             AND (HL)
-	156B EB             EX DE,HL
-	156C B6             OR (HL)
-	156D 02             LD (BC),A
-	156E 04             INC B
-	156F 0A             LD A,(BC)
-	1570 B6             OR (HL)
-	1571 EB             EX DE,HL
-	1572 A6             AND (HL)
-	1573 02             LD (BC),A
-	1574 05             DEC B
-	1575 0C             INC C
-	1576 23             INC HL
-	1577 13             INC DE
-	1578 0A             LD A,(BC)
-	1579 A6             AND (HL)
-	157A EB             EX DE,HL
-	157B B6             OR (HL)
-	157C 02             LD (BC),A
-	157D 04             INC B
-	157E 0A             LD A,(BC)
-	157F B6             OR (HL)
-	1580 EB             EX DE,HL
-	1581 A6             AND (HL)
-	1582 02             LD (BC),A
-	1583 05             DEC B
-	1584 23             INC HL
-	1585 13             INC DE
-	1586 79             LD A,C
-	1587 C6 04          ADD A,4
-	1589 4F             LD C,A
-	158A 23             INC HL
-	158B 13             INC DE
+	155A 0A             LD		A,(BC)
+	155B A6             AND		(HL)
+	155C EB             EX		DE,HL
+	155D B6             OR		(HL)
+	155E 02             LD		(BC),A
+	155F 04             INC		B
+	1560 0A             LD		A,(BC)
+	1561 B6             OR		(HL)
+	1562 EB             EX		DE,HL
+	1563 A6             AND		(HL)
+	1564 02             LD		(BC),A
+	1565 05             DEC		B
+	1566 0C             INC		C
+	1567 23             INC		HL
+	1568 13             INC		DE
+	1569 0A             LD		A,(BC)
+	156A A6             AND		(HL)
+	156B EB             EX		DE,HL
+	156C B6             OR		(HL)
+	156D 02             LD		(BC),A
+	156E 04             INC		B
+	156F 0A             LD		A,(BC)
+	1570 B6             OR		(HL)
+	1571 EB             EX		DE,HL
+	1572 A6             AND		(HL)
+	1573 02             LD		(BC),A
+	1574 05             DEC		B
+	1575 0C             INC		C
+	1576 23             INC		HL
+	1577 13             INC		DE
+	1578 0A             LD		A,(BC)
+	1579 A6             AND		(HL)
+	157A EB             EX		DE,HL
+	157B B6             OR		(HL)
+	157C 02             LD		(BC),A
+	157D 04             INC		B
+	157E 0A             LD		A,(BC)
+	157F B6             OR		(HL)
+	1580 EB             EX		DE,HL
+	1581 A6             AND		(HL)
+	1582 02             LD		(BC),A
+	1583 05             DEC		B
+	1584 23             INC		HL
+	1585 13             INC		DE
+	1586 79             LD		A,C
+	1587 C6 04          ADD		A,4
+	1589 4F             LD		C,A
+	158A 23             INC		HL
+	158B 13             INC		DE
 	158C D9             EXX
-	158D 10 CA          DJNZ BlitMask3of4
+	158D 10 CA          DJNZ	BlitMask3of4
 	158F C9             RET
 
 .BlitMask4of4:
 	1590 D9             EXX
-	1591 0A             LD A,(BC)
-	1592 A6             AND (HL)
-	1593 EB             EX DE,HL
-	1594 B6             OR (HL)
-	1595 02             LD (BC),A
-	1596 04             INC B
-	1597 0A             LD A,(BC)
-	1598 B6             OR (HL)
-	1599 EB             EX DE,HL
-	159A A6             AND (HL)
-	159B 02             LD (BC),A
-	159C 05             DEC B
-	159D 0C             INC C
-	159E 23             INC HL
-	159F 13             INC DE
-	15A0 0A             LD A,(BC)
-	15A1 A6             AND (HL)
-	15A2 EB             EX DE,HL
-	15A3 B6             OR (HL)
-	15A4 02             LD (BC),A
-	15A5 04             INC B
-	15A6 0A             LD A,(BC)
-	15A7 B6             OR (HL)
-	15A8 EB             EX DE,HL
-	15A9 A6             AND (HL)
-	15AA 02             LD (BC),A
-	15AB 05             DEC B
-	15AC 0C             INC C
-	15AD 23             INC HL
-	15AE 13             INC DE
-	15AF 0A             LD A,(BC)
-	15B0 A6             AND (HL)
-	15B1 EB             EX DE,HL
-	15B2 B6             OR (HL)
-	15B3 02             LD (BC),A
-	15B4 04             INC B
-	15B5 0A             LD A,(BC)
-	15B6 B6             OR (HL)
-	15B7 EB             EX DE,HL
-	15B8 A6             AND (HL)
-	15B9 02             LD (BC),A
-	15BA 05             DEC B
-	15BB 0C             INC C
-	15BC 23             INC HL
-	15BD 13             INC DE
-	15BE 0A             LD A,(BC)
-	15BF A6             AND (HL)
-	15C0 EB             EX DE,HL
-	15C1 B6             OR (HL)
-	15C2 02             LD (BC),A
-	15C3 04             INC B
-	15C4 0A             LD A,(BC)
-	15C5 B6             OR (HL)
-	15C6 EB             EX DE,HL
-	15C7 A6             AND (HL)
-	15C8 02             LD (BC),A
-	15C9 05             DEC B
-	15CA 23             INC HL
-	15CB 13             INC DE
-	15CC 0C             INC C
-	15CD 0C             INC C
-	15CE 0C             INC C
+	1591 0A             LD		A,(BC)
+	1592 A6             AND		(HL)
+	1593 EB             EX		DE,HL
+	1594 B6             OR		(HL)
+	1595 02             LD		(BC),A
+	1596 04             INC		B
+	1597 0A             LD		A,(BC)
+	1598 B6             OR		(HL)
+	1599 EB             EX		DE,HL
+	159A A6             AND		(HL)
+	159B 02             LD		(BC),A
+	159C 05             DEC		B
+	159D 0C             INC		C
+	159E 23             INC		HL
+	159F 13             INC		DE
+	15A0 0A             LD		A,(BC)
+	15A1 A6             AND		(HL)
+	15A2 EB             EX		DE,HL
+	15A3 B6             OR		(HL)
+	15A4 02             LD		(BC),A
+	15A5 04             INC		B
+	15A6 0A             LD		A,(BC)
+	15A7 B6             OR		(HL)
+	15A8 EB             EX		DE,HL
+	15A9 A6             AND		(HL)
+	15AA 02             LD		(BC),A
+	15AB 05             DEC		B
+	15AC 0C             INC		C
+	15AD 23             INC		HL
+	15AE 13             INC		DE
+	15AF 0A             LD		A,(BC)
+	15B0 A6             AND		(HL)
+	15B1 EB             EX		DE,HL
+	15B2 B6             OR		(HL)
+	15B3 02             LD		(BC),A
+	15B4 04             INC		B
+	15B5 0A             LD		A,(BC)
+	15B6 B6             OR		(HL)
+	15B7 EB             EX		DE,HL
+	15B8 A6             AND		(HL)
+	15B9 02             LD		(BC),A
+	15BA 05             DEC		B
+	15BB 0C             INC		C
+	15BC 23             INC		HL
+	15BD 13             INC		DE
+	15BE 0A             LD		A,(BC)
+	15BF A6             AND		(HL)
+	15C0 EB             EX		DE,HL
+	15C1 B6             OR		(HL)
+	15C2 02             LD		(BC),A
+	15C3 04             INC		B
+	15C4 0A             LD		A,(BC)
+	15C5 B6             OR		(HL)
+	15C6 EB             EX		DE,HL
+	15C7 A6             AND		(HL)
+	15C8 02             LD		(BC),A
+	15C9 05             DEC		B
+	15CA 23             INC		HL
+	15CB 13             INC		DE
+	15CC 0C             INC		C
+	15CD 0C             INC		C
+	15CE 0C             INC		C
 	15CF D9             EXX
-	15D0 10 BE          DJNZ BlitMask4of4
+	15D0 10 BE          DJNZ	BlitMask4of4
 	15D2 C9             RET
 
 .BlitMask1of5:
 	15D3 D9             EXX
-	15D4 0A             LD A,(BC)
-	15D5 A6             AND (HL)
-	15D6 EB             EX DE,HL
-	15D7 B6             OR (HL)
-	15D8 02             LD (BC),A
-	15D9 04             INC B
-	15DA 0A             LD A,(BC)
-	15DB B6             OR (HL)
-	15DC EB             EX DE,HL
-	15DD A6             AND (HL)
-	15DE 02             LD (BC),A
-	15DF 05             DEC B
-	15E0 23             INC HL
-	15E1 13             INC DE
-	15E2 79             LD A,C
-	15E3 C6 06          ADD A,6
-	15E5 4F             LD C,A
-	15E6 23             INC HL
-	15E7 13             INC DE
-	15E8 23             INC HL
-	15E9 13             INC DE
-	15EA 23             INC HL
-	15EB 13             INC DE
-	15EC 23             INC HL
-	15ED 13             INC DE
+	15D4 0A             LD		A,(BC)
+	15D5 A6             AND		(HL)
+	15D6 EB             EX		DE,HL
+	15D7 B6             OR		(HL)
+	15D8 02             LD		(BC),A
+	15D9 04             INC		B
+	15DA 0A             LD		A,(BC)
+	15DB B6             OR		(HL)
+	15DC EB             EX		DE,HL
+	15DD A6             AND		(HL)
+	15DE 02             LD		(BC),A
+	15DF 05             DEC		B
+	15E0 23             INC		HL
+	15E1 13             INC		DE
+	15E2 79             LD		A,C
+	15E3 C6 06          ADD		A,6
+	15E5 4F             LD		C,A
+	15E6 23             INC		HL
+	15E7 13             INC		DE
+	15E8 23             INC		HL
+	15E9 13             INC		DE
+	15EA 23             INC		HL
+	15EB 13             INC		DE
+	15EC 23             INC		HL
+	15ED 13             INC		DE
 	15EE D9             EXX
-	15EF 10 E2          DJNZ BlitMask1of5
+	15EF 10 E2          DJNZ	BlitMask1of5
 	15F1 C9             RET
 
 .BlitMask2of5:
 	15F2 D9             EXX
-	15F3 0A             LD A,(BC)
-	15F4 A6             AND (HL)
-	15F5 EB             EX DE,HL
-	15F6 B6             OR (HL)
-	15F7 02             LD (BC),A
-	15F8 04             INC B
-	15F9 0A             LD A,(BC)
-	15FA B6             OR (HL)
-	15FB EB             EX DE,HL
-	15FC A6             AND (HL)
-	15FD 02             LD (BC),A
-	15FE 05             DEC B
-	15FF 0C             INC C
-	1600 23             INC HL
-	1601 13             INC DE
-	1602 0A             LD A,(BC)
-	1603 A6             AND (HL)
-	1604 EB             EX DE,HL
-	1605 B6             OR (HL)
-	1606 02             LD (BC),A
-	1607 04             INC B
-	1608 0A             LD A,(BC)
-	1609 B6             OR (HL)
-	160A EB             EX DE,HL
-	160B A6             AND (HL)
-	160C 02             LD (BC),A
-	160D 05             DEC B
-	160E 23             INC HL
-	160F 13             INC DE
-	1610 79             LD A,C
-	1611 C6 05          ADD A,5
-	1613 4F             LD C,A
-	1614 23             INC HL
-	1615 13             INC DE
-	1616 23             INC HL
-	1617 13             INC DE
-	1618 23             INC HL
-	1619 13             INC DE
+	15F3 0A             LD		A,(BC)
+	15F4 A6             AND		(HL)
+	15F5 EB             EX		DE,HL
+	15F6 B6             OR		(HL)
+	15F7 02             LD		(BC),A
+	15F8 04             INC		B
+	15F9 0A             LD		A,(BC)
+	15FA B6             OR		(HL)
+	15FB EB             EX		DE,HL
+	15FC A6             AND		(HL)
+	15FD 02             LD		(BC),A
+	15FE 05             DEC		B
+	15FF 0C             INC		C
+	1600 23             INC		HL
+	1601 13             INC		DE
+	1602 0A             LD		A,(BC)
+	1603 A6             AND		(HL)
+	1604 EB             EX		DE,HL
+	1605 B6             OR		(HL)
+	1606 02             LD		(BC),A
+	1607 04             INC		B
+	1608 0A             LD		A,(BC)
+	1609 B6             OR		(HL)
+	160A EB             EX		DE,HL
+	160B A6             AND		(HL)
+	160C 02             LD		(BC),A
+	160D 05             DEC		B
+	160E 23             INC		HL
+	160F 13             INC		DE
+	1610 79             LD		A,C
+	1611 C6 05          ADD		A,5
+	1613 4F             LD		C,A
+	1614 23             INC		HL
+	1615 13             INC		DE
+	1616 23             INC		HL
+	1617 13             INC		DE
+	1618 23             INC		HL
+	1619 13             INC		DE
 	161A D9             EXX
-	161B 10 D5          DJNZ BlitMask2of5
+	161B 10 D5          DJNZ	BlitMask2of5
 	161D C9             RET
 
 .BlitMask3of5:
 	161E D9             EXX
-	161F 0A             LD A,(BC)
-	1620 A6             AND (HL)
-	1621 EB             EX DE,HL
-	1622 B6             OR (HL)
-	1623 02             LD (BC),A
-	1624 04             INC B
-	1625 0A             LD A,(BC)
-	1626 B6             OR (HL)
-	1627 EB             EX DE,HL
-	1628 A6             AND (HL)
-	1629 02             LD (BC),A
-	162A 05             DEC B
-	162B 0C             INC C
-	162C 23             INC HL
-	162D 13             INC DE
-	162E 0A             LD A,(BC)
-	162F A6             AND (HL)
-	1630 EB             EX DE,HL
-	1631 B6             OR (HL)
-	1632 02             LD (BC),A
-	1633 04             INC B
-	1634 0A             LD A,(BC)
-	1635 B6             OR (HL)
-	1636 EB             EX DE,HL
-	1637 A6             AND (HL)
-	1638 02             LD (BC),A
-	1639 05             DEC B
-	163A 0C             INC C
-	163B 23             INC HL
-	163C 13             INC DE
-	163D 0A             LD A,(BC)
-	163E A6             AND (HL)
-	163F EB             EX DE,HL
-	1640 B6             OR (HL)
-	1641 02             LD (BC),A
-	1642 04             INC B
-	1643 0A             LD A,(BC)
-	1644 B6             OR (HL)
-	1645 EB             EX DE,HL
-	1646 A6             AND (HL)
-	1647 02             LD (BC),A
-	1648 05             DEC B
-	1649 23             INC HL
-	164A 13             INC DE
-	164B 79             LD A,C
-	164C C6 04          ADD A,4
-	164E 4F             LD C,A
-	164F 23             INC HL
-	1650 13             INC DE
-	1651 23             INC HL
-	1652 13             INC DE
+	161F 0A             LD		A,(BC)
+	1620 A6             AND		(HL)
+	1621 EB             EX		DE,HL
+	1622 B6             OR		(HL)
+	1623 02             LD		(BC),A
+	1624 04             INC		B
+	1625 0A             LD		A,(BC)
+	1626 B6             OR		(HL)
+	1627 EB             EX		DE,HL
+	1628 A6             AND		(HL)
+	1629 02             LD		(BC),A
+	162A 05             DEC		B
+	162B 0C             INC		C
+	162C 23             INC		HL
+	162D 13             INC		DE
+	162E 0A             LD		A,(BC)
+	162F A6             AND		(HL)
+	1630 EB             EX		DE,HL
+	1631 B6             OR		(HL)
+	1632 02             LD		(BC),A
+	1633 04             INC		B
+	1634 0A             LD		A,(BC)
+	1635 B6             OR		(HL)
+	1636 EB             EX		DE,HL
+	1637 A6             AND		(HL)
+	1638 02             LD		(BC),A
+	1639 05             DEC		B
+	163A 0C             INC		C
+	163B 23             INC		HL
+	163C 13             INC		DE
+	163D 0A             LD		A,(BC)
+	163E A6             AND		(HL)
+	163F EB             EX		DE,HL
+	1640 B6             OR		(HL)
+	1641 02             LD		(BC),A
+	1642 04             INC		B
+	1643 0A             LD		A,(BC)
+	1644 B6             OR		(HL)
+	1645 EB             EX		DE,HL
+	1646 A6             AND		(HL)
+	1647 02             LD		(BC),A
+	1648 05             DEC		B
+	1649 23             INC		HL
+	164A 13             INC		DE
+	164B 79             LD		A,C
+	164C C6 04          ADD		A,4
+	164E 4F             LD		C,A
+	164F 23             INC		HL
+	1650 13             INC		DE
+	1651 23             INC		HL
+	1652 13             INC		DE
 	1653 D9             EXX
-	1654 10 C8          DJNZ BlitMask3of5
+	1654 10 C8          DJNZ	BlitMask3of5
 	1656 C9             RET
 
 .BlitMask4of5:
 	1657 D9             EXX
-	1658 0A             LD A,(BC)
-	1659 A6             AND (HL)
-	165A EB             EX DE,HL
-	165B B6             OR (HL)
-	165C 02             LD (BC),A
-	165D 04             INC B
-	165E 0A             LD A,(BC)
-	165F B6             OR (HL)
-	1660 EB             EX DE,HL
-	1661 A6             AND (HL)
-	1662 02             LD (BC),A
-	1663 05             DEC B
-	1664 0C             INC C
-	1665 23             INC HL
-	1666 13             INC DE
-	1667 0A             LD A,(BC)
-	1668 A6             AND (HL)
-	1669 EB             EX DE,HL
-	166A B6             OR (HL)
-	166B 02             LD (BC),A
-	166C 04             INC B
-	166D 0A             LD A,(BC)
-	166E B6             OR (HL)
-	166F EB             EX DE,HL
-	1670 A6             AND (HL)
-	1671 02             LD (BC),A
-	1672 05             DEC B
-	1673 0C             INC C
-	1674 23             INC HL
-	1675 13             INC DE
-	1676 0A             LD A,(BC)
-	1677 A6             AND (HL)
-	1678 EB             EX DE,HL
-	1679 B6             OR (HL)
-	167A 02             LD (BC),A
-	167B 04             INC B
-	167C 0A             LD A,(BC)
-	167D B6             OR (HL)
-	167E EB             EX DE,HL
-	167F A6             AND (HL)
-	1680 02             LD (BC),A
-	1681 05             DEC B
-	1682 0C             INC C
-	1683 23             INC HL
-	1684 13             INC DE
-	1685 0A             LD A,(BC)
-	1686 A6             AND (HL)
-	1687 EB             EX DE,HL
-	1688 B6             OR (HL)
-	1689 02             LD (BC),A
-	168A 04             INC B
-	168B 0A             LD A,(BC)
-	168C B6             OR (HL)
-	168D EB             EX DE,HL
-	168E A6             AND (HL)
-	168F 02             LD (BC),A
-	1690 05             DEC B
-	1691 23             INC HL
-	1692 13             INC DE
-	1693 0C             INC C
-	1694 0C             INC C
-	1695 0C             INC C
-	1696 23             INC HL
-	1697 13             INC DE
+	1658 0A             LD		A,(BC)
+	1659 A6             AND		(HL)
+	165A EB             EX		DE,HL
+	165B B6             OR		(HL)
+	165C 02             LD		(BC),A
+	165D 04             INC		B
+	165E 0A             LD		A,(BC)
+	165F B6             OR		(HL)
+	1660 EB             EX		DE,HL
+	1661 A6             AND		(HL)
+	1662 02             LD		(BC),A
+	1663 05             DEC		B
+	1664 0C             INC		C
+	1665 23             INC		HL
+	1666 13             INC		DE
+	1667 0A             LD		A,(BC)
+	1668 A6             AND		(HL)
+	1669 EB             EX		DE,HL
+	166A B6             OR		(HL)
+	166B 02             LD		(BC),A
+	166C 04             INC		B
+	166D 0A             LD		A,(BC)
+	166E B6             OR		(HL)
+	166F EB             EX		DE,HL
+	1670 A6             AND		(HL)
+	1671 02             LD		(BC),A
+	1672 05             DEC		B
+	1673 0C             INC		C
+	1674 23             INC		HL
+	1675 13             INC		DE
+	1676 0A             LD		A,(BC)
+	1677 A6             AND		(HL)
+	1678 EB             EX		DE,HL
+	1679 B6             OR		(HL)
+	167A 02             LD		(BC),A
+	167B 04             INC		B
+	167C 0A             LD		A,(BC)
+	167D B6             OR		(HL)
+	167E EB             EX		DE,HL
+	167F A6             AND		(HL)
+	1680 02             LD		(BC),A
+	1681 05             DEC		B
+	1682 0C             INC		C
+	1683 23             INC		HL
+	1684 13             INC		DE
+	1685 0A             LD		A,(BC)
+	1686 A6             AND		(HL)
+	1687 EB             EX		DE,HL
+	1688 B6             OR		(HL)
+	1689 02             LD		(BC),A
+	168A 04             INC		B
+	168B 0A             LD		A,(BC)
+	168C B6             OR		(HL)
+	168D EB             EX		DE,HL
+	168E A6             AND		(HL)
+	168F 02             LD		(BC),A
+	1690 05             DEC		B
+	1691 23             INC		HL
+	1692 13             INC		DE
+	1693 0C             INC		C
+	1694 0C             INC		C
+	1695 0C             INC		C
+	1696 23             INC		HL
+	1697 13             INC		DE
 	1698 D9             EXX
-	1699 10 BC          DJNZ BlitMask4of5
+	1699 10 BC          DJNZ	BlitMask4of5
 	169B C9             RET
 
 .BlitMask5of5:
 	169C D9             EXX
-	169D 0A             LD A,(BC)
-	169E A6             AND (HL)
-	169F EB             EX DE,HL
-	16A0 B6             OR (HL)
-	16A1 02             LD (BC),A
-	16A2 04             INC B
-	16A3 0A             LD A,(BC)
-	16A4 B6             OR (HL)
-	16A5 EB             EX DE,HL
-	16A6 A6             AND (HL)
-	16A7 02             LD (BC),A
-	16A8 05             DEC B
-	16A9 0C             INC C
-	16AA 23             INC HL
-	16AB 13             INC DE
-	16AC 0A             LD A,(BC)
-	16AD A6             AND (HL)
-	16AE EB             EX DE,HL
-	16AF B6             OR (HL)
-	16B0 02             LD (BC),A
-	16B1 04             INC B
-	16B2 0A             LD A,(BC)
-	16B3 B6             OR (HL)
-	16B4 EB             EX DE,HL
-	16B5 A6             AND (HL)
-	16B6 02             LD (BC),A
-	16B7 05             DEC B
-	16B8 0C             INC C
-	16B9 23             INC HL
-	16BA 13             INC DE
-	16BB 0A             LD A,(BC)
-	16BC A6             AND (HL)
-	16BD EB             EX DE,HL
-	16BE B6             OR (HL)
-	16BF 02             LD (BC),A
-	16C0 04             INC B
-	16C1 0A             LD A,(BC)
-	16C2 B6             OR (HL)
-	16C3 EB             EX DE,HL
-	16C4 A6             AND (HL)
-	16C5 02             LD (BC),A
-	16C6 05             DEC B
-	16C7 0C             INC C
-	16C8 23             INC HL
-	16C9 13             INC DE
-	16CA 0A             LD A,(BC)
-	16CB A6             AND (HL)
-	16CC EB             EX DE,HL
-	16CD B6             OR (HL)
-	16CE 02             LD (BC),A
-	16CF 04             INC B
-	16D0 0A             LD A,(BC)
-	16D1 B6             OR (HL)
-	16D2 EB             EX DE,HL
-	16D3 A6             AND (HL)
-	16D4 02             LD (BC),A
-	16D5 05             DEC B
-	16D6 0C             INC C
-	16D7 23             INC HL
-	16D8 13             INC DE
-	16D9 0A             LD A,(BC)
-	16DA A6             AND (HL)
-	16DB EB             EX DE,HL
-	16DC B6             OR (HL)
-	16DD 02             LD (BC),A
-	16DE 04             INC B
-	16DF 0A             LD A,(BC)
-	16E0 B6             OR (HL)
-	16E1 EB             EX DE,HL
-	16E2 A6             AND (HL)
-	16E3 02             LD (BC),A
-	16E4 05             DEC B
-	16E5 23             INC HL
-	16E6 13             INC DE
-	16E7 0C             INC C
-	16E8 0C             INC C
+	169D 0A             LD		A,(BC)
+	169E A6             AND		(HL)
+	169F EB             EX		DE,HL
+	16A0 B6             OR		(HL)
+	16A1 02             LD		(BC),A
+	16A2 04             INC		B
+	16A3 0A             LD		A,(BC)
+	16A4 B6             OR		(HL)
+	16A5 EB             EX		DE,HL
+	16A6 A6             AND		(HL)
+	16A7 02             LD		(BC),A
+	16A8 05             DEC		B
+	16A9 0C             INC		C
+	16AA 23             INC		HL
+	16AB 13             INC		DE
+	16AC 0A             LD		A,(BC)
+	16AD A6             AND		(HL)
+	16AE EB             EX		DE,HL
+	16AF B6             OR		(HL)
+	16B0 02             LD		(BC),A
+	16B1 04             INC		B
+	16B2 0A             LD		A,(BC)
+	16B3 B6             OR		(HL)
+	16B4 EB             EX		DE,HL
+	16B5 A6             AND		(HL)
+	16B6 02             LD		(BC),A
+	16B7 05             DEC		B
+	16B8 0C             INC		C
+	16B9 23             INC		HL
+	16BA 13             INC		DE
+	16BB 0A             LD		A,(BC)
+	16BC A6             AND		(HL)
+	16BD EB             EX		DE,HL
+	16BE B6             OR		(HL)
+	16BF 02             LD		(BC),A
+	16C0 04             INC		B
+	16C1 0A             LD		A,(BC)
+	16C2 B6             OR		(HL)
+	16C3 EB             EX		DE,HL
+	16C4 A6             AND		(HL)
+	16C5 02             LD		(BC),A
+	16C6 05             DEC		B
+	16C7 0C             INC		C
+	16C8 23             INC		HL
+	16C9 13             INC		DE
+	16CA 0A             LD		A,(BC)
+	16CB A6             AND		(HL)
+	16CC EB             EX		DE,HL
+	16CD B6             OR		(HL)
+	16CE 02             LD		(BC),A
+	16CF 04             INC		B
+	16D0 0A             LD		A,(BC)
+	16D1 B6             OR		(HL)
+	16D2 EB             EX		DE,HL
+	16D3 A6             AND		(HL)
+	16D4 02             LD		(BC),A
+	16D5 05             DEC		B
+	16D6 0C             INC		C
+	16D7 23             INC		HL
+	16D8 13             INC		DE
+	16D9 0A             LD		A,(BC)
+	16DA A6             AND		(HL)
+	16DB EB             EX		DE,HL
+	16DC B6             OR		(HL)
+	16DD 02             LD		(BC),A
+	16DE 04             INC		B
+	16DF 0A             LD		A,(BC)
+	16E0 B6             OR		(HL)
+	16E1 EB             EX		DE,HL
+	16E2 A6             AND		(HL)
+	16E3 02             LD		(BC),A
+	16E4 05             DEC		B
+	16E5 23             INC		HL
+	16E6 13             INC		DE
+	16E7 0C             INC		C
+	16E8 0C             INC		C
 	16E9 D9             EXX
-	16EA 10 B0          DJNZ BlitMask5of5
+	16EA 10 B0          DJNZ	BlitMask5of5
 	16EC C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -4380,7 +4382,7 @@ Sound_ID_Teleport_Down		EQU 	&C8 		;; Teleport down
 .DrawPillarBuf:
 	16FE F5             PUSH 	AF											;; preserve A
 	16FF 21 98 B8       LD		HL,PillarBuf + MOVE_OFFSET
-	1702 01 28 01       LD		BC,296										;; Erase from &B898 length &0128 (296) bytes ; 296 = 32 (btm) + 72 (top) + 4*48 (a max of 4 mid part)
+	1702 01 28 01       LD		BC,PILLARBUF_LENGTH							;; Erase from &B898 length &0128 (296) bytes ; 296 = 32 (btm) + 72 (top) + 4*48 (a max of 4 mid part)
 	1705 CD 67 24       CALL 	Erase_forward_Block_RAM						;; clear pillar buffer
 	1708 AF             XOR 	A
 	1709 32 C0 1A       LD		(IsPillarBufFlipped),A						;; reset Flip bit
@@ -4390,7 +4392,7 @@ Sound_ID_Teleport_Down		EQU 	&C8 		;; Teleport down
 	1711 A7             AND 	A											;; test
 	1712 C8             RET 	Z											;; if 0 (height of 0) RET Z set, else:
 	;; Otherwise, draw in reverse from end of buffer PillarBuf...
-	1713 11 BF B9       LD		DE,PillarBuf+296 - 1 + MOVE_OFFSET			;; PillarBuf + PillarBufLen - 1 (B9A0 to B9BF)
+	1713 11 BF B9       LD		DE,PillarBuf+PILLARBUF_LENGTH - 1 + MOVE_OFFSET			;; PillarBuf + PillarBufLen - 1 (B9A0 to B9BF)
 	1716 21 97 B8       LD		HL,image_pillar_btm+32 - 1 + MOVE_OFFSET	;; image_pillar_btm + 4 * 4 - 1 (last byte of image_pillar_btm) (B878 to B897)
 	1719 01 20 00       LD		BC,32										;; length in bytes : 32 = 4 * 4 * 2
 	171C ED B8          LDDR												;; Copy Pillar Bottom in pillar buffer
@@ -4865,7 +4867,7 @@ hasPillarUnderDoor:
 	194A E5             PUSH 	HL
 	194B C5             PUSH 	BC
 	194C D5             PUSH 	DE
-	194D 01 28 01       LD		BC,296										;; Erase block of &0128 bytes
+	194D 01 28 01       LD		BC,PILLARBUF_LENGTH							;; Erase block of &0128 bytes
 	1950 CD 67 24       CALL 	Erase_forward_Block_RAM
 	1953 D1             POP 	DE
 	1954 C1             POP 	BC
@@ -5737,7 +5739,7 @@ unext_3:
 .PutXExtent:
 	1CD0 7D             LD		A,L									;; Round L up
 	1CD1 C6 03          ADD 	A,&03								;; &03
-	1CD3 E6 FC          AND 	&FC									;; align on a mult of 4 value (bits[1:0] = 2b00)
+	1CD3 E6 FC          AND 	&FC									;; trunc value on a mult of 4 (bits[1:0] = 2b00)
 	1CD5 6F             LD		L,A
 	1CD6 7C             LD		A,H
 	1CD7 E6 FC          AND 	&FC									;; ~&03 ; Round H down
@@ -6386,7 +6388,7 @@ GROUND_LEVEL			EQU 	&C0
 	1F38 01 04 00       LD		BC,4										;; ... (4 doors : nw ne se sw)
 	1F3B ED B0          LDIR												;; repeat LD (DE),(HL); DE++, HL++, BC-- until BC=0
 	1F3D 21 00 6A       LD		HL,BackgrdBuff								;; BackgrdBuff buffer
-	1F40 01 40 00       LD		BC,&0040									;; BackgrdBuff Len ; erase &0040 (64) bytes from &6A00
+	1F40 01 40 00       LD		BC,BACKGRDBUFF_LENGTH						;; BackgrdBuff Len ; erase &0040 (64) bytes from &6A00
 	1F43 CD 67 24       CALL 	Erase_forward_Block_RAM						;; Erase BackgrdBuff buffer
 	1F46 CD D0 22       CALL 	DoConfigWalls								;; do Walls
 	1F49 CD D8 21       CALL 	HasFloorAbove								;; check if Floor Above (Carry set = no Floor Above)
@@ -7519,6 +7521,7 @@ Jump_Height:
 	2491 02 			DEFB 	&02							;; TickTock; Phase for moving
 
 ;; -----------------------------------------------------------------------------------------------------------
+SR_LENGTH_BLOCK3		EQU		&0019
 .SaveRestore_Block3:										;; Save/Restore Block 3 : &19 (25 bytes)
 .Restored_if_death_block:									;; 5 values in buffer BB31 will be restored here when dying
 saved_room_access_code:
@@ -10973,6 +10976,7 @@ ObjVars_reset_data:
 ;;		A: SWdoor (right/nearside), SWdoor (left/farside), SEdoor (left/nearside), SEdoor (right/farside), end
 ;; -----------------------------------------------------------------------------------------------------------
 
+SR_LENGTH_BLOCK2		EQU		&001D
 .SaveRestore_Block2:											;; Save/Restore block 2 : &1D (29 bytes)
 .ObjListIdx:													;; The index into ObjectLists.
 	39A2 00 			DEFB 	&00								;; list index
@@ -13286,7 +13290,7 @@ Draw_sprite_3x32:
 ;; Clear the 6800 buffer
 .Clear_Dest_buffer:
 	464E 21 00 68       LD		HL,DestBuff
-	4651 01 00 01       LD		BC,&0100									;; erase 256 bytes (&0100) from &6800
+	4651 01 00 01       LD		BC,BUFFER_LENGTH							;; erase 256 bytes (&0100) from &6800
 	4654 C3 67 24       JP		Erase_forward_Block_RAM						;; Continue on Erase_forward_Block_RAM (will have a RET)
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -14583,7 +14587,7 @@ dsc_loop:
 JUSTIF_2LEFT_NOLEAD0	EQU		&00 * WORD_HIGH_BYTE + &FE				;; 2 digits Left aligned, No leading "0" (but if 0 print "0 ")
 JUSTIF_2RIGHT_NOLEAD0	EQU		&FF * WORD_HIGH_BYTE + &FE				;; 2 digits Right aligned (Pad with spaces), No leading "0" (but if 0 print " 0")
 JUSTIF_4LEFT_NOLEAD0	EQU		&00 * WORD_HIGH_BYTE + &F8				;; 4 digits Left aligned, No leading "0" (but if 0 print "0 ")
-DIGIT2ASCII				EQU		&30
+DIGIT2ASCII				EQU		&30										;; "0" -> &30, etc.
 SPACE_CHAR				EQU		&20										;; " "
 
 .Print_4Digits_LeftAligned:
@@ -14681,21 +14685,21 @@ ObjFnTeleport:
 	4C25 C3 91 0D       JP		Play_Sound	 								;; will RET
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; Function OBJFN_CANNONBALL &24 associated to the ObjDefns object &3C :
+;; Function OBJFN_CANNONBALL &24 associated to the ObjDefns object function &3C :
 ;; Cannon Balls (Sprite SPR_BALL) in the Victory room.
-;; It launches a new Cannon ball when delay_CannonBall reaches 0 and
+;; It launches a new Cannon ball when delayCannonBall reaches 0 and
 ;; resets it to &60, so that, as long as a Cannon Ball exists,
-;; delay_CannonBall won't be able to be 0, thus preventing the
+;; delayCannonBall won't be able to be 0, thus preventing the
 ;; Game_over in Victory_Room.
 ;; A launched cannon ball will have the behaviour of a fired Donut
 ;; (function id &19) and will get destroyed. When all Cannon Balls in
-;; the Victory room have been destroyed, delay_CannonBall will reach
+;; the Victory room have been destroyed, delayCannonBall will reach
 ;; 0 and the Victory room celebration will end and go to Game_over.
-delay_CannonBall:
-	4C28 60				DEFB 	DELAY_CANNONBALL							;; delay_CannonBall &60 by default, receives &40 at init, then &60 in ObjFnCannonFire
+delayCannonBall:
+	4C28 60				DEFB 	DELAY_CANNONBALL							;; delayCannonBall &60 by default, receives &40 at init, then &60 in ObjFnCannonFire
 
 ObjFnCannonFire:
-	4C29 21 28 4C       LD		HL,delay_CannonBall							;; delay_CannonBall
+	4C29 21 28 4C       LD		HL,delayCannonBall
 	4C2C 7E             LD		A,(HL)										;; read value
 	4C2D A7             AND 	A											;; and test
 	4C2E C0             RET 	NZ											;; if not 0 leave; else:
@@ -16026,36 +16030,41 @@ Room_List2:   ;; 71 more rooms
 ;; -----------------------------------------------------------------------------------------------------------
 ;; This block is not generated by DEFS, but instead by moving data 6600-AD8F to 70D8-B897 at init
 ;; hence leaving this memory area available for buffering:
+BUFFER_LENGTH		EQU		256
 BlitBuff:
-	6600		DEFS 	256				;; Table of values used by the blit routines (BlitScreen)
+	6600			DEFS 	BUFFER_LENGTH			;; Table of values used by the blit routines (BlitScreen)
 ViewBuff:
-	6700		DEFS 	256				;; buffer
+	6700			DEFS 	BUFFER_LENGTH			;; buffer
 DestBuff:
-	6800		DEFS 	256				;; buffer
+	6800			DEFS 	BUFFER_LENGTH			;; buffer
 RevTable:
-	6900		DEFS 	256				;; Table of values used by
+	6900			DEFS 	BUFFER_LENGTH			;; Table of values used by
+
+BACKGRDBUFF_LENGTH	EQU		64
 BackgrdBuff:
-	6A00		DEFS 	64				;; data???
-.SaveRestore_Block4:					;; Save/Restore Block 4 : &3F0 bytes (1008 = 56 x 18, each Object is 18 byte-long)
+	6A00			DEFS 	BACKGRDBUFF_LENGTH		;; data???
+
+SR_LENGTH_BLOCK4	EQU		&03F0
+.SaveRestore_Block4:								;; Save/Restore Block 4 : &3F0 bytes (1008 = 56 x 18, each Object is 18 byte-long)
 ObjectsBuffer:
-	6A40		DEFS 	&3F0			;; Objects buffer
+	6A40			DEFS 	SR_LENGTH_BLOCK4		;; Objects buffer
 .SaveRestore_Block4_end
 TODO_6E30:
-	6E30		DEFS 	&190 			;; ???
+	6E30			DEFS 	&190 					;; ???
 BlitRot_Buffer:
 KeyScanningBuffer:
-	6FC0		DEFS 	10				;; Buffer (key scanning)
-	6FCA		DEFS 	&10E
+	6FC0			DEFS 	10						;; Buffer (key scanning)
+	6FCA			DEFS 	&10E
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Again, everything below this point has been moved by &0AD8 at init (new 70D8 was placed at 6600 at loading before Entry).
 
-				org 	&6600		;; below data placed at 6600 at loading but is moved at 70D8 at init
+					org 	&6600		;; below data placed at 6600 at loading but is moved at 70D8 at init
 
 .PanelFlips:
-	70D8 		DEFS	8, &00
+	70D8 			DEFS	8, &00
 .SpriteFlips_buffer:													;; flipped sprite ; Bitmap of whether the nth sprite is store in flipped format.
-	70E0 		DEFS 	16, &00
+	70E0 			DEFS 	16, &00
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Sprites Data : Size, start addr
@@ -21663,9 +21672,10 @@ floor_tile_pattern7: 				;; Empty tile
 .end_moved_block:
 
 ;; -----------------------------------------------------------------------------------------------------------
-PillarBuf:								;; &0128 (296) bytes
+PILLARBUF_LENGTH		EQU		296		;; &0128 (296) bytes
+PillarBuf:
 	;; (top: 4*4 + mid: 4*6 + btm: 4*9) * 2 ("img+mask") = 296 bytes
-	B898				DEFS 	296
+	B898				DEFS 	PILLARBUF_LENGTH
 
 DoorwayBuf:								;; &0150 (336 = 2 * 168 bytes)
 DoorwayImgBuf:							;; &00A8 (168) bytes (3*56 (img L+R))
