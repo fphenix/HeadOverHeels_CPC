@@ -386,7 +386,7 @@ move_loaded_data_section
 	0295 ED B8          LDDR
 erase_buffer_6800
 	0297 21 00 4E       LD HL,DestBuff
-	029A 01 00 01       LD BC,&0100				;; length
+	029A 01 00 01       LD BC,BUFFER_LENGTH
 	029D CD A8 1B       CALL Erase_forward_Block_RAM
 	02A0 CD C8 06       CALL clr_screen
 	02A3 3E 08          LD A,COLOR_SCHEME_ALLBLACK
@@ -2963,7 +2963,7 @@ BlitMask5of5
 DrawPillarBuf
 	0F23 F5             PUSH AF
 	0F24 21 68 B7       LD HL,PillarBuf + MOVE_OFFSET ;; B768
-	0F27 01 28 01       LD BC,&0128 ;; 296
+	0F27 01 28 01       LD BC,PILLARBUF_LENGTH
 	0F2A CD A8 1B       CALL Erase_forward_Block_RAM
 	0F2D AF             XOR A
 	0F2E 32 EE 12       LD (IsPillarBufFlipped),A
@@ -2972,7 +2972,7 @@ DrawPillarBuf
 	0F35 F1             POP AF
 	0F36 A7             AND A
 	0F37 C8             RET Z
-	0F38 11 8F B8       LD DE,PillarBuf + 296 - 1 + MOVE_OFFSET
+	0F38 11 8F B8       LD DE,PillarBuf + PILLARBUF_LENGTH - 1 + MOVE_OFFSET
 	0F3B F5             PUSH AF
 	0F3C CD 5A 0F       CALL drawPillarBtm
 drawPillarLoop
@@ -3392,7 +3392,7 @@ hasPillarUnderDoor:
 	1178 E5             PUSH HL
 	1179 C5             PUSH BC
 	117A D5             PUSH DE
-	117B 01 28 01       LD BC,&0128
+	117B 01 28 01       LD BC,PILLARBUF_LENGTH
 	117E CD A8 1B       CALL Erase_forward_Block_RAM
 	1181 D1             POP DE
 	1182 C1             POP BC
@@ -5506,7 +5506,7 @@ EnterRoom
 	1B13 CD 96 1B       CALL Reinitialise
 	1B16 D6 1B          DEFW reset_stat			;; reset some sta like jump height, isStill, etc.
 	1B18 21 00 50       LD HL,BackgrdBuff
-	1B1B 01 40 00       LD BC,&0040
+	1B1B 01 40 00       LD BC,BACKGRDBUFF_LENGTH
 	1B1E CD A8 1B       CALL Erase_forward_Block_RAM
 	1B21 D9             EXX
 	1B22 CD 1D 17       CALL BuildRoom
@@ -5873,7 +5873,7 @@ lose_a_life
 	1C8F D6 01          SUB 1					;; Infinite lives : POKE &1C90,0
 	1C91 27             DAA
 	1C92 77             LD (HL),A
-	1C93 DC E5 1C       CALL c,&1CE5
+	1C93 DC E5 1C       CALL c,NoMoreLives
 	1C96 21 E7 1B       LD HL,EntryPosition_uvz
 	1C99 11 EF 1B       LD DE,Batman_variables+O_U
 	1C9C 01 03 00       LD BC,&0003
@@ -5907,12 +5907,14 @@ CharThing20
 	1CE2 C3 4F 03       JP Set_pen3_only		;; This will blink the colors when dying
 
 ;; -----------------------------------------------------------------------------------------------------------
+;; when no more lives, randomly give onke Bonus life (25% of the time), else Game over.
+NoMoreLives
 	1CE5 36 00          LD (HL),0
 	1CE7 CD 9B 36       CALL Random_gen
 	1CEA 7D             LD A,L
-	1CEB E6 03          AND &03
+	1CEB E6 03          AND &03					;; "POKE &1CEC,0" to give an extra life 100% of the time (instead of 25%)
 	1CED C2 17 01       JP NZ,Game_over
-	1CF0 C3 22 25       JP &2522
+	1CF0 C3 22 25       JP GiveOneMoreLife
 
 ;; -----------------------------------------------------------------------------------------------------------
 ;; Looks like more movement stuff
@@ -7248,6 +7250,7 @@ Batcraft_complete_screen:
 	251F C3 BE 24       JP Batman_Walking_animation
 
 ;; -----------------------------------------------------------------------------------------------------------
+GiveOneMoreLife
 	2522 CD 4D 0A       CALL Play_Batman_Theme
 	2525 3E 0A          LD A,10
 	2527 CD 5D 03       CALL Set_colors
@@ -10341,7 +10344,7 @@ Draw_sprite_3x32:
 ;; Clear the 6800 buffer
 .Clear_Dest_buffer:
 	380D 21 00 4E       LD HL,DestBuff
-	3810 01 00 01       LD BC,&0100
+	3810 01 00 01       LD BC,BUFFER_LENGTH
 	3813 C3 A8 1B       JP Erase_forward_Block_RAM
 
 ;; -----------------------------------------------------------------------------------------------------------
@@ -12521,20 +12524,24 @@ Room_list: ;; 151 rooms
 
 	org &4c00		;; (will be overridden at build, this space is freed at init when data is moved further)
 
+BUFFER_LENGTH			EQU		256
 BlitBuff:
-	4C00 				DEFS	256, 0
+	4C00 				DEFS	BUFFER_LENGTH, 0
 ViewBuff
-	4D00 	            DEFS	256, 0
+	4D00 	            DEFS	BUFFER_LENGTH, 0
 DestBuff
-	4E00 				DEFS	256, 0
+	4E00 				DEFS	BUFFER_LENGTH, 0
 RevTable
-	4F00 				DEFS	256, 0
-BackgrdBuff
-	5000				DEFS 	64
+	4F00 				DEFS	BUFFER_LENGTH, 0
 
+BACKGRDBUFF_LENGTH		EQU		64
+BackgrdBuff
+	5000				DEFS 	BACKGRDBUFF_LENGTH
+
+SR_BLOCK4_LENGTH		EQU		&03F0
 SaveRestore_Block4
 ObjectsBuffer
-	5040				DEFS 	&3F0
+	5040				DEFS 	SR_BLOCK4_LENGTH
 TODO_6E30
 	5430				DEFS 	&190 			;; ???
 
@@ -19400,8 +19407,9 @@ img_pillar_btm
 end_moved_block
 
 ;; -----------------------------------------------------------------------------------------------------------
+PILLARBUF_LENGTH	EQU	296
 PillarBuf
-	B768 DEFS 296
+	B768 DEFS PILLARBUF_LENGTH
 
 DoorwayBuf
 DoorwayImgBuf
