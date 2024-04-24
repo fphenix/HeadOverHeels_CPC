@@ -4498,7 +4498,7 @@ dbg_2:
 ;;   HL  - Pointer to BackgrdBuff array entry:
 ;;           Byte 0: Y of wall bottom (0 = clear)
 ;;           Byte 1: Id for wall panel sprite
-;;                   (0-3 - world-specific, 4 - Pillar, 5 - blank, | &80 to flip)
+;;                   (0-3: world-specific, 4: Pillar, 5: Blank, | &80 to flip)
 ;; Note that the Y coordinates are downward-increasing, matching memory.
 ;; The basic walls are 56 pixels high
 SHORT_WALL     			EQU 	56				;; &38
@@ -5019,20 +5019,23 @@ clr2_1:
 	19E8 E0 B4 			DEFW 	floor_tile_pattern1 + MOVE_OFFSET			;; default = floor_tile_pattern1 + MOVE_OFFSET
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; HL' points to the floor sprite id.
-;; If it's floor tile 5, we return a blank floor tile (no floor).
-;; Otherwise we return the current tile address pointer, plus an
+;; HL' points to the background data.
+;; If background wall tile ID is 5 (note: a 7 would also trigger) then
+;; we return a Blank floor tile (no floor under wall).
+;;   Reminder: Byte 1 of Background buffer = Id for wall panel sprite:
+;;			(0-3: world-specific, 4: Pillar, 5: Blank, | &80 to flip)
+;; Otherwise we return the current floor tile address pointer, plus an
 ;; offset C (0 or 2*8), in BC.
 .GetFloorAddr:
 	19EA F5             PUSH 	AF
-	19EB D9             EXX													;; get HL' (pointer on the floor sprite ID in the 6A?? buffer)
-	19EC 7E             LD		A,(HL)										;; get floor sprite ID
-	19ED F6 FA          OR		&FA											;; ~5; test if floor sprite ID = 5 (&FA or &05 + 1 = 0)
-	19EF 3C             INC 	A											;; If the wall sprite id is 5 (space) then A = 0 (Zero flag set) at this point
-	19F0 D9             EXX													;; Restore not prime 16b reg
-	19F1 28 0C          JR		Z,Blank_Tile								;; Floor tile ID 5 = No floor, else:
-	19F3 79             LD		A,C											;; else:
-	19F4 ED 4B E8 19    LD		BC,(FloorAddr)								;; get the floor_tile_pattern<n> pointer
+	19EB D9             EXX													;; get HL' (pointer on the background data in the 6Axx buffer)
+	19EC 7E             LD		A,(HL)										;; get wall ID
+	19ED F6 FA          OR		&FA											;; ~5; test if wall tile ID = 5 (&FA OR &05 + 1 = 0)
+	19EF 3C             INC 	A											;; If the wall id is 5 (Blank) then A = 0 (Zero flag set) at this point
+	19F0 D9             EXX													;; Restore "not prime" 16b reg
+	19F1 28 0C          JR		Z,Blank_Tile								;; Wall tile ID = 5 : use "Blank Tile" floor,
+	19F3 79             LD		A,C											;; else, get the Floor Tile to use:
+	19F4 ED 4B E8 19    LD		BC,(FloorAddr)								;; get the Floor tile floor_tile_pattern<n> pointer
 	19F8 81             ADD 	A,C											;; Add old C to FloorAddr and return in BC.
 	19F9 4F             LD		C,A
 	19FA 88             ADC		A,B
@@ -5042,7 +5045,7 @@ clr2_1:
 	19FE C9             RET
 
 ;; -----------------------------------------------------------------------------------------------------------
-;; Use the empty floor tile (no floor) if floor sprite ID = 5
+;; Use the empty floor tile (no floor) if floor sprite ID = 5 or 7
 .Blank_Tile:
 	19FF 01 00 B6       LD		BC,floor_tile_pattern7 + MOVE_OFFSET		;; IMG_2x24 + 7 * &30
 	1A02 F1             POP 	AF
